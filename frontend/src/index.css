@@ -1,0 +1,30 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-night-base text-fog-headline font-sans;
+  }
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { @apply bg-night-base; }
+  ::-webkit-scrollbar-thumb { @apply bg-night-hover rounded-full; }
+  ::-webkit-scrollbar-thumb:hover { @apply bg-mercury; }
+}
+
+@layer components {
+  .custom-gradient-border { position: relative; }
+  .custom-gradient-border::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(135deg, rgba(82, 102, 235, 0.45), rgba(255, 255, 255, 0.05));
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+}

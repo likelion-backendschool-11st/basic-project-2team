@@ -1,0 +1,36 @@
+export const ROUTES = {
+  home: '/',
+  homeLoggedIn: '/home',
+  board: '/board',
+  postWrite: '/board/write',
+  postDetail: '/board/:postId',
+  search: '/search',
+  notifications: '/notifications',
+  myPage: '/mypage',
+  profileEdit: '/mypage/profile',
+  passwordChange: '/mypage/password',
+  withdraw: '/mypage/withdraw',
+  review: '/review',
+  login: '/login',
+  signup: '/signup',
+  signupComplete: '/signup/complete',
+  findId: '/find-id',
+  findPassword: '/find-password',
+  admin: '/admin',
+  adminReports: '/admin/reports',
+  adminReportDetail: '/admin/reports/:reportId',
+  adminPosts: '/admin/posts',
+  adminPostDetail: '/admin/posts/:postId',
+  adminMembers: '/admin/members',
+  adminMemberDetail: '/admin/members/:memberId',
+  adminComments: '/admin/comments',
+  adminHistory: '/admin/history',
+} as const;
+
+/** Concrete URLs for the parameterised routes above. */
+export const paths = {
+  postDetail: (postId: string) => `/board/${postId}`,
+  adminReportDetail: (reportId: string) => `/admin/reports/${reportId}`,
+  adminPostDetail: (postId: string) => `/admin/posts/${postId}`,
+  adminMemberDetail: (memberId: string) => `/admin/members/${memberId}`,
+} as const;
