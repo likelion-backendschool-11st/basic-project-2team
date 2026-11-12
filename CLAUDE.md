@@ -28,7 +28,7 @@
 ### 현재 상태
 
 - 현재 저장소에는 **프론트엔드(`frontend/`)만** 존재합니다. 모든 화면은 `src/data/*.ts`의 **목(mock) 데이터**로 동작하며 실제 API 호출은 없습니다.
-- 백엔드는 아직 구현 전입니다. [API 정의서](./API_SPEC.md)는 화면·데이터 모델을 기준으로 정리한 **초안**이며, 백엔드 구현 시 이 문서를 함께 갱신합니다.
+- 백엔드는 아직 구현 전입니다. [API 정의서](./docs/API_SPEC.md)는 화면·데이터 모델을 기준으로 정리한 **초안**이며, 백엔드 구현 시 이 문서를 함께 갱신합니다.
 - 화면 디자인은 Google Stitch 시안을 기반으로 합니다(각 data 파일 상단 주석에 Stitch 화면명/ID 표기).
 
 ---
@@ -89,15 +89,15 @@ frontend/
 
 | 문서 | 내용 |
 | --- | --- |
-| [CODING_CONVENTION.md](./CODING_CONVENTION.md) | 아키텍처 원칙, 라우팅, 네이밍, TypeScript·React·Tailwind 규칙, 포맷, Git 컨벤션 |
-| [API_SPEC.md](./API_SPEC.md) | 공통 규칙(응답 포맷·인증·페이지네이션·상태 코드)과 도메인별 API 엔드포인트 (초안) |
+| [CODING_CONVENTION.md](./docs/CODING_CONVENTION.md) | 아키텍처 원칙, 라우팅, 네이밍, TypeScript·React·Tailwind 규칙, 포맷, Git 컨벤션 |
+| [API_SPEC.md](./docs/API_SPEC.md) | 공통 규칙(응답 포맷·인증·페이지네이션·상태 코드)과 도메인별 API 엔드포인트 (초안) |
 
 ---
 
 ## 4. Claude 작업 시 참고 사항
 
-- 코드를 작성·수정하기 전에 [CODING_CONVENTION.md](./CODING_CONVENTION.md) 를 읽고 규칙을 따릅니다.
+- 코드를 작성·수정하기 전에 [CODING_CONVENTION.md](./docs/CODING_CONVENTION.md) 를 읽고 규칙을 따릅니다.
 - 새 기능을 만들 때 기존 같은 도메인의 `data/` → `hooks/` → `components/` → `pages/` 파일을 먼저 읽고 패턴을 맞춥니다.
-- 목 데이터를 실제 API로 교체할 때는 [API_SPEC.md](./API_SPEC.md) 를 기준으로 하고, `data/` 의 타입 정의를 API 응답 타입으로 재사용하며, 목 상수는 연동이 끝난 뒤 제거합니다.
-- API 스펙을 바꾸면 [API_SPEC.md](./API_SPEC.md) 도 함께 수정합니다.
+- 목 데이터를 실제 API로 교체할 때는 [API_SPEC.md](./docs/API_SPEC.md) 를 기준으로 하고, `data/` 의 타입 정의를 API 응답 타입으로 재사용하며, 목 상수는 연동이 끝난 뒤 제거합니다.
+- API 스펙을 바꾸면 [API_SPEC.md](./docs/API_SPEC.md) 도 함께 수정합니다.
 - 변경 후 `frontend/` 에서 `npm run build` 와 `npm run lint` 를 실행해 확인합니다.
