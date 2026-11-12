@@ -39,7 +39,7 @@
 
 | 항목 | 버전 / 내용 |
 | --- | --- |
-| 런타임 | Node.js 18+ (권장 20 LTS), npm |
+| 런타임 | Node.js 26 (팀 기준 v26.13.1), npm 11 |
 | 언어 | TypeScript ~5.6 (`strict: true`, `noUnusedLocals`, `noUnusedParameters`) |
 | 프레임워크 | React 18.3 |
 | 빌드 도구 | Vite 5.4 (`@vitejs/plugin-react`) |
@@ -93,6 +93,7 @@ frontend/
 | [API_SPEC.md](./docs/API_SPEC.md) | 공통 규칙(응답 포맷·인증·페이지네이션·상태 코드)과 도메인별 API 엔드포인트 (초안) |
 | [02-requirements.md](./docs/02-requirements.md) | 요구사항 명세 (Notion 「요구 사항 명세」 내보내기를 분류별 표로 정리) |
 | [03-db-design.md](./docs/03-db-design.md) | MySQL 8 테이블 설계안 — 컬럼, 관계, 인덱스, 삭제 정책, 확정 필요 가정 (초안) |
+| [04-erd.md](./docs/04-erd.md) | 03 설계안을 옮긴 ERD (Mermaid) — 전체 관계도, 도메인별 상세 ERD, FK 목록과 삭제 동작 |
 
 ---
 
