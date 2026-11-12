@@ -39,7 +39,7 @@ export function useSelection() {
   const [selected, setSelected] = useState<ReadonlySet<number>>(new Set());
   return {
     selected,
-    toggle: (id: number) => setSelected((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; }),
+    toggle: (id: number) => setSelected((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; }),
     setAll: (ids: readonly number[], on: boolean) => setSelected((s) => { const n = new Set(s); ids.forEach((i) => (on ? n.add(i) : n.delete(i))); return n; }),
     clear: () => setSelected(new Set()),
   };

@@ -53,7 +53,7 @@ export function useWriteForm() {
 
   const summary = [
     labelOf(detailChoices, draft.detail).replace(/^어둠군단장 /, ''),
-    `${draft.headcount}명 모집(${draft.headcount + 1}인)`,
+    `${draft.headcount}인 파티(${draft.headcount - 1}명 모집)`,
     draft.voice ? '마이크 필수' : '마이크 선택',
   ].join(' • ');
 

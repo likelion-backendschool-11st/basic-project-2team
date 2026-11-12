@@ -50,7 +50,7 @@ export const writeText = {
   type: '모집 유형',
   detail: '상세 분류 (보스/던전명)',
   headcount: '모집 인원',
-  headcountNote: '작성자를 제외한 필요한 파티원 수를 설정하세요',
+  headcountNote: '작성자를 포함한 전체 파티 인원을 설정하세요',
   style: '선호 플레이 스타일',
   schedule: '플레이 일정',
   scheduleTbd: '일정 미정',
@@ -79,12 +79,13 @@ export const detailChoices: readonly SelectOption[] = [
   { value: 'illiakan', label: '일리아칸 (하드)' },
 ];
 
-/** Selectable party sizes (the slider snaps to these). */
+/** Selectable party sizes including the author (the slider snaps to these). Range 2~16. */
 export const headcounts: readonly { readonly value: number; readonly label: string }[] = [
-  { value: 1, label: '1명' },
+  { value: 2, label: '2명 (듀오)' },
   { value: 4, label: '4명' },
-  { value: 7, label: '7명 (선택)' },
+  { value: 5, label: '5명' },
   { value: 8, label: '8명 (풀파티)' },
+  { value: 16, label: '16명' },
 ];
 
 export const styleChoices: readonly StyleOption[] = [
@@ -121,7 +122,7 @@ export const initialDraft = {
   game: 'lostark',
   type: 'raid',
   detail: 'kamen',
-  headcount: 7,
+  headcount: 8,
   style: 'hard',
   tbd: true,
   date: '2024-05-17',

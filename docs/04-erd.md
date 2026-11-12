@@ -14,7 +14,7 @@
 | `\|\|--o\|` | 1 : 0..1 |
 | `PK` / `FK` / `UK` | 기본키 / 외래키 / UNIQUE |
 
-- `bigint`는 모두 `BIGINT UNSIGNED`, `int`·`tinyint`는 `UNSIGNED`입니다.
+- `bigint`는 모두 `BIGINT UNSIGNED`, `int`·`smallint`·`tinyint`는 `UNSIGNED`입니다. 예외는 설명에 `signed`로 표시했습니다.
 - 모든 테이블에 있는 공통 컬럼 `created_at`, `updated_at`은 다이어그램에서 생략했습니다.
 - 다른 절에서 자세히 그린 테이블은 `id`만 적고 "참고"로 표시했습니다.
 - 복합 UNIQUE, CHECK 제약은 Mermaid로 표현할 수 없어서 컬럼 설명에 적었습니다.
@@ -31,6 +31,7 @@ erDiagram
     member ||--o{ member_game_profile : ""
     member ||--o{ password_reset_token : ""
     member ||--o{ refresh_token : ""
+    member ||--o{ activity_point_log : ""
 
     category ||--o{ game : ""
     game ||--o{ game_content : ""
@@ -91,23 +92,26 @@ erDiagram
     game ||--o{ member_game_profile : "대상 게임"
     member ||--o{ password_reset_token : "비밀번호 재설정"
     member ||--o{ refresh_token : "로그인 유지"
+    member ||--o{ activity_point_log : "활동 점수"
 
     member {
         bigint id PK
-        varchar(20) login_id UK "탈퇴 시 NULL"
+        varchar(20) login_id UK "영문 소문자·숫자 4~20자, 탈퇴 시 NULL"
         varchar(100) password_hash "BCrypt"
         varchar(10) nickname UK "탈퇴 시 NULL"
         varchar(100) email UK "탈퇴 시 NULL"
         varchar(20) phone UK "하이픈 없이 저장"
-        varchar(50) name
+        varchar(50) name "선택 입력"
         varchar(10) age_range
         boolean age_range_public "기본 TRUE"
         varchar(200) bio
         varchar(500) avatar_url
         varchar(20) status "ACTIVE / WARNED / SUSPENDED / BANNED / WITHDRAWN"
         datetime suspended_until
-        decimal manner_temp "DECIMAL(4,1), 기본 36.5"
+        decimal manner_temp "DECIMAL(4,1), 기본 36.5, 범위 0.0~99.9"
         int review_count "기본 0"
+        int activity_point "누적 활동 점수, 기본 0"
+        smallint level "서비스 활동 레벨 1~99, 기본 1"
         tinyint login_fail_count "기본 0"
         datetime locked_until
         datetime last_login_at
@@ -128,7 +132,7 @@ erDiagram
         bigint game_id FK
         boolean is_main "대표 게임"
         varchar(30) character_name
-        json character_info "게임별 레벨, 티어 등"
+        json character_info "게임별 캐릭터 레벨, 티어 등"
         varchar(50) play_time_slot
         varchar(20) play_style
     }
@@ -162,6 +166,14 @@ erDiagram
         datetime verified_at
     }
 
+    activity_point_log {
+        bigint id PK
+        bigint member_id FK "UQ(member_id, action_type, ref_id)"
+        varchar(30) action_type "POST_CREATE / COMMENT_CREATE / REVIEW_WRITE / PARTY_COMPLETE / POST_REVOKE / COMMENT_REVOKE"
+        bigint ref_id "FK 없음. post / comment / review의 id"
+        int point "지급은 양수, 회수는 음수 (signed)"
+    }
+
     member_withdrawal {
         bigint id PK
         bigint member_id "FK 없음, 보관용 사본"
@@ -169,7 +181,7 @@ erDiagram
         char(64) email_hash "SHA-256"
         varchar(200) reason
         boolean had_sanction
-        datetime rejoin_blocked_until
+        datetime rejoin_blocked_until "NULL이면 제한 없음"
         datetime purge_at "파기 예정일"
         datetime withdrawn_at
     }
@@ -230,13 +242,13 @@ erDiagram
         bigint game_id FK
         bigint game_content_id FK "NULL 허용"
         varchar(20) party_type
-        varchar(100) title
+        varchar(100) title "2~100자"
         text body "마크다운"
         varchar(30) party_name
         varchar(20) play_style
         varchar(200) required_spec
-        tinyint headcount "모집 정원"
-        tinyint current_count "기본 1"
+        tinyint headcount "파티장 포함 정원, 2~16"
+        tinyint current_count "파티장 포함, 기본 1"
         datetime schedule_at "NULL이면 시간 미정"
         boolean voice_required "기본 FALSE"
         varchar(20) status "OPEN / CLOSED / COMPLETED / DELETED"
@@ -307,7 +319,7 @@ erDiagram
         varchar(500) content
         boolean is_secret "비밀 댓글"
         varchar(20) status "VISIBLE / HIDDEN / DELETED"
-        int report_count "기본 0"
+        int report_count "기본 0, 5 이상이면 HIDDEN"
         datetime deleted_at
     }
 
@@ -347,7 +359,7 @@ erDiagram
     }
 ```
 
-### 2.4 알림 (범위 확정 필요)
+### 2.4 알림
 
 ```mermaid
 erDiagram
@@ -409,7 +421,7 @@ erDiagram
         bigint id PK
         bigint reporter_id FK "UQ(reporter_id, target_type, target_id)"
         varchar(20) target_type "MEMBER / NO_SHOW / POST / COMMENT"
-        bigint target_id "FK 없음 (대상 종류가 여러 개)"
+        bigint target_id "FK 없음. member / post_application / post / comment의 id"
         bigint target_member_id FK
         bigint post_id FK "NULL 허용"
         varchar(30) reason_code
@@ -469,24 +481,25 @@ erDiagram
 ## 3. FK 목록과 삭제 동작
 
 03 문서 [3. 관계](./03-db-design.md#3-관계)의 ON DELETE 규칙을 FK 단위로 풀어 쓴 표입니다.
-**미정**은 03 문서에 규칙이 없는 FK입니다. 괄호 안은 03의 원칙(마스터 데이터는 RESTRICT, 기록은 보존, 회원에게만 딸린 데이터는 CASCADE)에 맞춘 제안이며, 확정되면 03 문서에도 반영해 주세요.
+원칙은 세 가지입니다. 마스터 데이터(category·game·game_content·tag·review_tag)와 보존할 기록은 RESTRICT, 회원에게만 딸린 데이터는 CASCADE입니다. 알림의 공고 링크처럼 없어도 되는 참조는 SET NULL입니다.
 
 | 자식 테이블.컬럼 | 부모 | 관계 | ON DELETE |
 | --- | --- | --- | --- |
 | member_agreement.member_id | member | 1:N | CASCADE |
 | member_game_profile.member_id | member | 1:N | CASCADE |
-| member_game_profile.game_id | game | 1:N | 미정 (RESTRICT) |
-| password_reset_token.member_id | member | 1:N | 미정 (CASCADE) |
+| member_game_profile.game_id | game | 1:N | RESTRICT |
+| password_reset_token.member_id | member | 1:N | CASCADE |
 | refresh_token.member_id | member | 1:N | CASCADE |
+| activity_point_log.member_id | member | 1:N | CASCADE |
 | game.category_code | category | 1:N | RESTRICT |
 | game_content.game_id | game | 1:N | RESTRICT |
 | post.author_id | member | 1:N | RESTRICT |
-| post.category_code | category | 1:N | 미정 (RESTRICT) |
-| post.game_id | game | 1:N | 미정 (RESTRICT) |
-| post.game_content_id | game_content | 0..1:N | 미정 (RESTRICT) |
+| post.category_code | category | 1:N | RESTRICT |
+| post.game_id | game | 1:N | RESTRICT |
+| post.game_content_id | game_content | 0..1:N | RESTRICT |
 | post.deleted_by_admin_id | admin_account | 0..1:N | RESTRICT |
 | post_tag.post_id | post | 1:N | CASCADE |
-| post_tag.tag_id | tag | 1:N | 미정 (RESTRICT) |
+| post_tag.tag_id | tag | 1:N | RESTRICT |
 | post_draft.member_id | member | 1:0..1 | CASCADE |
 | post_scrap.member_id | member | 1:N | CASCADE |
 | post_scrap.post_id | post | 1:N | CASCADE |
@@ -499,19 +512,19 @@ erDiagram
 | review.reviewer_id | member | 1:N | RESTRICT |
 | review.target_id | member | 1:N | RESTRICT |
 | review_tag_map.review_id | review | 1:N | CASCADE |
-| review_tag_map.review_tag_id | review_tag | 1:N | 미정 (RESTRICT) |
+| review_tag_map.review_tag_id | review_tag | 1:N | RESTRICT |
 | favorite_member.member_id | member | 1:N | CASCADE |
 | favorite_member.target_member_id | member | 1:N | CASCADE |
 | notification.member_id | member | 1:N | CASCADE |
-| notification.post_id | post | 0..1:N | 미정 (SET NULL) |
+| notification.post_id | post | 0..1:N | SET NULL |
 | notification_subscription.member_id | member | 1:N | CASCADE |
-| notification_subscription.game_id | game | 1:N | 미정 (RESTRICT) |
-| notification_subscription.game_content_id | game_content | 0..1:N | 미정 (RESTRICT) |
+| notification_subscription.game_id | game | 1:N | RESTRICT |
+| notification_subscription.game_content_id | game_content | 0..1:N | RESTRICT |
 | report.reporter_id | member | 1:N | RESTRICT |
 | report.target_member_id | member | 1:N | RESTRICT |
-| report.post_id | post | 0..1:N | 미정 (RESTRICT) |
+| report.post_id | post | 0..1:N | RESTRICT |
 | report.handled_by | admin_account | 0..1:N | RESTRICT |
-| sanction.member_id | member | 1:N | 미정 (RESTRICT) |
+| sanction.member_id | member | 1:N | RESTRICT |
 | sanction.report_id | report | 0..1:0..1 | SET NULL |
 | sanction.admin_id | admin_account | 1:N | RESTRICT |
 | sanction.released_by | admin_account | 0..1:N | RESTRICT |
@@ -521,7 +534,8 @@ erDiagram
 
 | 컬럼 | 이유 |
 | --- | --- |
-| report.target_id | 대상이 회원·공고·댓글 등 여러 테이블이라 하나의 FK로 걸 수 없습니다. 신고당한 회원은 target_member_id에 따로 저장합니다. |
+| report.target_id | 대상이 회원·신청(노쇼)·공고·댓글 등 여러 테이블이라 하나의 FK로 걸 수 없습니다. 신고당한 회원은 target_member_id에 따로 저장합니다. |
 | admin_action_log.target_id | 같은 이유. 이력은 대상이 지워져도 남아야 합니다. |
+| activity_point_log.ref_id | 근거가 공고·댓글·리뷰 중 하나라 하나의 FK로 걸 수 없습니다. 근거 글이 삭제돼도 점수 이력은 남아야 합니다. |
 | member_withdrawal.member_id | 보관용 사본이라 원본 회원 행과 독립적으로 파기 일정을 가져갑니다. |
 | email_verification.email | 가입 전 단계라 아직 회원 행이 없습니다. |

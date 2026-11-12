@@ -72,7 +72,7 @@ export function getPostDetail(postId: string): PostDetail {
     isOwner,
     ...base,
     raid: '군단장 레이드',
-    host: { name: isOwner ? '빛나는힐러' : (post?.author ?? '빛나는오더'), level: 1630, record: '레이드 지휘 184회 완료 · 클린 인증 파티', manner: '99.8℃' },
+    host: { name: isOwner ? '빛나는힐러' : (post?.author ?? '빛나는오더'), level: 52, record: '레이드 지휘 184회 완료 · 클린 인증 파티', manner: '99.8℃' },
     views: (post?.views ?? 38) * 9,
     postedAgo: '15분 전',
     tiles: [
