@@ -1,6 +1,6 @@
 # 코딩 컨벤션
 
-OurParty 프론트엔드(`frontend/`)의 코딩 컨벤션입니다. 프로젝트 개요와 개발 환경은 [CLAUDE.md](./CLAUDE.md)를 참고하세요.
+OurParty 프론트엔드(`frontend/`)의 코딩 컨벤션입니다. 프로젝트 개요와 개발 환경은 [CLAUDE.md](../CLAUDE.md)를 참고하세요.
 
 ## 1. 아키텍처 원칙
 

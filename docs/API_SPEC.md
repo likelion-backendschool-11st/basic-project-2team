@@ -1,6 +1,6 @@
 # API 정의서
 
-OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발 환경은 [CLAUDE.md](./CLAUDE.md)를 참고하세요.
+OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발 환경은 [CLAUDE.md](../CLAUDE.md)를 참고하세요.
 
 > ⚠️ **초안** — 현재 프론트엔드 화면과 `src/data/*.ts` 의 데이터 모델을 기준으로 작성했습니다.
 > 백엔드 구현 과정에서 변경되면 이 표와 프론트 타입을 함께 수정해 주세요.
