@@ -91,6 +91,8 @@ frontend/
 | --- | --- |
 | [CODING_CONVENTION.md](./docs/CODING_CONVENTION.md) | 아키텍처 원칙, 라우팅, 네이밍, TypeScript·React·Tailwind 규칙, 포맷, Git 컨벤션 |
 | [API_SPEC.md](./docs/API_SPEC.md) | 공통 규칙(응답 포맷·인증·페이지네이션·상태 코드)과 도메인별 API 엔드포인트 (초안) |
+| [02-requirements.md](./docs/02-requirements.md) | 요구사항 명세 (Notion 「요구 사항 명세」 내보내기를 분류별 표로 정리) |
+| [03-db-design.md](./docs/03-db-design.md) | MySQL 8 테이블 설계안 — 컬럼, 관계, 인덱스, 삭제 정책, 확정 필요 가정 (초안) |
 
 ---
 
