@@ -347,7 +347,7 @@ erDiagram
 
     favorite_member {
         bigint member_id PK, FK
-        bigint target_member_id PK, FK "CHECK 자기 자신 불가"
+        bigint target_member_id PK, FK "자기 자신 불가 (애플리케이션 검증)"
     }
 
     post {
@@ -450,10 +450,10 @@ erDiagram
     admin_account {
         bigint id PK
         varchar(20) login_id UK
-        varchar password_hash
+        varchar(100) password_hash
         varchar(50) name
-        varchar(20) role
-        varchar status
+        varchar(20) role "기본 ADMIN"
+        varchar(20) status "기본 ACTIVE"
         datetime last_login_at
     }
 

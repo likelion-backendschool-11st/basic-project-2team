@@ -94,6 +94,8 @@ frontend/
 | [02-requirements.md](./docs/02-requirements.md) | 요구사항 명세 (Notion 「요구 사항 명세」 내보내기를 분류별 표로 정리) |
 | [03-db-design.md](./docs/03-db-design.md) | MySQL 8 테이블 설계안 — 컬럼, 관계, 인덱스, 삭제 정책, 결정 사항 |
 | [04-erd.md](./docs/04-erd.md) | 03 설계안을 옮긴 ERD (Mermaid) — 전체 관계도, 도메인별 상세 ERD, FK 목록과 삭제 동작 |
+| [db/create-app-user.sql](./db/create-app-user.sql) | 로컬 DB `beggdb`와 전용 계정 `begg` 생성 (root로 먼저 실행) |
+| [db/schema.sql](./db/schema.sql) | 04 ERD 기준 MySQL DDL — 테이블, FK, 인덱스, CHECK. 스키마를 바꾸면 03·04 문서도 함께 수정 |
 
 ---
 

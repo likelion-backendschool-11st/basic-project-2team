@@ -198,7 +198,7 @@ API의 `level`은 **서비스 활동 레벨**(`member.level`)입니다. 공고 �
 | --- | --- | --- | --- |
 | `review` | id, post_id FK, reviewer_id FK, target_id FK, rating TINYINT, comment VARCHAR(500), created_at | UNIQUE(post_id, reviewer_id, target_id). CHECK rating 1~5, CHECK reviewer ≠ target | MySQL은 8.0.16부터 CHECK 제약을 실제로 검사합니다 |
 | `review_tag_map` | review_id, review_tag_id | PK(review_id, review_tag_id) | |
-| `favorite_member` | member_id, target_member_id, created_at | PK(member_id, target_member_id). CHECK 자기 자신 불가 | FAV-002 |
+| `favorite_member` | member_id, target_member_id, created_at | PK(member_id, target_member_id) | FAV-002. 자기 자신 즐겨찾기 금지는 애플리케이션에서 검증 (MySQL은 CASCADE FK 컬럼에 CHECK를 걸 수 없음) |
 
 ### 2.12 알림
 
