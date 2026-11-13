@@ -119,7 +119,24 @@ function createPostService({ postRepository, now = () => new Date() }) {
     if (!(await postRepository.softDeletePost(id, now()))) throw notFound();
   }
 
-  return { createPost, saveDraft, getLatestDraft, updatePost, deletePost };
+  /** 스크랩이 걸린 공고인지 확인합니다. 없거나 삭제된 공고는 404 입니다. */
+  async function assertPostExists(rawPostId) {
+    const postId = parsePostId(rawPostId);
+    if (!(await postRepository.findPostAuthor(postId))) throw new ApiError(404, 'POST_NOT_FOUND', postMessages.postNotFound);
+    return postId;
+  }
+
+  /** POST /api/posts/:postId/scrap — 이미 스크랩했어도 성공합니다(멱등). */
+  async function scrapPost(rawPostId, memberId) {
+    await postRepository.addScrap(memberId, await assertPostExists(rawPostId));
+  }
+
+  /** DELETE /api/posts/:postId/scrap — 스크랩하지 않았어도 성공합니다(멱등). */
+  async function unscrapPost(rawPostId, memberId) {
+    await postRepository.removeScrap(memberId, await assertPostExists(rawPostId));
+  }
+
+  return { createPost, saveDraft, getLatestDraft, updatePost, scrapPost, unscrapPost, deletePost };
 }
 
 module.exports = { createPostService };

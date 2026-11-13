@@ -21,12 +21,22 @@ function createPostController(postService) {
     return sendSuccess(res, 200, await postService.updatePost(req.params.postId, req.auth.memberId, req.body));
   }
 
+  async function scrap(req, res) {
+    await postService.scrapPost(req.params.postId, req.auth.memberId);
+    return res.status(204).end();
+  }
+
+  async function unscrap(req, res) {
+    await postService.unscrapPost(req.params.postId, req.auth.memberId);
+    return res.status(204).end();
+  }
+
   async function remove(req, res) {
     await postService.deletePost(req.params.postId, req.auth.memberId);
     return res.status(204).end();
   }
 
-  return { create, saveDraft, getLatestDraft, update, remove };
+  return { create, saveDraft, getLatestDraft, update, scrap, unscrap, remove };
 }
 
 module.exports = { createPostController };

@@ -182,7 +182,20 @@ function createPostRepository(pool) {
     }
   }
 
-  return { findGameByCode, findGameContent, createPost, saveDraft, findDraft, findPostAuthor, updatePost, softDeletePost };
+  /** 스크랩을 추가합니다. 이미 있거나 그 사이 삭제된 공고면 아무것도 하지 않습니다. */
+  async function addScrap(memberId, postId) {
+    await pool.query(
+      `INSERT IGNORE INTO post_scrap (member_id, post_id)
+       SELECT ?, id FROM post WHERE id = ? AND deleted_at IS NULL AND status <> '${POST_STATUS_DELETED}'`,
+      [memberId, postId],
+    );
+  }
+
+  async function removeScrap(memberId, postId) {
+    await pool.query('DELETE FROM post_scrap WHERE member_id = ? AND post_id = ?', [memberId, postId]);
+  }
+
+  return { addScrap, removeScrap, findGameByCode, findGameContent, createPost, saveDraft, findDraft, findPostAuthor, updatePost, softDeletePost };
 }
 
 module.exports = { createPostRepository };
