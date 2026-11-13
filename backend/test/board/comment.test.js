@@ -26,7 +26,7 @@ const members = () =>
 
 /** DB 대신 메모리에 저장하는 가짜 repository */
 function createFakeRepository() {
-  const state = { posts: new Map(), members: new Map(), comments: [], seconds: 0 };
+  const state = { posts: new Map(), members: new Map(), comments: [], reports: [], seconds: 0 };
   const alive = (c) => c.status !== 'DELETED';
   const withAuthor = (c) => {
     const m = state.members.get(c.authorId);
@@ -56,6 +56,7 @@ function createFakeRepository() {
         parentId: null,
         isSecret: false,
         status: 'VISIBLE',
+        reportCount: 0,
         postId: POST_ID,
         createdAt: new Date(NOW.getTime() - 3600000 + state.seconds * 1000),
         ...comment,
@@ -95,6 +96,36 @@ function createFakeRepository() {
         .sort(byTime)
         .map(withAuthor);
     },
+    async findCommentContext(commentId) {
+      const c = state.comments.find((x) => x.id === commentId && alive(x));
+      const post = c && state.posts.get(c.postId);
+      if (!c || !post || post.status === 'DELETED') return null;
+      const parent = state.comments.find((x) => x.id === c.parentId);
+      return { ...withAuthor(c), postAuthorId: post.authorId, parentAuthorId: parent?.authorId ?? null };
+    },
+    async updateCommentContent(commentId, content) {
+      state.comments.find((x) => x.id === commentId).content = content;
+    },
+    async deleteCommentWithReplies({ commentId, postId, deletedAt }) {
+      const targets = state.comments.filter((c) => (c.id === commentId || c.parentId === commentId) && alive(c));
+      for (const c of targets) Object.assign(c, { status: 'DELETED', deletedAt });
+      const post = state.posts.get(postId);
+      post.commentCount = Math.max(0, post.commentCount - targets.length);
+      return targets.length;
+    },
+    async createCommentReport({ reporterId, commentId, targetMemberId, postId, reasonCode, detail }) {
+      if (state.reports.some((r) => r.reporterId === reporterId && r.targetId === commentId)) return null;
+      state.reports.push({ id: state.reports.length + 1, reporterId, targetId: commentId, targetMemberId, postId, reasonCode, detail });
+      const c = state.comments.find((x) => x.id === commentId);
+      if (c.status === 'VISIBLE' && c.reportCount + 1 >= 5) c.status = 'HIDDEN';
+      c.reportCount += 1;
+      return state.reports.length;
+    },
+    async findReportedCommentIds(memberId, commentIds) {
+      return new Set(
+        state.reports.filter((r) => r.reporterId === memberId && commentIds.includes(r.targetId)).map((r) => r.targetId),
+      );
+    },
   };
 }
 
@@ -114,6 +145,7 @@ describe('댓글 API /api/posts/:postId/comments', () => {
   after(() => server.close());
   beforeEach(() => {
     repo.state.comments.length = 0;
+    repo.state.reports.length = 0;
     repo.state.seconds = 0;
     repo.state.posts = new Map([[POST_ID, { id: POST_ID, authorId: HOST_ID, status: 'OPEN', commentCount: 0 }]]);
     repo.state.members = members();
@@ -146,6 +178,7 @@ describe('댓글 API /api/posts/:postId/comments', () => {
         text: '극신속 홀나 1625입니다.',
         secret: false,
         hidden: false,
+        reported: false,
         createdAt: body.data.createdAt,
       });
       assert.equal(repo.state.posts.get(POST_ID).commentCount, 1);
@@ -346,6 +379,157 @@ describe('댓글 API /api/posts/:postId/comments', () => {
         ['sort', 'page', 'size'],
       );
       assert.equal((await list('', {}, 999)).body.error.code, 'POST_NOT_FOUND');
+    });
+  });
+
+  const send = async (method, path, body, memberId = ALICE) => {
+    const res = await fetch(`${baseUrl}${path}`, {
+      method,
+      headers: { 'content-type': 'application/json', ...(memberId === null ? {} : as(memberId)) },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    return { status: res.status, body: res.status === 204 ? null : await res.json() };
+  };
+
+  describe('댓글 수정', () => {
+    it('본인 댓글을 고치고 수정된 댓글을 돌려준다', async () => {
+      const id = repo.seed({ authorId: ALICE, content: '처음 내용' });
+      const { status, body } = await send('PATCH', `/api/comments/${id}`, { text: '  고친 내용 ' });
+      assert.equal(status, 200);
+      assert.equal(body.data.id, id);
+      assert.equal(body.data.text, '고친 내용');
+      assert.equal(body.data.mine, true);
+      assert.equal(repo.state.comments[0].content, '고친 내용');
+    });
+
+    it('다른 사람 댓글은 403 NOT_COMMENT_AUTHOR (공고 작성자도 마찬가지)', async () => {
+      const id = repo.seed({ authorId: ALICE, content: '내용' });
+      for (const memberId of [BOB, HOST_ID]) {
+        const { status, body } = await send('PATCH', `/api/comments/${id}`, { text: '남의 글' }, memberId);
+        assert.equal(status, 403);
+        assert.equal(body.error.code, 'NOT_COMMENT_AUTHOR');
+      }
+      assert.equal(repo.state.comments[0].content, '내용');
+    });
+
+    it('관리자가 가린 댓글은 403 COMMENT_HIDDEN, 정지 회원은 403 ACCOUNT_SUSPENDED', async () => {
+      const hiddenId = repo.seed({ authorId: ALICE, content: '가려짐', status: 'HIDDEN' });
+      assert.equal((await send('PATCH', `/api/comments/${hiddenId}`, { text: '수정' })).body.error.code, 'COMMENT_HIDDEN');
+
+      const id = repo.seed({ authorId: ALICE, content: '내용' });
+      Object.assign(repo.state.members.get(ALICE), { status: 'SUSPENDED', suspendedUntil: new Date(NOW.getTime() + 1000) });
+      assert.equal((await send('PATCH', `/api/comments/${id}`, { text: '수정' })).body.error.code, 'ACCOUNT_SUSPENDED');
+    });
+
+    it('빈 내용은 400, 없거나 삭제된 댓글·잘못된 id 는 404, 비로그인은 401', async () => {
+      const id = repo.seed({ authorId: ALICE, content: '내용' });
+      const deletedId = repo.seed({ authorId: ALICE, content: '삭제됨', status: 'DELETED' });
+      assert.equal((await send('PATCH', `/api/comments/${id}`, { text: ' ' })).status, 400);
+      assert.equal((await send('PATCH', `/api/comments/${deletedId}`, { text: '수정' })).body.error.code, 'COMMENT_NOT_FOUND');
+      assert.equal((await send('PATCH', '/api/comments/999', { text: '수정' })).status, 404);
+      assert.equal((await send('PATCH', '/api/comments/abc', { text: '수정' })).body.error.code, 'COMMENT_NOT_FOUND');
+      assert.equal((await send('PATCH', `/api/comments/${id}`, { text: '수정' }, null)).status, 401);
+    });
+  });
+
+  describe('댓글 삭제', () => {
+    it('본인 댓글을 대댓글과 함께 삭제하고 204, 공고 댓글 수를 그만큼 줄인다', async () => {
+      const rootId = repo.seed({ authorId: ALICE, content: '질문' });
+      repo.seed({ authorId: HOST_ID, content: '답변', parentId: rootId });
+      repo.seed({ authorId: BOB, content: '이미 삭제된 답글', parentId: rootId, status: 'DELETED' });
+      const otherId = repo.seed({ authorId: BOB, content: '다른 댓글' });
+      repo.state.posts.get(POST_ID).commentCount = 3; // 삭제된 답글은 이미 빠진 수
+
+      const { status } = await send('DELETE', `/api/comments/${rootId}`);
+      assert.equal(status, 204);
+      assert.deepEqual(
+        repo.state.comments.map((c) => c.status),
+        ['DELETED', 'DELETED', 'DELETED', 'VISIBLE'],
+      );
+      assert.ok(repo.state.comments[0].deletedAt instanceof Date);
+      assert.equal(repo.state.posts.get(POST_ID).commentCount, 1);
+
+      const { body } = await list();
+      assert.deepEqual(
+        body.data.items.map((c) => c.id),
+        [otherId],
+      );
+    });
+
+    it('대댓글만 삭제하면 그 대댓글만 지운다', async () => {
+      const rootId = repo.seed({ authorId: BOB, content: '질문' });
+      const replyId = repo.seed({ authorId: ALICE, content: '답변', parentId: rootId });
+      assert.equal((await send('DELETE', `/api/comments/${replyId}`)).status, 204);
+      assert.deepEqual(
+        repo.state.comments.map((c) => c.status),
+        ['VISIBLE', 'DELETED'],
+      );
+    });
+
+    it('다른 사람 댓글은 403, 이미 삭제된 댓글은 404', async () => {
+      const id = repo.seed({ authorId: ALICE, content: '내용' });
+      assert.equal((await send('DELETE', `/api/comments/${id}`, undefined, BOB)).body.error.code, 'NOT_COMMENT_AUTHOR');
+      assert.equal((await send('DELETE', `/api/comments/${id}`)).status, 204);
+      assert.equal((await send('DELETE', `/api/comments/${id}`)).body.error.code, 'COMMENT_NOT_FOUND');
+    });
+  });
+
+  describe('댓글 신고', () => {
+    const report = (body, memberId = BOB) => send('POST', '/api/reports', body, memberId);
+    const valid = (targetId) => ({ targetType: 'COMMENT', targetId, reason: '욕설 및 비하 발언', detail: '  반복 욕설 ' });
+
+    it('신고를 저장하고 201 { id }, 신고한 사람의 목록에서만 reported 로 표시된다', async () => {
+      const id = repo.seed({ authorId: ALICE, content: '비매너 댓글' });
+      const { status, body } = await report(valid(id));
+      assert.equal(status, 201);
+      assert.deepEqual(body.data, { id: 1 });
+      assert.deepEqual(repo.state.reports[0], {
+        id: 1,
+        reporterId: BOB,
+        targetId: id,
+        targetMemberId: ALICE,
+        postId: POST_ID,
+        reasonCode: '욕설 및 비하 발언',
+        detail: '반복 욕설',
+      });
+      assert.equal(repo.state.comments[0].reportCount, 1);
+
+      assert.equal((await list('', as(BOB))).body.data.items[0].reported, true);
+      assert.equal((await list('', as(HOST_ID))).body.data.items[0].reported, false);
+      assert.equal((await list()).body.data.items[0].reported, false);
+    });
+
+    it('같은 댓글을 다시 신고하면 409 ALREADY_REPORTED, 본인 댓글은 400 CANNOT_REPORT_SELF', async () => {
+      const id = repo.seed({ authorId: ALICE, content: '댓글' });
+      await report(valid(id));
+      const again = await report(valid(id));
+      assert.equal(again.status, 409);
+      assert.equal(again.body.error.code, 'ALREADY_REPORTED');
+
+      const self = await report(valid(id), ALICE);
+      assert.equal(self.status, 400);
+      assert.equal(self.body.error.code, 'CANNOT_REPORT_SELF');
+      assert.equal(repo.state.comments[0].reportCount, 1);
+    });
+
+    it('서로 다른 5명이 신고하면 댓글이 자동으로 가려진다', async () => {
+      const id = repo.seed({ authorId: ALICE, content: '악성 댓글' });
+      for (const reporter of [BOB, HOST_ID, 11, 12]) await report(valid(id), reporter);
+      assert.equal(repo.state.comments[0].status, 'VISIBLE');
+      await report(valid(id), 13);
+      assert.equal(repo.state.comments[0].status, 'HIDDEN');
+      assert.equal((await list()).body.data.items[0].hidden, true);
+    });
+
+    it('입력이 틀리면 400 (COMMENT 외 대상, 목록에 없는 사유, 500자 넘는 상세), 없는 댓글은 404, 비로그인은 401', async () => {
+      const { status, body } = await report({ targetType: 'POST', targetId: 'x', reason: '그냥', detail: '가'.repeat(501) });
+      assert.equal(status, 400);
+      assert.deepEqual(
+        body.error.fields.map((f) => f.field),
+        ['targetType', 'targetId', 'reason', 'detail'],
+      );
+      assert.equal((await report(valid(999))).body.error.code, 'COMMENT_NOT_FOUND');
+      assert.equal((await report(valid(1), null)).status, 401);
     });
   });
 });

@@ -66,8 +66,17 @@ function createApp({
   app.use('/api/categories', createCategoryModule({ pool, categoryRepository }).router);
 
   // GET /api/posts/:postId 를 잡으므로 /api/posts 아래 고정 경로(popular, urgent …)는 이보다 먼저 마운트된 라우터에 둡니다.
-  const board = createBoardModule({ pool, boardRepository, commentRepository, requireAuth, optionalAuth, now });
+  const board = createBoardModule({
+    pool,
+    boardRepository,
+    commentRepository,
+    requireAuth,
+    optionalAuth,
+    now,
+  });
   app.use('/api/posts', board.router);
+  app.use('/api/comments', board.commentRouter);
+  app.use('/api/reports', board.reportRouter);
 
   const admin = createAdminModule({ pool, adminRepository, tokenProvider, requireAdmin, bcryptRounds, now });
   app.use('/api/admin', admin.router);

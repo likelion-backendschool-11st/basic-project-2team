@@ -24,6 +24,14 @@ const MEMBER_STATUS = Object.freeze({
   withdrawn: 'WITHDRAWN',
 });
 
+/** POST /api/reports (docs/API_SPEC.md 6절). 이번 범위는 댓글 신고만 처리합니다. */
+const REPORT_TARGET_TYPES = Object.freeze({ comment: 'COMMENT' });
+/** frontend/src/data/commentData.ts reportReasons. report.reason_code 에 이 문구 그대로 저장합니다 (관리자 화면이 그대로 표시). */
+const REPORT_REASONS = Object.freeze(['욕설 및 비하 발언', '스팸 / 도배', '부적절한 광고', '개인정보 노출', '기타']);
+const REPORT_DETAIL_MAX_LENGTH = 500;
+/** 서로 다른 신고자 수가 이 값 이상이면 댓글을 HIDDEN 으로 자동 가림 (REQ-REPORT-004, docs/03-db-design.md 2.10) */
+const COMMENT_HIDE_REPORT_COUNT = 5;
+
 const commentMessages = Object.freeze({
   invalidInput: '입력값을 확인해주세요.',
   textRequired: '댓글 내용을 입력해주세요.',
@@ -39,6 +47,15 @@ const commentMessages = Object.freeze({
   accountBanned: '영구 정지된 계정입니다.',
   unauthorized: '로그인이 필요합니다.',
   withdrawnAuthor: '탈퇴한 회원',
+  commentNotFound: '존재하지 않는 댓글입니다.',
+  notCommentAuthor: '본인이 작성한 댓글만 수정·삭제할 수 있습니다.',
+  commentHidden: '관리자가 가린 댓글은 수정할 수 없습니다.',
+  targetTypeInvalid: `현재는 ${REPORT_TARGET_TYPES.comment} 신고만 접수할 수 있습니다.`,
+  targetIdInvalid: 'targetId 는 1 이상의 정수여야 합니다.',
+  reasonInvalid: `reason 은 ${REPORT_REASONS.join(', ')} 중 하나여야 합니다.`,
+  detailTooLong: `상세 사유는 ${REPORT_DETAIL_MAX_LENGTH}자 이하로 입력해주세요.`,
+  cannotReportSelf: '본인이 작성한 댓글은 신고할 수 없습니다.',
+  alreadyReported: '이미 신고한 댓글입니다.',
 });
 
 module.exports = {
@@ -49,5 +66,9 @@ module.exports = {
   DEFAULT_COMMENT_PAGE_SIZE,
   MAX_COMMENT_PAGE_SIZE,
   MEMBER_STATUS,
+  REPORT_TARGET_TYPES,
+  REPORT_REASONS,
+  REPORT_DETAIL_MAX_LENGTH,
+  COMMENT_HIDE_REPORT_COUNT,
   commentMessages,
 };

@@ -8,6 +8,9 @@ const {
   DEFAULT_COMMENT_SORT,
   DEFAULT_COMMENT_PAGE_SIZE,
   MAX_COMMENT_PAGE_SIZE,
+  REPORT_TARGET_TYPES,
+  REPORT_REASONS,
+  REPORT_DETAIL_MAX_LENGTH,
   commentMessages: m,
 } = require('./commentConstants');
 
@@ -49,18 +52,29 @@ function parseCommentListQuery(query) {
   return { sort, page, size };
 }
 
+const asObject = (body) => (body && typeof body === 'object' ? body : {});
+
+/** 댓글 본문 text 를 검증해 앞뒤 공백을 뺀 값을 돌려줍니다. 오류는 fail 로 모읍니다. */
+function checkText(raw, fail) {
+  const text = asString(raw);
+  if (!text) fail('text', m.textRequired);
+  else if (charLength(text) > COMMENT_MAX_LENGTH) fail('text', m.textTooLong);
+  return text;
+}
+
+/** 경로 파라미터 commentId 를 숫자로. 형식이 틀리면 null */
+const parseCommentId = (raw) => parseId(raw);
+
 /**
  * 댓글·대댓글 작성 요청 본문 `{ text, parentId?, secret? }` 을 검증·정규화합니다.
  * @returns {{ text: string, parentId: number | null, secret: boolean }}
  */
 function validateCreateComment(body) {
-  const source = body && typeof body === 'object' ? body : {};
+  const source = asObject(body);
   const fields = [];
   const fail = (field, message) => fields.push({ field, message });
 
-  const text = asString(source.text);
-  if (!text) fail('text', m.textRequired);
-  else if (charLength(text) > COMMENT_MAX_LENGTH) fail('text', m.textTooLong);
+  const text = checkText(source.text, fail);
 
   const secret = source.secret ?? false;
   if (typeof secret !== 'boolean') fail('secret', m.secretInvalid);
@@ -75,4 +89,46 @@ function validateCreateComment(body) {
   return { text, parentId, secret };
 }
 
-module.exports = { parseCommentListQuery, validateCreateComment };
+/**
+ * 댓글 수정 요청 본문 `{ text }` 을 검증·정규화합니다.
+ * @returns {{ text: string }}
+ */
+function validateUpdateComment(body) {
+  const fields = [];
+  const text = checkText(asObject(body).text, (field, message) => fields.push({ field, message }));
+  if (fields.length > 0) throw new ApiError(400, 'INVALID_INPUT', m.invalidInput, fields);
+  return { text };
+}
+
+/**
+ * 신고 요청 본문 `{ targetType, targetId, reason, detail? }` 을 검증·정규화합니다.
+ * @returns {{ targetType: string, targetId: number, reason: string, detail: string | null }}
+ */
+function validateCreateReport(body) {
+  const source = asObject(body);
+  const fields = [];
+  const fail = (field, message) => fields.push({ field, message });
+
+  const targetType = asString(source.targetType);
+  if (targetType !== REPORT_TARGET_TYPES.comment) fail('targetType', m.targetTypeInvalid);
+
+  const targetId = parseId(source.targetId);
+  if (targetId === null) fail('targetId', m.targetIdInvalid);
+
+  const reason = asString(source.reason);
+  if (!REPORT_REASONS.includes(reason)) fail('reason', m.reasonInvalid);
+
+  const detail = asString(source.detail);
+  if (charLength(detail) > REPORT_DETAIL_MAX_LENGTH) fail('detail', m.detailTooLong);
+
+  if (fields.length > 0) throw new ApiError(400, 'INVALID_INPUT', m.invalidInput, fields);
+  return { targetType, targetId, reason, detail: detail || null };
+}
+
+module.exports = {
+  parseCommentId,
+  parseCommentListQuery,
+  validateCreateComment,
+  validateUpdateComment,
+  validateCreateReport,
+};
