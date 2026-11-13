@@ -111,6 +111,10 @@ export function useWriteForm() {
   /** 공고 작성 API 호출. 성공하면 새 공고 상세로 이동하고, 실패하면 서버 메시지를 보여줍니다. */
   const submit = async () => {
     if (!draft.title.trim() || !draft.body.trim()) return setError(writeText.submitInvalid);
+    // 날짜·시간은 브라우저 로컬 시간. 비어 있거나 지금 이전이면 서버에 보내기 전에 막습니다.
+    const scheduleAt = draft.tbd ? null : new Date(`${draft.date}T${draft.time}`);
+    if (scheduleAt && (!draft.date || !draft.time || Number.isNaN(scheduleAt.getTime()))) return setError(writeText.scheduleRequired);
+    if (scheduleAt && scheduleAt.getTime() <= Date.now()) return setError(writeText.schedulePast);
     if (!draft.game) return setError(writeText.placeholders.game);
     if (!draft.type) return setError(writeText.placeholders.type);
     if (options.detail.length > 0 && !draft.detail) return setError(writeText.placeholders.detail);
@@ -127,7 +131,7 @@ export function useWriteForm() {
         style: draft.style,
         scheduleTbd: draft.tbd,
         // 날짜·시간은 브라우저 로컬 시간 → 시간대가 포함된 ISO 문자열
-        schedule: draft.tbd ? undefined : new Date(`${draft.date}T${draft.time}`).toISOString(),
+        schedule: scheduleAt?.toISOString(),
         voiceRequired: draft.voice,
       });
       navigate(paths.postDetail(String(id)));

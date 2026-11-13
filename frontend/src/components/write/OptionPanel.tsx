@@ -97,7 +97,7 @@ export const OptionPanel: React.FC<OptionPanelProps> = ({ draft, onChange, summa
           </div>
           {!draft.tbd && (
             <div className="grid grid-cols-2 gap-2">
-              <input type="date" value={draft.date} onChange={(e) => onChange('date', e.target.value)} className={field} />
+              <input type="date" min={new Date().toLocaleDateString('sv-SE')} value={draft.date} onChange={(e) => onChange('date', e.target.value)} className={field} />
               <input type="time" value={draft.time} onChange={(e) => onChange('time', e.target.value)} className={field} />
             </div>
           )}
