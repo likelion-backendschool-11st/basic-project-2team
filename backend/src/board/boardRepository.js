@@ -5,8 +5,15 @@ const { POST_STATUS } = require('./boardConstants');
 /** 삭제되지 않은 공고만 대상으로 하는 조건 (소프트 삭제: deleted_at / status = DELETED) */
 const ALIVE_POST = `p.deleted_at IS NULL AND p.status <> '${POST_STATUS.deleted}'`;
 
+/** 정렬은 SQL 에 직접 들어가므로 이 목록의 값만 씁니다. urgent: 출발이 가까운 순(일정 미정은 뒤), 남은 자리가 적은 순 */
+const LIST_ORDER = Object.freeze({
+  recent: 'p.created_at DESC, p.id DESC',
+  views: 'p.view_count DESC, p.id DESC',
+  urgent: '(p.schedule_at IS NULL), p.schedule_at ASC, (p.headcount - p.current_count) ASC, p.id DESC',
+});
+
 /**
- * 공고 상세 조회용 테이블 접근: post · category · game · game_content · member · post_tag · tag · post_scrap · post_application
+ * 공고 목록·상세 조회용 테이블 접근: post · category · game · game_content · member · post_tag · tag · post_scrap · post_application
  * @param {import('mysql2/promise').Pool} pool
  */
 function createBoardRepository(pool) {
@@ -64,7 +71,62 @@ function createBoardRepository(pool) {
     return { scrapped: Boolean(row?.scrapped), applicationStatus: row?.applicationStatus ?? null };
   }
 
-  return { increaseViewCount, findPostDetail, findTagNames, findViewerState };
+  /**
+   * 공고 목록 한 페이지와 전체 건수. 삭제된 공고는 제외하고, tags 는 모두 가진 공고만(AND) 남깁니다.
+   * @param {{ category: string | null, sort: string, tags: string[], excludeClosed: boolean, limit: number, offset: number }} filter
+   */
+  async function findPostPage({ category, sort, tags, excludeClosed, limit, offset }) {
+    const where = [ALIVE_POST];
+    const params = [];
+    if (category) {
+      where.push('p.category_code = ?');
+      params.push(category);
+    }
+    if (excludeClosed) where.push(`p.status = '${POST_STATUS.open}'`);
+    if (tags.length > 0) {
+      where.push(
+        `p.id IN (SELECT pt.post_id FROM post_tag pt JOIN tag t ON t.id = pt.tag_id
+                   WHERE t.name IN (?) GROUP BY pt.post_id HAVING COUNT(DISTINCT t.id) = ?)`,
+      );
+      params.push(tags, tags.length);
+    }
+    const condition = where.join(' AND ');
+
+    const [[{ totalCount }]] = await pool.query(`SELECT COUNT(*) AS totalCount FROM post p WHERE ${condition}`, params);
+    const [rows] = await pool.query(
+      `SELECT p.id, p.category_code AS categoryCode, g.code AS gameCode, g.name AS gameName,
+              p.party_type AS partyType, p.title, p.headcount, p.current_count AS currentCount,
+              p.schedule_at AS scheduleAt, p.voice_required AS voiceRequired, p.status,
+              p.view_count AS viewCount, p.comment_count AS commentCount, p.created_at AS createdAt,
+              m.nickname AS authorNickname, m.status AS authorStatus
+         FROM post p
+         JOIN game g ON g.id = p.game_id
+         JOIN member m ON m.id = p.author_id
+        WHERE ${condition}
+        ORDER BY ${LIST_ORDER[sort]}
+        LIMIT ? OFFSET ?`,
+      [...params, limit, offset],
+    );
+    return { rows, totalCount };
+  }
+
+  /** 여러 공고의 태그를 한 번에: { postId → 태그 이름[] } */
+  async function findTagNamesByPostIds(postIds) {
+    const byPost = new Map();
+    if (postIds.length === 0) return byPost;
+    const [rows] = await pool.query(
+      `SELECT pt.post_id AS postId, t.name FROM post_tag pt JOIN tag t ON t.id = pt.tag_id
+        WHERE pt.post_id IN (?) ORDER BY pt.created_at, t.id`,
+      [postIds],
+    );
+    for (const row of rows) {
+      if (!byPost.has(row.postId)) byPost.set(row.postId, []);
+      byPost.get(row.postId).push(row.name);
+    }
+    return byPost;
+  }
+
+  return { increaseViewCount, findPostDetail, findTagNames, findViewerState, findPostPage, findTagNamesByPostIds };
 }
 
 module.exports = { createBoardRepository };
