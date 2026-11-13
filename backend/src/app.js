@@ -8,6 +8,7 @@ const { createTokenProvider } = require('./common/tokenProvider');
 const { createRequireAuth } = require('./common/authMiddleware');
 const { createMemberModule } = require('./member');
 const { createPostModule } = require('./post');
+const { createGameModule } = require('./game');
 
 /**
  * Express 앱을 만듭니다. 서버 실행(server.js)과 분리해 테스트에서 DB 없이 띄울 수 있게 합니다.
@@ -15,13 +16,14 @@ const { createPostModule } = require('./post');
  *   pool?: import('mysql2/promise').Pool,
  *   memberRepository?: object,
  *   postRepository?: object,
+ *   gameRepository?: object,
  *   corsOrigins: string[],
  *   bcryptRounds: number,
  *   auth?: typeof env.auth,
  *   now?: () => Date,
  * }} options
  */
-function createApp({ pool, memberRepository, postRepository, corsOrigins, bcryptRounds, auth = env.auth, now }) {
+function createApp({ pool, memberRepository, postRepository, gameRepository, corsOrigins, bcryptRounds, auth = env.auth, now }) {
   const app = express();
 
   app.use(cors({ origin: corsOrigins }));
@@ -35,6 +37,7 @@ function createApp({ pool, memberRepository, postRepository, corsOrigins, bcrypt
 
   const post = createPostModule({ pool, postRepository, requireAuth, now });
   app.use('/api/posts', post.router);
+  app.use('/api/games', createGameModule({ pool, gameRepository }).router);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

@@ -21,8 +21,9 @@ function createFakeRepository() {
     async findGameByCode(code) {
       return code === 'lostark' ? { id: 1, categoryCode: 'mmorpg' } : null;
     },
-    async findGameContentId(gameId, code) {
-      return gameId === 1 && code === 'kamen' ? 10 : null;
+    async findGameContent(gameId, code) {
+      if (gameId !== 1) return null;
+      return { kamen: { id: 10, type: 'raid', maxHeadcount: 8 }, ranked: { id: 11, type: 'rank', maxHeadcount: 5 } }[code] ?? null;
     },
     async createPost({ post, tags }) {
       state.posts.push({ ...post, tags });
@@ -123,6 +124,18 @@ describe('POST /api/posts', () => {
     const res = await post({ ...validBody(), game: 'nope' });
     assert.equal(res.status, 404);
     assert.equal((await res.json()).error.code, 'GAME_NOT_FOUND');
+  });
+
+  it('모집 유형과 맞지 않는 상세 분류면 400', async () => {
+    const res = await post({ ...validBody(), detail: 'ranked' });
+    assert.equal(res.status, 400);
+    assert.equal((await res.json()).error.fields[0].field, 'detail');
+  });
+
+  it('상세 분류의 최대 인원을 넘으면 400', async () => {
+    const res = await post({ ...validBody(), headcount: 9 });
+    assert.equal(res.status, 400);
+    assert.equal((await res.json()).error.fields[0].field, 'headcount');
   });
 
   it('게임에 없는 상세 분류면 404', async () => {

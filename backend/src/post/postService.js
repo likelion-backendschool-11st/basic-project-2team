@@ -18,8 +18,19 @@ function createPostService({ postRepository, now = () => new Date() }) {
 
     let gameContentId = null;
     if (input.detail) {
-      gameContentId = await postRepository.findGameContentId(game.id, input.detail);
-      if (gameContentId === null) throw new ApiError(404, 'GAME_CONTENT_NOT_FOUND', postMessages.detailNotFound);
+      const content = await postRepository.findGameContent(game.id, input.detail);
+      if (!content) throw new ApiError(404, 'GAME_CONTENT_NOT_FOUND', postMessages.detailNotFound);
+      if (content.type !== input.type) {
+        throw new ApiError(400, 'INVALID_INPUT', postMessages.invalidInput, [
+          { field: 'detail', message: postMessages.detailTypeMismatch },
+        ]);
+      }
+      if (input.headcount > content.maxHeadcount) {
+        throw new ApiError(400, 'INVALID_INPUT', postMessages.invalidInput, [
+          { field: 'headcount', message: postMessages.headcountOverMax(content.maxHeadcount) },
+        ]);
+      }
+      gameContentId = content.id;
     }
 
     const id = await postRepository.createPost({

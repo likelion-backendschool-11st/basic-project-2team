@@ -10,8 +10,8 @@ const HEADCOUNT_MAX = 16;
 const MAX_TAGS = 5;
 const TAG_MAX_LENGTH = 20;
 
-/** frontend/src/data/writeData.ts 의 모집 유형 · 플레이 스타일 */
-const PARTY_TYPES = Object.freeze(['raid', 'rank', 'casual']);
+/** 모집 유형은 game_content.content_type(RANK/NORMAL/DUNGEON/RAID)을 소문자로 쓴 값, 플레이 스타일은 frontend writeData.ts 기준 */
+const PARTY_TYPES = Object.freeze(['raid', 'dungeon', 'rank', 'normal']);
 const PLAY_STYLES = Object.freeze(['hard', 'casual', 'newbie', 'any']);
 
 const postMessages = Object.freeze({
@@ -33,6 +33,8 @@ const postMessages = Object.freeze({
   tagsInvalid: `태그는 공백 없는 ${TAG_MAX_LENGTH}자 이하 문자열 최대 ${MAX_TAGS}개여야 합니다.`,
   gameNotFound: '존재하지 않는 게임입니다.',
   detailNotFound: '해당 게임에 없는 상세 분류입니다.',
+  headcountOverMax: (max) => `이 모드의 최대 모집 인원은 ${max}명입니다.`,
+  detailTypeMismatch: '선택한 모집 유형에 속하지 않는 상세 분류입니다.',
 });
 
 module.exports = {

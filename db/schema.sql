@@ -200,14 +200,16 @@ CREATE TABLE game (
 CREATE TABLE game_content (
   id            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   game_id       BIGINT UNSIGNED NOT NULL,
-  content_type  VARCHAR(20)     NOT NULL COMMENT 'RANK / DUNGEON / RAID',
+  content_type  VARCHAR(20)     NOT NULL COMMENT 'RANK / NORMAL / DUNGEON / RAID',
   code          VARCHAR(30)     NOT NULL COMMENT 'kamen ...',
   name          VARCHAR(50)     NOT NULL,
+  max_headcount TINYINT UNSIGNED NOT NULL DEFAULT 16 COMMENT '파티장 포함 최대 모집 인원 2~16',
   created_at    DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at    DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   CONSTRAINT uq_game_content_code UNIQUE (game_id, code),
-  CONSTRAINT fk_game_content_game FOREIGN KEY (game_id) REFERENCES game (id) ON DELETE RESTRICT
+  CONSTRAINT fk_game_content_game FOREIGN KEY (game_id) REFERENCES game (id) ON DELETE RESTRICT,
+  CONSTRAINT ck_game_content_max_headcount CHECK (max_headcount BETWEEN 2 AND 16)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '레이드·던전 등 세부 콘텐츠';
 
 CREATE TABLE tag (

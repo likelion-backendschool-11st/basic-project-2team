@@ -14,13 +14,13 @@ function createPostRepository(pool) {
     return rows[0] ?? null;
   }
 
-  /** 게임 안의 상세 콘텐츠 코드 → id. 없으면 null */
-  async function findGameContentId(gameId, code) {
-    const [rows] = await pool.query('SELECT id FROM game_content WHERE game_id = ? AND code = ? LIMIT 1', [
-      gameId,
-      code,
-    ]);
-    return rows[0]?.id ?? null;
+  /** 게임 안의 상세 콘텐츠 코드 → { id, type(소문자), maxHeadcount }. 없으면 null */
+  async function findGameContent(gameId, code) {
+    const [rows] = await pool.query(
+      'SELECT id, LOWER(content_type) AS type, max_headcount AS maxHeadcount FROM game_content WHERE game_id = ? AND code = ? LIMIT 1',
+      [gameId, code],
+    );
+    return rows[0] ?? null;
   }
 
   /** 공고와 태그 연결을 한 트랜잭션으로 저장하고 새 공고 id 를 반환합니다. */
@@ -67,7 +67,7 @@ function createPostRepository(pool) {
     }
   }
 
-  return { findGameByCode, findGameContentId, createPost };
+  return { findGameByCode, findGameContent, createPost };
 }
 
 module.exports = { createPostRepository };
