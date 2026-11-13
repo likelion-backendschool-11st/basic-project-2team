@@ -5,6 +5,12 @@ const cors = require('cors');
 const { env } = require('./config/env');
 const { notFoundHandler, errorHandler } = require('./common/errorHandler');
 const { createTokenProvider } = require('./common/tokenProvider');
+const { createRequireAuth, createOptionalAuth } = require('./common/authMiddleware');
+const { createMailer } = require('./common/mailer');
+const { createEmailVerificationModule } = require('./emailVerification');
+const { createMemberModule } = require('./member');
+const { createPostModule } = require('./post');
+const { createBoardModule } = require('./board');
 const { createRequireAuth, createRequireAdmin } = require('./common/authMiddleware');
 const { createMemberModule } = require('./member');
 const { createPostModule } = require('./post');
@@ -16,6 +22,9 @@ const { createAdminModule } = require('./admin');
  *   pool?: import('mysql2/promise').Pool,
  *   memberRepository?: object,
  *   postRepository?: object,
+ *   boardRepository?: object,
+ *   emailVerificationRepository?: object,
+ *   mailer?: ReturnType<typeof createMailer>,
  *   adminRepository?: object,
  *   corsOrigins: string[],
  *   bcryptRounds: number,
@@ -27,6 +36,9 @@ function createApp({
   pool,
   memberRepository,
   postRepository,
+  boardRepository,
+  emailVerificationRepository,
+  mailer = createMailer(env.mail),
   adminRepository,
   corsOrigins,
   bcryptRounds,
@@ -40,6 +52,7 @@ function createApp({
 
   const tokenProvider = createTokenProvider(auth);
   const requireAuth = createRequireAuth(tokenProvider);
+  const optionalAuth = createOptionalAuth(tokenProvider);
   const requireAdmin = createRequireAdmin(tokenProvider);
 
   const emailVerification = createEmailVerificationModule({
@@ -57,6 +70,9 @@ function createApp({
   const post = createPostModule({ pool, postRepository, requireAuth, now });
   app.use('/api/posts', post.router);
 
+  // GET /api/posts/:postId 를 잡으므로 /api/posts 아래 고정 경로(popular, urgent …)는 이보다 먼저 마운트된 라우터에 둡니다.
+  const board = createBoardModule({ pool, boardRepository, optionalAuth });
+  app.use('/api/posts', board.router);
   const admin = createAdminModule({ pool, adminRepository, tokenProvider, requireAdmin, bcryptRounds, now });
   app.use('/api/admin', admin.router);
 

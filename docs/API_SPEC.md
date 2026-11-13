@@ -275,6 +275,43 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 - `schedule` 은 시간대(offset)를 포함한 ISO-8601 이며 현재 이후여야 합니다. `scheduleTbd: true` 이면 `schedule` 은 무시하고 NULL 로 저장합니다.
 - 오류: 400 `INVALID_INPUT`(필드별), 401 `UNAUTHORIZED`, 404 `GAME_NOT_FOUND`·`GAME_CONTENT_NOT_FOUND`.
 
+**공고 상세 (`GET /api/posts/{postId}`)**
+
+- 로그인 없이 조회할 수 있습니다. `Authorization` 헤더를 보내면 `viewer` 에 로그인한 사용자 기준 정보가 담기고, 헤더가 있는데 토큰이 틀리거나 만료됐으면 401 (`UNAUTHORIZED` · `TOKEN_EXPIRED`) 입니다.
+- 호출할 때마다 조회수가 1 오르며, 응답 `views` 는 오른 뒤의 값입니다.
+- 필드 이름은 공고 작성 요청과 같습니다 (`game`·`detail` 은 코드, 이름은 `gameName`·`detailName`). `current` 는 파티장을 포함한 현재 인원입니다.
+- 확정 파티원 목록은 `GET /api/posts/{postId}/participants`, 관련 공고는 `GET /api/posts/{postId}/related` 로 따로 조회합니다.
+- 오류: 404 `POST_NOT_FOUND` (없음, 삭제됨, `postId` 가 1 이상의 정수가 아님), 401 (잘못된 토큰).
+
+```json
+{
+  "id": 7,
+  "category": "mmorpg", "categoryName": "MMORPG",
+  "game": "lostark", "gameName": "로스트아크",
+  "detail": "kamen", "detailName": "카멘", "detailType": "RAID",
+  "type": "raid",
+  "title": "[카멘 1-3관] 1620+ 숙련 랏서폿 1분 모십니다",
+  "body": "마크다운 본문",
+  "partyName": "카멘 하드 숙련팟",
+  "style": "hard",
+  "requiredSpec": null,
+  "headcount": 8, "current": 7,
+  "schedule": "2026-11-15T12:00:00.000Z", "scheduleTbd": false,
+  "voiceRequired": true,
+  "status": "OPEN",
+  "views": 129, "commentCount": 3,
+  "tags": ["숙련", "디코필수"],
+  "host": { "id": 3, "nickname": "빛나는오더", "avatarUrl": null, "level": 52, "mannerTemp": 99.8, "reviewCount": 184 },
+  "viewer": { "isOwner": false, "scrapped": true, "applicationStatus": "PENDING" },
+  "createdAt": "2026-11-12T11:30:00.000Z",
+  "updatedAt": "2026-11-12T11:30:00.000Z"
+}
+```
+
+- `detail`·`detailName`·`detailType`·`partyName`·`style`·`requiredSpec` 은 없으면 `null`. 일정 미정이면 `schedule: null`, `scheduleTbd: true`.
+- `viewer` 는 비로그인이면 `null`. `applicationStatus` 는 신청한 적이 없으면 `null`, 아니면 `PENDING`·`ACCEPTED`·`REJECTED`·`CANCELED`·`NO_SHOW`.
+- 탈퇴한 작성자는 `host.nickname` 이 `"탈퇴한 회원"`, `avatarUrl` 이 `null` 입니다.
+
 **공고 목록 아이템 (`BoardPost`)**
 
 ```json
