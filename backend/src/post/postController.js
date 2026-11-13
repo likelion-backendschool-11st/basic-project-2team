@@ -9,7 +9,15 @@ function createPostController(postService) {
     return sendSuccess(res, 201, data);
   }
 
-  return { create };
+  async function saveDraft(req, res) {
+    return sendSuccess(res, 200, await postService.saveDraft(req.auth.memberId, req.body));
+  }
+
+  async function getLatestDraft(req, res) {
+    return sendSuccess(res, 200, await postService.getLatestDraft(req.auth.memberId));
+  }
+
+  return { create, saveDraft, getLatestDraft };
 }
 
 module.exports = { createPostController };

@@ -25,6 +25,9 @@ export const writeText = {
   crumbCurrent: '공고글 작성하기',
   draftSaved: (time: string) => `임시저장됨 (${time})`,
   draftButton: '임시저장',
+  draftLoaded: '임시저장된 글을 불러왔습니다.',
+  draftSaveFailed: '임시저장에 실패했습니다. 잠시 후 다시 시도해주세요.',
+  draftNeedLogin: '임시저장은 로그인 후 사용할 수 있습니다.',
   leave: '나가기',
   titleLabel: '공고글 제목',
   titlePlaceholder: '예) [카멘 1-3관] 1620+ 숙련 랏서폿 1분 모십니다',
@@ -49,6 +52,7 @@ export const writeText = {
   section2Side: '세부 조율',
   partyName: '파티 명',
   partyNameSide: '메인 노출명',
+  partyNamePlaceholder: '예) 카멘 1-3관 숙련 쾌속팟',
   game: '게임 선택',
   type: '모집 유형',
   detail: '상세 분류 (보스/던전명)',
@@ -93,18 +97,9 @@ export const toolbarActions: readonly ToolbarAction[] = [
 ];
 
 export const initialDraft = {
-  title: '[카멘 1-3관] 1620+ 숙련 랏서폿 1분 모십니다 (트라이X, 디코필참)',
-  body: `안녕하세요! 금요일 밤 카멘 1-3관 원클팟 랏서폿(바드 or 홀나) 1자리 모십니다.
-
-■ 출발 시간: 이번 주 금요일 밤 10시 정각 출발
-■ 현재 구성: 딜러 7명 구성 완료 (평균 1625+, 전원 암흑불길/빛무리 보유)
-■ 조건:
- - 1620+ 서포터 (극신속 선호, 풋 엘릭서 40)
- - 1-3관 숙련 (사고시 피드백 원활하고 멘탈 좋으신 분)
- - OurParty 디스코드 채널 입장 필수 (듣톡 가능)
-
-신청 주시면 스펙 확인 후 5분 내로 수락 드립니다. 편하게 지원해주세요!`,
-  partyName: '카멘 1-3관 숙련 쾌속팟',
+  title: '',
+  body: '',
+  partyName: '',
   // 게임·모집 유형·상세 분류는 GET /api/games 로 불러온 뒤 채웁니다.
   game: '',
   type: '',

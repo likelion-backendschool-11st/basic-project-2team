@@ -12,6 +12,8 @@ const {
   TAG_MAX_LENGTH,
   PARTY_TYPES,
   PLAY_STYLES,
+  DRAFT_STRING_FIELDS,
+  DRAFT_BOOLEAN_FIELDS,
   postMessages: m,
 } = require('./postConstants');
 
@@ -109,4 +111,32 @@ function validateCreatePost(body, now) {
   };
 }
 
-module.exports = { validateCreatePost };
+/**
+ * 임시저장 본문에서 알려진 필드만 골라냅니다. 작성 도중의 미완성 값이라 비어 있거나 덜 채워져도 허용하고,
+ * 타입이 틀리거나 너무 긴 값만 400 으로 거절합니다.
+ */
+function validateDraft(body) {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) throw new ApiError(400, 'INVALID_INPUT', m.draftInvalid);
+  const draft = {};
+  const fields = [];
+  const fail = (field) => fields.push({ field, message: m.draftInvalid });
+
+  for (const [key, max] of Object.entries(DRAFT_STRING_FIELDS)) {
+    if (body[key] === undefined) continue;
+    if (typeof body[key] !== 'string' || charLength(body[key]) > max) fail(key);
+    else draft[key] = body[key];
+  }
+  for (const key of DRAFT_BOOLEAN_FIELDS) {
+    if (body[key] === undefined) continue;
+    if (typeof body[key] !== 'boolean') fail(key);
+    else draft[key] = body[key];
+  }
+  if (body.headcount !== undefined) {
+    if (!Number.isInteger(body.headcount) || body.headcount < HEADCOUNT_MIN || body.headcount > HEADCOUNT_MAX) fail('headcount');
+    else draft.headcount = body.headcount;
+  }
+  if (fields.length > 0) throw new ApiError(400, 'INVALID_INPUT', m.invalidInput, fields);
+  return draft;
+}
+
+module.exports = { validateCreatePost, validateDraft };

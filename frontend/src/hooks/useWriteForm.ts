@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { HEADCOUNT_MAX, initialDraft, toolbarActions, typeLabels, writeText, type SelectOption, type ToolbarAction } from '../data/writeData';
 import { paths, ROUTES } from '../data/routes';
 import { getGames, type Game } from '../api/gameApi';
-import { createPost } from '../api/postApi';
+import { createPost, getLatestDraft, saveDraft as saveDraftApi } from '../api/postApi';
 import { ApiRequestError } from '../api/http';
 import { useModal } from './useModal';
 import { useToast } from './useToast';
@@ -27,13 +27,13 @@ function normalizeDraft(draft: WriteDraft, games: readonly Game[]): WriteDraft {
   return { ...draft, game: game?.code ?? '', type, detail, headcount: Math.min(draft.headcount, maxHeadcount) };
 }
 
-const clock = () => new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
+const clock = (date = new Date()) => date.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
 const labelOf = (list: readonly { value: string; label: string }[], value: string) => list.find((o) => o.value === value)?.label ?? '';
 
 export function useWriteForm() {
   const navigate = useNavigate();
   const [draft, setDraft] = useState<WriteDraft>(initialDraft);
-  const [savedAt, setSavedAt] = useState(clock);
+  const [savedAt, setSavedAt] = useState<string | null>(null);
   const [previewing, setPreviewing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -42,18 +42,27 @@ export function useWriteForm() {
   const leave = useModal(false);
   const toast = useToast();
 
-  /** 게임 목록은 DB(GET /api/games)에서 한 번 불러옵니다. */
+  /**
+   * 게임 목록(GET /api/games)과 내 임시저장(GET /api/posts/drafts/latest)을 한 번 불러옵니다.
+   * 임시저장은 게임 목록이 있어야 선택값을 맞출 수 있어서 함께 받고, 로그인하지 않았거나 실패하면 빈 폼으로 시작합니다.
+   */
   useEffect(() => {
     let cancelled = false;
-    getGames()
-      .then((list) => {
+    Promise.all([getGames(), getLatestDraft().catch(() => null)])
+      .then(([list, saved]) => {
         if (cancelled) return;
         setGames(list);
+        if (saved) {
+          setDraft(normalizeDraft({ ...initialDraft, ...saved.draft }, list));
+          setSavedAt(clock(new Date(saved.savedAt)));
+          toast.show(writeText.draftLoaded);
+        }
       })
       .catch(() => !cancelled && setError(writeText.optionsLoadFailed));
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- toast.show 는 안정적이라 한 번만 실행
   }, []);
 
   const set = useCallback(
@@ -88,9 +97,15 @@ export function useWriteForm() {
     });
   };
 
-  const saveDraft = () => {
-    setSavedAt(clock());
-    toast.show('임시저장 되었습니다.');
+  /** 작성 중인 폼을 서버에 저장합니다(회원당 1개, 덮어쓰기). */
+  const saveDraft = async () => {
+    try {
+      const saved = await saveDraftApi(draft);
+      setSavedAt(clock(new Date(saved.savedAt)));
+      toast.show('임시저장 되었습니다.');
+    } catch (err) {
+      toast.show(err instanceof ApiRequestError && err.status === 401 ? writeText.draftNeedLogin : writeText.draftSaveFailed);
+    }
   };
 
   /** 공고 작성 API 호출. 성공하면 새 공고 상세로 이동하고, 실패하면 서버 메시지를 보여줍니다. */

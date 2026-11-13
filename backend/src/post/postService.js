@@ -2,7 +2,7 @@
 
 const { ApiError } = require('../common/ApiError');
 const { postMessages } = require('./postConstants');
-const { validateCreatePost } = require('./postValidator');
+const { validateCreatePost, validateDraft } = require('./postValidator');
 
 /**
  * 공고 작성 비즈니스 로직.
@@ -53,7 +53,24 @@ function createPostService({ postRepository, now = () => new Date() }) {
     return { id };
   }
 
-  return { createPost };
+  /** mysql2 는 JSON 컬럼을 객체로 돌려주지만 문자열로 올 수도 있어 둘 다 받습니다. */
+  const toDraftResponse = (row) => ({
+    draft: typeof row.payload === 'string' ? JSON.parse(row.payload) : row.payload,
+    savedAt: new Date(row.savedAt).toISOString(),
+  });
+
+  /** POST /api/posts/drafts — 새로 저장하면 이전 임시저장을 덮어씁니다. */
+  async function saveDraft(memberId, body) {
+    return toDraftResponse(await postRepository.saveDraft(memberId, validateDraft(body)));
+  }
+
+  /** GET /api/posts/drafts/latest — 없으면 null */
+  async function getLatestDraft(memberId) {
+    const row = await postRepository.findDraft(memberId);
+    return row ? toDraftResponse(row) : null;
+  }
+
+  return { createPost, saveDraft, getLatestDraft };
 }
 
 module.exports = { createPostService };
