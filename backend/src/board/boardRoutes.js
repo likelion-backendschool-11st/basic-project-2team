@@ -13,6 +13,7 @@ function createBoardRouter(boardController, { optionalAuth, commentRouter }) {
   router.get('/popular', boardController.popular);
   router.get('/urgent', boardController.urgent);
   router.use('/:postId/comments', commentRouter);
+  router.get('/:postId/related', boardController.related);
   router.get('/:postId', optionalAuth, boardController.getDetail);
   return router;
 }

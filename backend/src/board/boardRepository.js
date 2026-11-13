@@ -153,6 +153,32 @@ function createBoardRepository(pool) {
     return rows;
   }
 
+  /**
+   * 한 공고의 관련 공고: 같은 게임의, 모집 중이고 아직 출발하지 않은(일정 미정 포함) 다른 공고.
+   * 같은 상세 분류 → 겹치는 태그가 많은 순 → 최신순으로 정렬합니다.
+   * @returns {Promise<object[] | null>} 기준 공고가 없거나 삭제됐으면 null
+   */
+  async function findRelatedPosts({ postId, limit, now }) {
+    const [[source]] = await pool.query(
+      `SELECT p.game_id AS gameId, p.game_content_id AS gameContentId FROM post p WHERE p.id = ? AND ${ALIVE_POST}`,
+      [postId],
+    );
+    if (!source) return null;
+    const [rows] = await pool.query(
+      `SELECT ${LIST_COLUMNS}
+         ${LIST_JOINS}
+        WHERE ${ALIVE_POST} AND p.id <> ? AND p.game_id = ? AND p.status = '${POST_STATUS.open}'
+          AND (p.schedule_at IS NULL OR p.schedule_at > ?)
+        ORDER BY (p.game_content_id <=> ?) DESC,
+                 (SELECT COUNT(*) FROM post_tag pt WHERE pt.post_id = p.id
+                     AND pt.tag_id IN (SELECT tag_id FROM post_tag WHERE post_id = ?)) DESC,
+                 p.created_at DESC, p.id DESC
+        LIMIT ?`,
+      [postId, source.gameId, now, source.gameContentId, postId, limit],
+    );
+    return rows;
+  }
+
   /** 여러 공고의 태그를 한 번에: { postId → 태그 이름[] } */
   async function findTagNamesByPostIds(postIds) {
     const byPost = new Map();
@@ -169,7 +195,7 @@ function createBoardRepository(pool) {
     return byPost;
   }
 
-  return { increaseViewCount, findPostDetail, findTagNames, findViewerState, findPostPage, findFeaturedPosts, findTagNamesByPostIds };
+  return { increaseViewCount, findPostDetail, findTagNames, findViewerState, findPostPage, findFeaturedPosts, findRelatedPosts, findTagNamesByPostIds };
 }
 
 module.exports = { createBoardRepository };

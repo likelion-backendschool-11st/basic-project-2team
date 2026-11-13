@@ -60,6 +60,15 @@ function parseFeaturedQuery(query) {
   return { category, limit };
 }
 
+/** 관련 공고 쿼리(limit)를 검증·정규화합니다. limit 규칙은 인기·마감 임박과 같습니다. */
+function parseRelatedQuery(query) {
+  const limit = parseInteger(query.limit, DEFAULT_FEATURED_LIMIT);
+  if (limit === null || limit < 1 || limit > MAX_FEATURED_LIMIT) {
+    throw new ApiError(400, 'INVALID_INPUT', m.invalidInput, [{ field: 'limit', message: m.limitInvalid }]);
+  }
+  return { limit };
+}
+
 /**
  * 공고 목록 쿼리(category, q, sort, tags, page, size, excludeClosed)를 검증·정규화합니다.
  * @returns {{ category: string | null, q: string, sort: string, tags: string[], page: number, size: number, excludeClosed: boolean }}
@@ -93,4 +102,4 @@ function parseListQuery(query) {
   return { category, q, sort, tags, page, size, excludeClosed: excludeClosedRaw === 'true' };
 }
 
-module.exports = { parsePostId, parseListQuery, parseFeaturedQuery };
+module.exports = { parsePostId, parseListQuery, parseFeaturedQuery, parseRelatedQuery };
