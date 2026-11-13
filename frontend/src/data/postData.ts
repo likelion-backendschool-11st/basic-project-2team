@@ -3,9 +3,6 @@ import { paths } from './routes';
 
 /** Stitch screens: "공고글 상세 - 파티원 모드 / 작성자 모드" (project 15649597777945524469), comments (project 270338861769685965) */
 
-/** 마이페이지 목 데이터(myPageData)가 링크하는 공고 id. 마이페이지 API 연동 후 제거합니다. */
-export const MY_POST_ID = 'mmorpg-7';
-
 export type PostStatus = 'OPEN' | 'CLOSED' | 'COMPLETED';
 export type ApplicationStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'CANCELED' | 'NO_SHOW';
 

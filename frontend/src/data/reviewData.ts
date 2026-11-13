@@ -71,7 +71,22 @@ export const reviewText = {
   tagHint: '(파티원 칭찬 키워드 선택)',
   tagSelectedSuffix: '개 선택됨',
   submit: '등록',
-  submitNote: '작성하신 평가는 최종 승인 후 파티원 매너 온도에 반영됩니다.',
+  submitNote: '등록한 평가는 파티원 매너 온도에 바로 반영되며 수정·삭제할 수 없습니다.',
+  submitting: '등록 중…',
+  hostRole: '파티장',
+  memberRole: '파티원',
+  loadFailed: '평가할 파티원을 불러오지 못했습니다.',
+  submitFailed: '평가를 등록하지 못했습니다.',
+  allReviewed: '이미 모든 파티원을 평가했습니다.',
+  submitted: (name: string) => `${name}님에게 평가를 남겼습니다.`,
+  finished: '모든 파티원 평가를 마쳤습니다. 감사합니다!',
+};
+
+/** 실제 평가 창(마이페이지)의 시작 값 — 별점·후기·태그 모두 비운 상태 */
+export const reviewEmptyDefaults = {
+  rating: 0,
+  text: '',
+  selectedTagIds: [] as readonly string[],
 };
 
 export const confirmText = {

@@ -27,3 +27,7 @@ export const saveDraft = (draft: object) => request<DraftResponse>('POST', '/api
 export const getLatestDraft = () => request<DraftResponse | null>('GET', '/api/posts/drafts/latest');
 
 export const createPost = (body: CreatePostRequest) => request<{ readonly id: number }>('POST', '/api/posts', body);
+
+/** PATCH /api/posts/{postId}/status — COMPLETED 는 마이페이지 「활동 완료」에서만 쓰고 되돌릴 수 없습니다. */
+export const changePostStatus = (postId: number, status: 'OPEN' | 'CLOSED' | 'COMPLETED') =>
+  request<{ readonly id: number; readonly status: string }>('PATCH', `/api/posts/${postId}/status`, { status });

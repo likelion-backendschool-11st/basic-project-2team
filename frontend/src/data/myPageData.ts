@@ -1,10 +1,20 @@
-import { MY_POST_ID } from './postData';
-import { paths, ROUTES } from './routes';
+import { ROUTES } from './routes';
 
 export type GameAccent = 'amber' | 'blue' | 'rose';
-export type PostStatus = 'completed' | 'closed' | 'open';
-export type PresenceStatus = 'online' | 'away' | 'offline';
-export type ActivityTab = 'posts' | 'comments';
+export type ActivityTab = 'posts' | 'parties' | 'comments';
+
+/**
+ * 목록 「상태 / 조치」 칸에 보여줄 것.
+ * - `complete`: 「활동 완료 처리」 버튼 (PATCH /api/posts/{postId}/status)
+ * - `review`: 「별점 평가」 버튼 (평가할 파티원이 남음)
+ * - `label`: 버튼 없이 상태만 표시 (모집 중·마감·평가 완료 …)
+ */
+export type ActivityActionKind = 'complete' | 'review' | 'label';
+
+export interface ActivityAction {
+  readonly kind: ActivityActionKind;
+  readonly label: string;
+}
 
 export interface AccountMenuItem {
   readonly id: string;
@@ -31,8 +41,32 @@ export interface TopTag {
   readonly percent: string;
 }
 
+export interface ProfileField {
+  readonly id: string;
+  readonly label: string;
+  readonly value: string;
+}
+
+/** 마이페이지 상단 프로필 카드 (GET /api/members/me/summary 를 화면용으로 바꾼 값) */
+export interface ProfileSummary {
+  readonly avatarUrl: string | null;
+  readonly nickname: string;
+  readonly levelLabel: string;
+  /** 대표 게임 배지. 게이머 프로필이 없으면 null */
+  readonly mainGameBadge: string | null;
+  readonly fields: readonly ProfileField[];
+  readonly intro: string;
+  readonly stats: readonly ProfileStat[];
+  readonly rating: { readonly score: string; readonly temperature: string };
+  readonly topTagsCaption: string;
+  readonly topTags: readonly TopTag[];
+}
+
+/** 내 공고 · 참여한 파티 한 줄 */
 export interface ActivityPost {
   readonly id: string;
+  /** 「활동 완료」·「별점 평가」를 호출할 공고 id */
+  readonly postId: number;
   readonly no: number;
   readonly game: string;
   readonly accent: GameAccent;
@@ -40,7 +74,7 @@ export interface ActivityPost {
   readonly members: string;
   readonly full: boolean;
   readonly date: string;
-  readonly status: PostStatus;
+  readonly action: ActivityAction;
   readonly to: string;
 }
 
@@ -56,14 +90,12 @@ export interface ActivityComment {
 }
 
 export interface FavoriteUser {
-  readonly id: string;
+  readonly id: number;
   readonly name: string;
   readonly level: number;
   readonly detail: string;
-  readonly avatarUrl: string;
-  readonly presence: PresenceStatus;
-  readonly presenceLabel: string;
-  readonly action: 'invite' | 'profile';
+  readonly avatarUrl: string | null;
+  readonly manner: string;
 }
 
 export const accountMenu = {
@@ -77,50 +109,73 @@ export const accountMenu = {
   ] as readonly AccountMenuItem[],
 };
 
-export const profileSummary = {
-  avatarUrl:
-    'https://lh3.googleusercontent.com/aida-public/AB6AXuAlJEqvgA9E1E2unlsNxqAsnK1FI6VGDK4h92FQ2Z2tquqLBJFIcq8gbjv9GuRXqfxtHXOnJN8ZUrYWd0KtuIcxaxAZqsK35y5Hm5HQFq-SEAIEdmQ6NNb2wtSn6HucmWRky03z8cC3QJqieuzW8RM1e06ybtvnwIriH2OxefIPHpgkZdYy0GyjH9CxAMGaUuGqBRiC4OZl8f_xoLrLj-txkFCuMYNcffxuaNQDlP7V',
-  avatarAlt: '빛나는힐러 프로필 이미지',
+export const profileText = {
+  avatarAltSuffix: ' 프로필 이미지',
   avatarCaption: '프로필 이미지',
-  levelLabel: 'Lv.48',
-  nickname: '빛나는힐러',
-  positionBadge: '주포지션 서포터',
-  fields: [
-    { id: 'nickname', label: '닉네임 :' },
-    { id: 'games', label: '선호하는 게임 :', value: '로스트아크, 리그 오브 레전드, 발로란트' },
-    { id: 'style', label: '플레이 스타일 :', value: '즐겜 지향 / 보이스(디스코드) 선호 / 서포터·힐러 전담' },
-  ],
-  intro: '"멘탈 강하고 트라이 즐기는 힐러입니다. 언제든 편하게 말 걸어주세요!"',
-  stats: [
-    { id: 'posts', label: '게시글 수', value: '24', unit: '개' },
-    { id: 'matched', label: '매칭된 파티 수', value: '156', unit: '회 완료', highlight: true },
-  ] as readonly ProfileStat[],
-  rating: {
-    label: '유저 평점 (매너 온도)',
-    score: '4.7',
-    note: '(최근 30건 반영)',
-    temperature: '98.4°C',
-  },
+  levelPrefix: 'Lv.',
+  mainGamePrefix: '대표 게임 ',
+  nicknameLabel: '닉네임 :',
+  gamesLabel: '선호하는 게임 :',
+  styleLabel: '플레이 스타일 :',
+  noGames: '등록한 게임이 없습니다',
+  noStyle: '미설정',
+  noIntro: '아직 자기소개가 없습니다.',
+  postsLabel: '게시글 수',
+  postsUnit: '개',
+  partiesLabel: '완료한 파티 수',
+  partiesUnit: '회 완료',
+  ratingLabel: '유저 평점 (매너 온도)',
+  ratingNote: '(최근 30건 반영)',
+  noRating: '-',
+  temperatureSuffix: '°C',
   topTagsTitle: '유저들이 뽑은 태그 Top 3',
-  topTagsCaption: '따뜻한 공대장',
-  topTags: [
-    { rank: 1, label: '#멘탈갑_긍정왕', percent: '94%' },
-    { rank: 2, label: '#브리핑_장인', percent: '88%' },
-    { rank: 3, label: '#시간엄수_칼출발', percent: '82%' },
-  ] as readonly TopTag[],
+  reviewCountCaption: (count: number) => `받은 평가 ${count}건`,
+  noTopTags: '아직 받은 태그가 없습니다.',
   rankSuffix: '위',
+  loading: '프로필을 불러오는 중입니다…',
+  loadFailed: '프로필을 불러오지 못했습니다.',
+  retry: '다시 시도',
+};
+
+/** 게임 코드별 배지 색 (없는 게임은 blue) */
+export const gameAccents: Readonly<Record<string, GameAccent>> = {
+  lostark: 'amber',
+  ff14: 'amber',
+  wow: 'amber',
+  maplestory: 'amber',
+  lol: 'blue',
+  tft: 'blue',
+  overwatch: 'blue',
+  valorant: 'rose',
+  apex: 'rose',
+  pubg: 'rose',
+  dota2: 'rose',
 };
 
 export const activityText = {
   tabs: [
-    { id: 'posts', label: '게시글', badge: '3' },
+    { id: 'posts', label: '내 공고' },
+    { id: 'parties', label: '참여한 파티' },
     { id: 'comments', label: '댓글' },
   ] as readonly { readonly id: ActivityTab; readonly label: string; readonly badge?: string }[],
-  hint: '내가 모집한(참여한) 글 목록을 확인하고 파티 완료 여부를 제어합니다.',
-  postsTitle: '내가 모집한(참여한) 글',
-  postsCount: '총 3건 등록됨',
-  commentsTitle: '내가 작성한 댓글',
-  commentsCount: '총 3건 작성됨',
+  hint: '활동이 끝난 파티는 활동 완료 처리 후 파티원에게 별점을 남겨주세요.',
+  titles: {
+    posts: '내가 모집한 공고',
+    parties: '내가 참여한 파티',
+    comments: '내가 작성한 댓글',
+  } as Record<ActivityTab, string>,
+  countLabel: {
+    posts: (n: number) => `총 ${n}건 등록됨`,
+    parties: (n: number) => `총 ${n}건 참여함`,
+    comments: (n: number) => `총 ${n}건 작성됨`,
+  } as Record<ActivityTab, (n: number) => string>,
+  empty: {
+    posts: '아직 작성한 공고가 없습니다.',
+    parties: '아직 참여한 파티가 없습니다.',
+    comments: '아직 작성한 댓글이 없습니다.',
+  } as Record<ActivityTab, string>,
+  loading: '불러오는 중입니다…',
+  loadFailed: '목록을 불러오지 못했습니다.',
   columns: {
     no: '번호',
     game: '게임',
@@ -129,95 +184,43 @@ export const activityText = {
     status: '상태 / 조치',
     comment: '댓글 내용',
   },
-  status: {
-    completed: '활동 완료',
-    closed: '매칭 종료',
-    open: '활동 완료 처리',
-  } as Record<PostStatus, string>,
-  /** Total posts used for the "1-3 of 24개" range label. */
-  totalPosts: 24,
+  /** 공고 상태 (버튼이 없을 때 그대로 표시) */
+  postStatus: {
+    OPEN: '모집 중',
+    CLOSED: '모집 마감',
+    COMPLETED: '활동 완료',
+  } as Record<string, string>,
+  complete: '활동 완료 처리',
+  review: (reviewed: number, total: number) => `별점 평가 ${reviewed}/${total}`,
+  reviewed: '평가 완료',
+  hostPrefix: '파티장 ',
+  hiddenComment: '[가려진 댓글] ',
+  secretComment: '[비밀] ',
   rangeSuffix: '개',
-  pageSize: 3,
+  pageSize: 5,
   prevLabel: '<',
   nextLabel: '>',
 };
 
-export const activityPosts: readonly ActivityPost[] = [
-  { id: 'p1', no: 1, game: '로스트아크', accent: 'amber', title: '[로스트아크] 종익 트라이 저녁 8시부터 가실분', members: '(8/8)', full: true, date: '11-10', status: 'completed', to: paths.postDetail(MY_POST_ID) },
-  { id: 'p2', no: 2, game: '리그 오브 레전드', accent: 'blue', title: '칼바람 5인 나락 즐겜팟 음성필수', members: '(5/5)', full: true, date: '11-08', status: 'closed', to: paths.postDetail('mmorpg-2') },
-  { id: 'p3', no: 3, game: '발로란트', accent: 'rose', title: '골플 경쟁전 3인큐 구인 (연패 끊으실분)', members: '(2/3)', full: false, date: '11-12', status: 'open', to: paths.postDetail(MY_POST_ID) },
-  { id: 'p4', no: 4, game: '로스트아크', accent: 'amber', title: '[로스트아크] 카멘 노말 1-3관 숙련팟 서폿 구해요', members: '(8/8)', full: true, date: '11-05', status: 'closed', to: paths.postDetail('mmorpg-4') },
-  { id: 'p5', no: 5, game: '리그 오브 레전드', accent: 'blue', title: '자랭 골드~플래 3인 같이 올리실 분', members: '(5/5)', full: true, date: '11-03', status: 'closed', to: paths.postDetail('mmorpg-5') },
-  { id: 'p6', no: 6, game: '발로란트', accent: 'rose', title: '언레 5인 즐겜 내전 인원 모집', members: '(10/10)', full: true, date: '11-01', status: 'closed', to: paths.postDetail('mmorpg-6') },
-];
-
-export const activityComments: readonly ActivityComment[] = [
-  { id: 'c1', no: 1, game: '로스트아크', accent: 'amber', postTitle: '[로스트아크] 에키드나 하드 랏딜러 바로 출발합니다', content: '서폿 자리 남았으면 신청합니다! 1640 바드입니다.', date: '11-11', to: paths.postDetail('mmorpg-1') },
-  { id: 'c2', no: 2, game: '리그 오브 레전드', accent: 'blue', postTitle: '[롤] 에메랄드~다이아 자유랭크 5인큐', content: '서폿 메인 에메2입니다. 디코 가능해요.', date: '11-09', to: paths.postDetail('mmorpg-2') },
-  { id: 'c3', no: 3, game: '발로란트', accent: 'rose', postTitle: '[발로란트] 초월자 듀오나 3인팟', content: '세이지/스카이 가능합니다. 브리핑 잘 따라가요!', date: '11-07', to: paths.postDetail('mmorpg-3') },
-];
+export const completeText = {
+  title: '활동을 완료 처리할까요?',
+  description: '완료하면 모집 상태로 되돌릴 수 없고, 파티원 모두에게 활동 점수가 지급됩니다. 이후 파티원끼리 별점 평가를 할 수 있습니다.',
+  confirm: '활동 완료',
+  confirming: '처리 중…',
+  cancel: '취소',
+  done: '활동 완료 처리했습니다. 파티원에게 별점을 남겨주세요.',
+  failed: '활동 완료 처리에 실패했습니다.',
+};
 
 export const favoritesText = {
   title: '즐겨찾기 한 유저 목록',
   countSuffix: '명',
-  viewAll: '전체보기',
-  viewAllTo: ROUTES.myPage,
   levelPrefix: 'Lv.',
-  actions: {
-    invite: '파티 초대',
-    profile: '프로필',
-  },
-  presenceTitles: {
-    online: '온라인',
-    away: '자리비움',
-    offline: '오프라인',
-  } as Record<PresenceStatus, string>,
+  mannerPrefix: '매너 ',
+  noMainGame: '대표 게임 미설정',
+  remove: '즐겨찾기 해제',
+  removed: (name: string) => `${name}님을 즐겨찾기에서 해제했습니다.`,
+  removeFailed: '즐겨찾기 해제에 실패했습니다.',
+  empty: '아직 즐겨찾기한 유저가 없습니다.',
   avatarAltSuffix: ' 아바타',
 };
-
-export const favoriteUsers: readonly FavoriteUser[] = [
-  {
-    id: 'f1',
-    name: '철수',
-    level: 52,
-    detail: '로스트아크 · 딜러',
-    avatarUrl:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuDFLFDr_pOlp3YWn01tl3tkn2zDXiL98klc9a6cRHvwJdcb3pKh7gKTGgGsg8k4vUH3y0bwYuHR_KkU4kbTHiaic9NAXumUh4Flu8k9YgD6nTBp_Z4MKudfNHFTt1JVqNksICtgihrcbZ9ocMSF5HwvgC-GDOLZwMXeK9caIeqHgn_G2UFF3JD2L7rw8nuxwCVpHOD8woeliPpzIgJocNz0XVdIgIXTGx2rCuyToOuT',
-    presence: 'online',
-    presenceLabel: '온라인 (게임 중)',
-    action: 'invite',
-  },
-  {
-    id: 'f2',
-    name: '짱구',
-    level: 40,
-    detail: '발로란트 · 타격대',
-    avatarUrl:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuClwJLjYbdmDpmJrG2sWvARWl10WLqSSXWIp7sP7-wJ5N93eV1ADEfJRbK7Oc0tJA0qOKxGKWDcyM5CDeyEIM7-HOWx0VgVveBDmMLj_st21hJnDQtHKTZuNYOEZBODUYhmg-tTA-RpWLftuXJg_lazPubMKyfSEGYXhjIitIfHQ2ykp7oB7cxR04ELiNKCC3AS8t40rqXtmtewkP_aPCkRCoucnww8SzdzSRtNEUQl',
-    presence: 'online',
-    presenceLabel: '접속 중',
-    action: 'invite',
-  },
-  {
-    id: 'f3',
-    name: '유리',
-    level: 61,
-    detail: '리그 오브 레전드 · 미드',
-    avatarUrl:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuCJiY0VhVKjYcWMc4IuIr3u7DhipuauZJK6YQgtQOzLGHgL9x4LYPs1ytppobjIAPiB9ggLAFMDnPhvQFjoKV7WB5FZUVADvaqFCmwuPYRob773M2FaqiViqdcWhCu_0aTLjE5KV4vd9go7m0itORF9Yw77SZ_avL7RM4nW_b2fCv752H_WN6mjmMARuTTmdBZmq_tS9rJREfS2HshWUXgySmXm_2UbL72_jEex_kcY',
-    presence: 'away',
-    presenceLabel: '자리 비움',
-    action: 'profile',
-  },
-  {
-    id: 'f4',
-    name: '훈이',
-    level: 35,
-    detail: '로스트아크 · 워로드',
-    avatarUrl:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuBAvCMSuDg-FrFCHCOGvvyIjRO08lQL-ve32nH3Hl6YzqYB9lGftBNvBzsmtiMN6jUVWePSZQHDA461IxVUdWsEgf9--YagMzZ4D_o7PXal3EPclb_aLM8ss-TCpmLAOGAi8kskfCysy6_ekLWlVjv97yyNCsMd6vzUzzJgvciXwYKi933chNIS6w-2RTfCFxiwqVhYEQB8G69zxOKSi305W-FTHRMIsMlNDlIlE0vd',
-    presence: 'offline',
-    presenceLabel: '오프라인 (2시간 전)',
-    action: 'profile',
-  },
-];

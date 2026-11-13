@@ -27,6 +27,9 @@ interface ReviewSheetProps {
   readonly isTagSelected: (id: string) => boolean;
   readonly onToggleTag: (id: string) => void;
   readonly canSubmit: boolean;
+  readonly submitting?: boolean;
+  /** 등록 실패 문구 */
+  readonly error?: string | null;
   readonly onSubmit: () => void;
   readonly onClose: () => void;
 }
@@ -75,13 +78,18 @@ export const ReviewSheet: React.FC<ReviewSheetProps> = (p) => (
       <ReviewTextArea id="review-content" value={p.text} length={p.textLength} maxLength={p.maxLength} onChange={p.onTextChange} />
       <TagChecklist tags={p.tags} selectedCount={p.selectedCount} isSelected={p.isTagSelected} onToggle={p.onToggleTag} />
       <div className="pt-2">
+        {p.error && (
+          <p role="alert" className="mb-2 text-center text-xs font-medium text-rose-400">
+            {p.error}
+          </p>
+        )}
         <button
           type="button"
           disabled={!p.canSubmit}
           onClick={p.onSubmit}
           className="w-full py-3.5 px-6 rounded-xl bg-gradient-to-r from-mercury via-indigo-600 to-mercury-dark hover:from-mercury-light hover:to-indigo-500 text-white font-bold text-base shadow-lg shadow-mercury/30 transition-all transform active:scale-[0.99] flex items-center justify-center gap-2 border border-mercury-light/30 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          <span>{reviewText.submit}</span>
+          <span>{p.submitting ? reviewText.submitting : reviewText.submit}</span>
         </button>
         <p className="text-center text-[11px] text-slate-500 mt-2">{reviewText.submitNote}</p>
       </div>
