@@ -17,12 +17,16 @@ function createPostController(postService) {
     return sendSuccess(res, 200, await postService.getLatestDraft(req.auth.memberId));
   }
 
+  async function update(req, res) {
+    return sendSuccess(res, 200, await postService.updatePost(req.params.postId, req.auth.memberId, req.body));
+  }
+
   async function remove(req, res) {
     await postService.deletePost(req.params.postId, req.auth.memberId);
     return res.status(204).end();
   }
 
-  return { create, saveDraft, getLatestDraft, remove };
+  return { create, saveDraft, getLatestDraft, update, remove };
 }
 
 module.exports = { createPostController };
