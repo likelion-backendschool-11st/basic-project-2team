@@ -14,7 +14,6 @@ const {
   PLAY_STYLES,
   DRAFT_STRING_FIELDS,
   DRAFT_BOOLEAN_FIELDS,
-  CHANGEABLE_POST_STATUSES,
   postMessages: m,
 } = require('./postConstants');
 
@@ -140,16 +139,4 @@ function validateDraft(body) {
   return draft;
 }
 
-/**
- * 모집 상태 변경 본문 `{ status: "OPEN" | "CLOSED" | "COMPLETED" }`
- * @returns {string}
- */
-function validateStatusChange(body) {
-  const status = body && typeof body === 'object' ? body.status : undefined;
-  if (typeof status !== 'string' || !CHANGEABLE_POST_STATUSES.includes(status)) {
-    throw new ApiError(400, 'INVALID_INPUT', m.invalidInput, [{ field: 'status', message: m.statusInvalid }]);
-  }
-  return status;
-}
-
-module.exports = { validateCreatePost, validateDraft, validateStatusChange };
+module.exports = { validateCreatePost, validateDraft };

@@ -4,14 +4,7 @@
  * post · post_tag · tag · game · game_content 테이블 접근.
  * @param {import('mysql2/promise').Pool} pool
  */
-const { POST_STATUS_DELETED, POST_STATUS_COMPLETED, STATUS_CHANGE_RESULT } = require('./postConstants');
-const { awardActivityPoints } = require('../common/activityPoint');
-
-/** 활동 완료 시 점수를 받을 파티원: 승인된 신청자 중 탈퇴하지 않은 회원 */
-const ACCEPTED_MEMBERS_SQL = `SELECT pa.applicant_id AS memberId
-   FROM post_application pa
-   JOIN member m ON m.id = pa.applicant_id
-  WHERE pa.post_id = ? AND pa.status = 'ACCEPTED' AND m.status <> 'WITHDRAWN'`;
+const { POST_STATUS_DELETED } = require('./postConstants');
 
 function createPostRepository(pool) {
   /** 게임 코드 → { id, categoryCode }. 없거나 비활성이면 null */
@@ -95,61 +88,13 @@ function createPostRepository(pool) {
     return rows[0] ?? null;
   }
 
-  /** 삭제되지 않은 공고의 작성자와 상태 → { authorId, status }. 없거나 삭제됐으면 null */
+  /** 삭제되지 않은 공고의 작성자 → { authorId }. 없거나 삭제됐으면 null */
   async function findPostAuthor(postId) {
     const [rows] = await pool.query(
-      `SELECT author_id AS authorId, status FROM post WHERE id = ? AND deleted_at IS NULL AND status <> '${POST_STATUS_DELETED}' LIMIT 1`,
+      `SELECT author_id AS authorId FROM post WHERE id = ? AND deleted_at IS NULL AND status <> '${POST_STATUS_DELETED}' LIMIT 1`,
       [postId],
     );
     return rows[0] ?? null;
-  }
-
-  /**
-   * 모집 상태를 바꿉니다. 공고 행을 잠근 뒤 상태를 다시 확인하므로 동시에 요청해도 완료 처리는 한 번만 됩니다.
-   * COMPLETED 로 바꾸면 같은 트랜잭션에서 파티장과 승인된 파티원에게 활동 점수(PARTY_COMPLETE)를 지급합니다.
-   * @param {number} postId
-   * @param {'OPEN' | 'CLOSED' | 'COMPLETED'} status
-   * @returns {Promise<string>} STATUS_CHANGE_RESULT 값
-   */
-  async function changePostStatus(postId, status) {
-    const connection = await pool.getConnection();
-    try {
-      await connection.beginTransaction();
-      const [[post]] = await connection.query(
-        `SELECT author_id AS authorId, status FROM post
-          WHERE id = ? AND deleted_at IS NULL AND status <> '${POST_STATUS_DELETED}' FOR UPDATE`,
-        [postId],
-      );
-      let result;
-      if (!post) result = STATUS_CHANGE_RESULT.notFound;
-      else if (post.status === status) result = STATUS_CHANGE_RESULT.unchanged;
-      else if (post.status === POST_STATUS_COMPLETED) result = STATUS_CHANGE_RESULT.alreadyCompleted;
-      else if (status !== POST_STATUS_COMPLETED) {
-        await connection.query('UPDATE post SET status = ? WHERE id = ?', [status, postId]);
-        result = STATUS_CHANGE_RESULT.changed;
-      } else {
-        const [accepted] = await connection.query(ACCEPTED_MEMBERS_SQL, [postId]);
-        if (accepted.length === 0) {
-          result = STATUS_CHANGE_RESULT.noPartyMembers;
-        } else {
-          await connection.query('UPDATE post SET status = ? WHERE id = ?', [status, postId]);
-          // 리뷰 저장(reviewRepository)과 같은 순서(id 오름차순)로 회원 행을 잠가 교착을 막습니다.
-          const memberIds = [post.authorId, ...accepted.map((row) => row.memberId)].sort((a, b) => a - b);
-          await connection.query('SELECT id FROM member WHERE id IN (?) ORDER BY id FOR UPDATE', [memberIds]);
-          for (const memberId of memberIds) {
-            await awardActivityPoints(connection, memberId, [{ actionType: 'PARTY_COMPLETE', refId: postId }]);
-          }
-          result = STATUS_CHANGE_RESULT.changed;
-        }
-      }
-      await connection.commit();
-      return result;
-    } catch (err) {
-      await connection.rollback();
-      throw err;
-    } finally {
-      connection.release();
-    }
   }
 
   /**
@@ -176,16 +121,7 @@ function createPostRepository(pool) {
     }
   }
 
-  return {
-    findGameByCode,
-    findGameContent,
-    createPost,
-    saveDraft,
-    findDraft,
-    findPostAuthor,
-    softDeletePost,
-    changePostStatus,
-  };
+  return { findGameByCode, findGameContent, createPost, saveDraft, findDraft, findPostAuthor, softDeletePost };
 }
 
 module.exports = { createPostRepository };

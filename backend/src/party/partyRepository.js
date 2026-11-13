@@ -1,8 +1,14 @@
 'use strict';
 
 const { APPLICATION_STATUS: S, POST_STATUS, NOTIFICATION_TYPE } = require('./partyConstants');
+const { awardActivityPoints } = require('../common/activityPoint');
 
 const ALIVE_POST = "p.deleted_at IS NULL AND p.status <> 'DELETED'";
+/** 활동 완료 시 점수를 받을 파티원: 승인된 신청자 중 탈퇴하지 않은 회원 */
+const ACCEPTED_MEMBERS_SQL = `SELECT pa.applicant_id AS memberId
+   FROM post_application pa
+   JOIN member m ON m.id = pa.applicant_id
+  WHERE pa.post_id = ? AND pa.status = '${S.accepted}' AND m.status <> 'WITHDRAWN'`;
 const APPLICANT_COLUMNS = `m.id AS memberId, m.nickname, m.avatar_url AS avatarUrl, m.level,
        m.manner_temp AS mannerTemp, m.review_count AS reviewCount, m.status AS memberStatus`;
 
@@ -184,13 +190,14 @@ function createPartyRepository(pool) {
 
   /**
    * 작성자가 공고의 모집 상태를 바꿉니다. 완료(COMPLETED)된 공고는 되돌릴 수 없고, 정원이 찬 공고는 다시 열 수 없습니다.
-   * 완료 처리는 승인된 파티원이 있고 출발 시간이 지난 뒤(일정 미정이면 제외)에만 가능합니다.
+   * 완료 처리는 승인된 파티원(탈퇴 제외)이 있고 출발 시간이 지난 뒤(일정 미정이면 제외)에만 가능합니다.
+   * 완료하면 같은 트랜잭션에서 파티장과 승인된 파티원에게 활동 점수(PARTY_COMPLETE)를 지급합니다.
    * @returns {Promise<{ result: 'OK' | 'NOT_FOUND' | 'COMPLETED' | 'FULL' | 'NO_MEMBERS' | 'NOT_STARTED', status?: string, current?: number, max?: number }>}
    */
   async function changePostStatus({ postId, status, now, notice }) {
     return inTransaction(async (connection) => {
       const [[post]] = await connection.query(
-        `SELECT status, headcount, current_count AS current, schedule_at AS scheduleAt FROM post p WHERE p.id = ? AND ${ALIVE_POST} FOR UPDATE`,
+        `SELECT author_id AS authorId, status, headcount, current_count AS current, schedule_at AS scheduleAt FROM post p WHERE p.id = ? AND ${ALIVE_POST} FOR UPDATE`,
         [postId],
       );
       if (!post) return { result: 'NOT_FOUND' };
@@ -198,11 +205,21 @@ function createPartyRepository(pool) {
       if (post.status === status) return unchanged;
       if (post.status === POST_STATUS.completed) return { result: 'COMPLETED' };
       if (status === POST_STATUS.open && post.current >= post.headcount) return { result: 'FULL' };
+      let accepted = [];
       if (status === POST_STATUS.completed) {
-        if (post.current <= 1) return { result: 'NO_MEMBERS' };
+        [accepted] = await connection.query(ACCEPTED_MEMBERS_SQL, [postId]);
+        if (accepted.length === 0) return { result: 'NO_MEMBERS' };
         if (post.scheduleAt && new Date(post.scheduleAt) > now) return { result: 'NOT_STARTED' };
       }
       await connection.query('UPDATE post SET status = ? WHERE id = ?', [status, postId]);
+      if (status === POST_STATUS.completed) {
+        // 리뷰 저장(reviewRepository)과 같은 순서(id 오름차순)로 회원 행을 잠가 교착을 막습니다.
+        const memberIds = [post.authorId, ...accepted.map((row) => row.memberId)].sort((a, b) => a - b);
+        await connection.query('SELECT id FROM member WHERE id IN (?) ORDER BY id FOR UPDATE', [memberIds]);
+        for (const memberId of memberIds) {
+          await awardActivityPoints(connection, memberId, [{ actionType: 'PARTY_COMPLETE', refId: postId }]);
+        }
+      }
       // 마감·완료는 대기 중이거나 수락된 신청자에게 알립니다 (모집 재개는 알리지 않음).
       if (notice) {
         await notifyApplicants(connection, { postId, type: NOTIFICATION_TYPE.postUpdated, message: notice, statuses: [S.pending, S.accepted] });

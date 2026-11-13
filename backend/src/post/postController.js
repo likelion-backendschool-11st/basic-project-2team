@@ -22,11 +22,7 @@ function createPostController(postService) {
     return res.status(204).end();
   }
 
-  async function changeStatus(req, res) {
-    return sendSuccess(res, 200, await postService.changePostStatus(req.params.postId, req.auth.memberId, req.body));
-  }
-
-  return { create, saveDraft, getLatestDraft, remove, changeStatus };
+  return { create, saveDraft, getLatestDraft, remove };
 }
 
 module.exports = { createPostController };

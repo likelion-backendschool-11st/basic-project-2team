@@ -123,7 +123,7 @@ describe('마이페이지 API (/api/members)', () => {
   const tokens = createTokenProvider(AUTH);
 
   before(async () => {
-    const app = createApp({ mypageRepository: repo, corsOrigins: [], bcryptRounds: 4, auth: AUTH });
+    const app = createApp({ mypageRepository: repo, corsOrigins: [], bcryptRounds: 4, auth: AUTH, now: () => new Date('2026-11-16T00:00:00Z') });
     await new Promise((resolve) => {
       server = app.listen(0, resolve);
     });
@@ -315,6 +315,17 @@ describe('마이페이지 API (/api/members)', () => {
           { id: 3, canComplete: false, review: { targetCount: 3, reviewedCount: 3 } },
         ],
       );
+    });
+
+    it('출발 시간 전이면 canComplete 가 false 다 (일정 미정은 시간 조건 없음)', async () => {
+      const base = { ...repo.state.posts[0], postStatus: 'OPEN', reviewTargetCount: 3, reviewedCount: 0 };
+      repo.state.posts = [
+        { ...base, postId: 1, scheduleAt: new Date('2026-11-17T00:00:00Z') },
+        { ...base, postId: 2, scheduleAt: new Date('2026-11-15T00:00:00Z') },
+        { ...base, postId: 3, scheduleAt: null },
+      ];
+      const { data } = await (await get('/me/posts', as(ME))).json();
+      assert.deepEqual(data.items.map((item) => item.canComplete), [false, true, true]);
     });
 
     it('page·size 로 offset 을 계산한다', async () => {
