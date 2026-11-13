@@ -190,6 +190,8 @@ function validateResetPassword(body) {
 }
 
 module.exports = {
+  // 회원가입과 같은 규칙을 프로필 수정·비밀번호 변경(account 모듈)에서도 씁니다.
+  fieldRules,
   validateSignup,
   validateCheckQuery,
   validateLogin,
