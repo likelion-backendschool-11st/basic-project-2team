@@ -46,7 +46,9 @@ function createFakeRepository() {
       const a = find(postId, applicantId);
       if (!a || !['PENDING', 'ACCEPTED'].includes(a.status)) return false;
       if (a.status === 'ACCEPTED') {
-        state.posts.get(postId).currentCount -= 1;
+        const post = state.posts.get(postId);
+        if (post.status === 'CLOSED' && post.currentCount >= post.headcount) post.status = 'OPEN';
+        post.currentCount -= 1;
         a.lateCancel = a.lateCancel || lateCancel;
       }
       a.status = 'CANCELED';
@@ -63,12 +65,26 @@ function createFakeRepository() {
       if (!a) return { result: 'NOT_FOUND' };
       if (a.status !== 'PENDING') return { result: 'ALREADY_DECIDED' };
       if (status === 'ACCEPTED') {
-        if (post.status !== 'OPEN') return { result: 'POST_CLOSED' };
         if (post.currentCount >= post.headcount) return { result: 'FULL' };
+        if (post.status !== 'OPEN') return { result: 'POST_CLOSED' };
         post.currentCount += 1;
+        if (post.currentCount >= post.headcount) post.status = 'CLOSED';
       }
       a.status = status;
-      return { result: 'OK', current: post.currentCount, max: post.headcount };
+      return { result: 'OK', current: post.currentCount, max: post.headcount, postStatus: post.status };
+    },
+    async changePostStatus({ postId, status, now }) {
+      const post = state.posts.get(postId);
+      const out = () => ({ result: 'OK', status: post.status, current: post.currentCount, max: post.headcount });
+      if (post.status === status) return out();
+      if (post.status === 'COMPLETED') return { result: 'COMPLETED' };
+      if (status === 'OPEN' && post.currentCount >= post.headcount) return { result: 'FULL' };
+      if (status === 'COMPLETED') {
+        if (post.currentCount <= 1) return { result: 'NO_MEMBERS' };
+        if (post.scheduleAt && post.scheduleAt > now) return { result: 'NOT_STARTED' };
+      }
+      post.status = status;
+      return out();
     },
     async findParticipants(postId) {
       const post = state.posts.get(postId);
@@ -260,12 +276,12 @@ describe('party application API', () => {
       await apply(A);
       const res = await decide(1, 'ACCEPTED');
       assert.equal(res.status, 200);
-      assert.deepEqual((await json(res)).data, { id: 1, status: 'ACCEPTED', current: 2, max: 3 });
+      assert.deepEqual((await json(res)).data, { id: 1, status: 'ACCEPTED', current: 2, max: 3, postStatus: 'OPEN' });
     });
 
     it('거절은 인원을 바꾸지 않는다', async () => {
       await apply(A);
-      assert.deepEqual((await json(await decide(1, 'REJECTED'))).data, { id: 1, status: 'REJECTED', current: 1, max: 3 });
+      assert.deepEqual((await json(await decide(1, 'REJECTED'))).data, { id: 1, status: 'REJECTED', current: 1, max: 3, postStatus: 'OPEN' });
     });
 
     it('정원이 차면 승인은 409 PARTY_FULL, 거절은 가능하다', async () => {
@@ -292,6 +308,85 @@ describe('party application API', () => {
       for (const id of ['99', 'abc', '0']) assert.equal((await decide(id, 'ACCEPTED')).status, 404, id);
       assert.equal((await decide(1, 'PENDING')).status, 400);
       assert.equal(repo.state.applications[0].status, 'PENDING');
+    });
+  });
+
+  describe('PATCH /:postId/status', () => {
+    const setStatus = (status, memberId = HOST, id = 1) => call('PATCH', `/${id}/status`, { status }, memberId);
+
+    it('작성자가 모집을 마감하고 다시 열 수 있다', async () => {
+      assert.deepEqual((await json(await setStatus('CLOSED'))).data, { id: 1, status: 'CLOSED', current: 1, max: 3 });
+      assert.equal((await json(await apply(A))).error.code, 'POST_CLOSED');
+      assert.deepEqual((await json(await setStatus('OPEN'))).data, { id: 1, status: 'OPEN', current: 1, max: 3 });
+      assert.equal((await apply(A)).status, 201);
+    });
+
+    it('같은 상태로 바꾸는 요청은 그대로 200 이다', async () => {
+      assert.equal((await setStatus('OPEN')).status, 200);
+    });
+
+    it('완료 처리하면 되돌릴 수 없다 (409 POST_COMPLETED)', async () => {
+      Object.assign(repo.state.posts.get(1), { currentCount: 2, scheduleAt: new Date('2026-11-13T00:00:00Z') });
+      assert.equal((await setStatus('COMPLETED')).status, 200);
+      for (const status of ['OPEN', 'CLOSED']) {
+        const res = await setStatus(status);
+        assert.equal(res.status, 409, status);
+        assert.equal((await json(res)).error.code, 'POST_COMPLETED');
+      }
+      assert.equal((await setStatus('COMPLETED')).status, 200);
+    });
+
+    it('완료 처리는 파티원이 있고 출발 시간이 지난 뒤에만 가능하다 (일정 미정은 시간 조건 없음)', async () => {
+      const post = repo.state.posts.get(1);
+      const reject = async (reason) => {
+        const res = await setStatus('COMPLETED');
+        assert.equal(res.status, 409, reason);
+        assert.equal((await json(res)).error.code, 'COMPLETE_NOT_ALLOWED', reason);
+        assert.equal(post.status, 'OPEN', reason);
+      };
+      await reject('파티원 없음(혼자)');
+      post.currentCount = 2; // 출발은 NOW 보다 12시간 뒤
+      await reject('출발 전');
+      post.scheduleAt = null;
+      assert.equal((await setStatus('COMPLETED')).status, 200);
+    });
+
+    it('정원이 찬 공고는 다시 열 수 없다 (409 PARTY_FULL)', async () => {
+      repo.state.posts.get(1).currentCount = 3;
+      repo.state.posts.get(1).status = 'CLOSED';
+      assert.equal((await json(await setStatus('OPEN'))).error.code, 'PARTY_FULL');
+    });
+
+    it('작성자가 아니면 403, 상태값이 틀리면 400, 없는 공고는 404, 비로그인은 401', async () => {
+      assert.equal((await json(await setStatus('CLOSED', A))).error.code, 'NOT_POST_AUTHOR');
+      assert.equal((await setStatus('DELETED')).status, 400);
+      assert.equal((await setStatus('closed')).status, 400);
+      assert.equal((await setStatus('CLOSED', HOST, 999)).status, 404);
+      assert.equal((await call('PATCH', '/1/status', { status: 'CLOSED' })).status, 401);
+      assert.equal(repo.state.posts.get(1).status, 'OPEN');
+    });
+  });
+
+  describe('모집 인원에 따른 자동 마감', () => {
+    it('마지막 자리를 승인하면 공고가 마감되고, 수락된 사람이 취소하면 다시 모집 중이 된다', async () => {
+      await apply(A);
+      await apply(B);
+      await decide(1, 'ACCEPTED');
+      const last = await json(await decide(2, 'ACCEPTED'));
+      assert.deepEqual(last.data, { id: 2, status: 'ACCEPTED', current: 3, max: 3, postStatus: 'CLOSED' });
+      assert.equal(repo.state.posts.get(1).status, 'CLOSED');
+
+      await call('DELETE', '/1/applications/me', undefined, B);
+      assert.deepEqual([repo.state.posts.get(1).status, repo.state.posts.get(1).currentCount], ['OPEN', 2]);
+      assert.equal((await apply(C)).status, 201);
+    });
+
+    it('작성자가 직접 마감한 공고는 자리가 나도 그대로 마감이다', async () => {
+      await apply(A);
+      await decide(1, 'ACCEPTED');
+      repo.state.posts.get(1).status = 'CLOSED';
+      await call('DELETE', '/1/applications/me', undefined, A);
+      assert.equal(repo.state.posts.get(1).status, 'CLOSED');
     });
   });
 

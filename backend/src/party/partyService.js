@@ -2,7 +2,7 @@
 
 const { ApiError } = require('../common/ApiError');
 const { APPLICATION_STATUS: S, POST_STATUS, MEMBER_STATUS, LATE_CANCEL_HOURS, partyMessages: m } = require('./partyConstants');
-const { parseId, validateApply, validateDecision, parseListStatus } = require('./partyValidator');
+const { parseId, validateApply, validateDecision, validatePostStatus, parseListStatus } = require('./partyValidator');
 
 const toIso = (value) => (value ? new Date(value).toISOString() : null);
 const postNotFound = () => new ApiError(404, 'POST_NOT_FOUND', m.postNotFound);
@@ -55,8 +55,8 @@ function createPartyService({ partyRepository, now = () => new Date() }) {
     const post = await loadPost(rawPostId);
 
     if (post.authorId === memberId) throw new ApiError(403, 'CANNOT_APPLY_OWN_POST', m.cannotApplyOwnPost);
-    if (post.status !== POST_STATUS.open) throw new ApiError(409, 'POST_CLOSED', m.postClosed);
     if (post.currentCount >= post.headcount) throw new ApiError(409, 'PARTY_FULL', m.partyFull);
+    if (post.status !== POST_STATUS.open) throw new ApiError(409, 'POST_CLOSED', m.postClosed);
 
     const existing = await partyRepository.findMyApplication(post.id, memberId);
     const alreadyApplied = () => new ApiError(409, 'ALREADY_APPLIED', m.alreadyApplied);
@@ -108,7 +108,7 @@ function createPartyService({ partyRepository, now = () => new Date() }) {
     const outcome = await partyRepository.decideApplication({ postId: post.id, applicationId, status, decidedAt: now() });
     switch (outcome.result) {
       case 'OK':
-        return { id: applicationId, status, current: outcome.current, max: outcome.max };
+        return { id: applicationId, status, current: outcome.current, max: outcome.max, postStatus: outcome.postStatus };
       case 'ALREADY_DECIDED':
         throw new ApiError(409, 'ALREADY_DECIDED', m.alreadyDecided);
       case 'POST_CLOSED':
@@ -120,6 +120,27 @@ function createPartyService({ partyRepository, now = () => new Date() }) {
     }
   }
 
+  /** PATCH /api/posts/:postId/status — 작성자만. 모집 중 ↔ 마감, 완료 처리 */
+  async function changeStatus(rawPostId, memberId, body) {
+    const { status } = validatePostStatus(body);
+    const post = await loadOwnedPost(rawPostId, memberId);
+    const outcome = await partyRepository.changePostStatus({ postId: post.id, status, now: now() });
+    switch (outcome.result) {
+      case 'OK':
+        return { id: post.id, status: outcome.status, current: outcome.current, max: outcome.max };
+      case 'COMPLETED':
+        throw new ApiError(409, 'POST_COMPLETED', m.postCompleted);
+      case 'FULL':
+        throw new ApiError(409, 'PARTY_FULL', m.partyFull);
+      case 'NO_MEMBERS':
+        throw new ApiError(409, 'COMPLETE_NOT_ALLOWED', m.completeNoMembers);
+      case 'NOT_STARTED':
+        throw new ApiError(409, 'COMPLETE_NOT_ALLOWED', m.completeNotStarted);
+      default:
+        throw postNotFound();
+    }
+  }
+
   /** GET /api/posts/:postId/participants — 파티장 + 수락된 파티원 */
   async function listParticipants(rawPostId) {
     const post = await loadPost(rawPostId);
@@ -127,7 +148,7 @@ function createPartyService({ partyRepository, now = () => new Date() }) {
     return rows.map((row) => ({ ...toMember(row), role: row.role, isHost: Boolean(row.isHost) }));
   }
 
-  return { apply, cancelMine, listApplications, decide, listParticipants };
+  return { apply, cancelMine, listApplications, decide, changeStatus, listParticipants };
 }
 
 module.exports = { createPartyService };

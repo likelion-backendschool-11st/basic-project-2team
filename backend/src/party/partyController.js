@@ -23,11 +23,15 @@ function createPartyController(partyService) {
     return sendSuccess(res, 200, await partyService.decide(req.params.postId, req.params.applicationId, memberId(req), req.body));
   }
 
+  async function changeStatus(req, res) {
+    return sendSuccess(res, 200, await partyService.changeStatus(req.params.postId, memberId(req), req.body));
+  }
+
   async function listParticipants(req, res) {
     return sendSuccess(res, 200, await partyService.listParticipants(req.params.postId));
   }
 
-  return { apply, cancelMine, listApplications, decide, listParticipants };
+  return { apply, cancelMine, listApplications, decide, changeStatus, listParticipants };
 }
 
 module.exports = { createPartyController };
