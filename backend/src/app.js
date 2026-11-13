@@ -15,6 +15,8 @@ const { createBoardModule } = require('./board');
 const { createAdminModule } = require('./admin');
 const { createMypageModule } = require('./mypage');
 const { createAccountModule } = require('./account');
+const { createReviewModule } = require('./review');
+const { createRankingModule } = require('./ranking');
 
 /**
  * Express 앱을 만듭니다. 서버 실행(server.js)과 분리해 테스트에서 DB 없이 띄울 수 있게 합니다.
@@ -30,6 +32,8 @@ const { createAccountModule } = require('./account');
  *   adminRepository?: object,
  *   mypageRepository?: object,
  *   accountRepository?: object,
+ *   reviewRepository?: object,
+ *   rankingRepository?: object,
  *   corsOrigins: string[],
  *   bcryptRounds: number,
  *   auth?: typeof env.auth,
@@ -48,6 +52,8 @@ function createApp({
   adminRepository,
   mypageRepository,
   accountRepository,
+  reviewRepository,
+  rankingRepository,
   corsOrigins,
   bcryptRounds,
   auth = env.auth,
@@ -71,6 +77,11 @@ function createApp({
   app.use('/api/games', createGameModule({ pool, gameRepository }).router);
   app.use('/api/posts', createPartyModule({ pool, partyRepository, requireAuth, now }).router);
   app.use('/api/categories', createCategoryModule({ pool, categoryRepository }).router);
+
+  const review = createReviewModule({ pool, reviewRepository, requireAuth });
+  app.use('/api/posts', review.postReviewRouter);
+  app.use('/api/review-tags', review.tagRouter);
+  app.use('/api/rankings', createRankingModule({ pool, rankingRepository }).router);
 
   // GET /api/posts/:postId 를 잡으므로 /api/posts 아래 고정 경로(popular, urgent …)는 이보다 먼저 마운트된 라우터에 둡니다.
   const board = createBoardModule({

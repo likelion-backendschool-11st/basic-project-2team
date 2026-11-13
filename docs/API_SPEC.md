@@ -296,6 +296,11 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
   - `popular`: 조회수 → 댓글 수 순
   - `urgent`: 남은 자리가 2 이하이거나 출발이 24시간 이내인 공고를 출발이 가까운 순(일정 미정은 뒤) → 남은 자리가 적은 순으로 정렬 (기준은 `boardConstants.js` 의 `URGENT_*`)
 - **공고 삭제** (`DELETE /api/posts/{postId}`) 🔒 작성자: 응답 `204`. 소프트 삭제(`status = DELETED`, `deleted_at`)라 신청·댓글·리뷰는 보존하고, 그 공고의 스크랩은 삭제합니다. 삭제된 공고는 목록·상세·카테고리 공고 수에서 빠집니다. 오류: 401 `UNAUTHORIZED`, 403 `NOT_POST_AUTHOR`, 404 `POST_NOT_FOUND`(없음, 이미 삭제됨, `postId` 가 1 이상의 정수가 아님). 활동 점수 회수(`POST_REVOKE`)는 점수 지급이 구현될 때 함께 합니다.
+- **모집 상태 변경** (`PATCH /api/posts/{postId}/status`) 🔒 작성자: 요청 `{ "status": "OPEN" | "CLOSED" | "COMPLETED" }`, 응답 `200 { id, status }`.
+  - `OPEN`(모집 중) ↔ `CLOSED`(모집 마감)는 자유롭게 바꿉니다. 지금과 같은 상태로 요청하면 아무것도 하지 않고 200 입니다.
+  - `COMPLETED`(활동 완료)는 마이페이지 「활동 완료」 버튼에서 호출합니다. 승인된(`ACCEPTED`) 파티원이 1명 이상 있어야 하고, 한 번 완료하면 되돌릴 수 없습니다.
+  - 완료하면 같은 트랜잭션에서 파티장과 승인된 파티원에게 활동 점수 `PARTY_COMPLETE` +20 을 지급합니다 (결정 사항 8-1). 이후 파티원끼리 별점 평가(7절)를 할 수 있습니다.
+  - 오류: 400 `INVALID_INPUT`(`status`), 401 `UNAUTHORIZED`, 403 `NOT_POST_AUTHOR`, 404 `POST_NOT_FOUND`, 409 `POST_ALREADY_COMPLETED`(완료된 공고를 바꾸려 함) · `NO_PARTY_MEMBERS`(승인된 파티원 없이 완료하려 함).
 - **임시저장** (`POST /api/posts/drafts`, `GET /api/posts/drafts/latest`): 회원당 1개이며 새로 저장하면 덮어씁니다. 요청 본문은 작성 폼 값 `{ title, body, partyName, game, type, detail, headcount, style, tbd, date, time, voice }` 중 보낸 것만 저장하고(미완성·빈 값 허용, 알 수 없는 필드는 버림), 타입이 틀리거나 너무 긴 값은 400 `INVALID_INPUT`(필드별) 입니다. 두 API 모두 `{ draft, savedAt }` 를 돌려주며, 저장한 적이 없으면 `GET` 은 `data: null` 입니다. 공고를 등록하면 그 회원의 임시저장은 삭제됩니다.
 - `GET /api/categories` 는 `[{ code, name, postCount }]` 를 `sort_order` 순으로 돌려줍니다. `postCount` 는 삭제되지 않은 공고 수(마감 포함)입니다.
 - 삭제된 공고는 목록에 나오지 않습니다. 응답은 `{ items, page, size, totalCount, totalPages }` 이고, 값이 올바르지 않으면 400 `INVALID_INPUT`(필드별) 입니다.
@@ -526,13 +531,56 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 | POST | `/api/posts/{postId}/reviews` | 파티원 평가 제출 | 🔒 파티원 |
 | GET | `/api/review-tags` | 평가 태그 목록 | |
 
+- **파티원**은 파티장(공고 작성자)과 신청이 `ACCEPTED` 인 회원입니다. 탈퇴한 회원은 파티원에서 빠집니다.
+- 평가는 공고가 `COMPLETED`(작성자가 활동 완료 처리)일 때만 할 수 있습니다. 완료 처리는 `PATCH /api/posts/{postId}/status` (3절)로 합니다.
+- 화면 흐름: 마이페이지 내 공고에서 `canComplete` 이면 「활동 완료」 버튼 → 완료되면 내 공고·참여한 파티 아이템에 `review` 가 생겨 「별점 평가」 버튼 → 평가 창에서 아래 targets 조회 후 제출 (8절 참고).
+- 두 🔒 API 모두 확인 순서는 공고 존재(404) → 요청자가 파티원인지(403) → 공고 상태(409) 입니다.
+
+**평가 태그 목록 (`GET /api/review-tags`)**
+
+- 로그인 없이 조회할 수 있습니다. `review_tag` 중 `is_active = true` 인 태그를 `sort_order` 순으로 돌려줍니다. 평가 제출 시 `tags` 에는 `code` 를 보냅니다.
+
+```json
+[
+  { "code": "on-time", "label": "#시간엄수" },
+  { "code": "kind", "label": "#친절함" }
+]
+```
+
+**평가 대상 파티원 (`GET /api/posts/{postId}/reviews/targets`)** 🔒 파티원
+
+- 본인을 뺀 파티원 목록입니다. 파티장이 먼저, 그다음 승인 순입니다.
+- `reviewed`: 내가 이 공고에서 이미 평가한 파티원이면 `true` (다시 평가할 수 없음).
+- `characterName` 은 그 파티원의 이 게임 프로필(`member_game_profile.character_name`), `role` 은 신청 시 포지션이며 없으면 `null` 입니다 (파티장은 항상 `null`).
+- 오류: 401 `UNAUTHORIZED`, 403 `NOT_PARTY_MEMBER`, 404 `POST_NOT_FOUND`(없음, 삭제됨, `postId` 가 1 이상의 정수가 아님), 409 `POST_NOT_COMPLETED`.
+
+```json
+[
+  { "id": 3, "nickname": "빛나는오더", "avatarUrl": null, "level": 52, "game": "로스트아크", "characterName": null, "role": null, "isHost": true, "reviewed": true },
+  { "id": 9, "nickname": "홀리한빛", "avatarUrl": null, "level": 40, "game": "로스트아크", "characterName": "홀리한빛", "role": "서포터", "isHost": false, "reviewed": false }
+]
+```
+
+**파티원 평가 제출 (`POST /api/posts/{postId}/reviews`)** 🔒 파티원
+
 ```json
 {
   "reviews": [
-    { "targetMemberId": "m1", "rating": 5, "tags": ["on-time", "kind"], "comment": "덕분에 한 번에 클리어했어요!" }
+    { "targetMemberId": 9, "rating": 5, "tags": ["on-time", "kind"], "comment": "덕분에 한 번에 클리어했어요!" }
   ]
 }
 ```
+
+- 여러 파티원을 한 번에 평가합니다. 하나라도 실패하면 아무것도 저장하지 않습니다 (`review` + `review_tag_map` 를 한 트랜잭션으로 저장).
+- `reviews` 1~15개. `targetMemberId` 1 이상의 정수(본인 불가, 한 요청 안에서 중복 불가), `rating` 1~5 정수, `tags` 선택(활성 태그 `code` 배열, 최대 10개, 중복은 하나로 합침), `comment` 선택(앞뒤 공백 제거 후 500자 이하, 빈 문자열은 `null`).
+- 응답 `201 { "reviewIds": [41, 42] }` (요청 순서와 같음).
+- 등록한 평가는 수정·삭제할 수 없습니다.
+- 같은 트랜잭션에서 함께 반영합니다 ([DB 설계 결정 사항](./03-db-design.md#6-결정-사항) 2, 8-1, 8-3):
+  - 대상 회원 `mannerTemp`: 리뷰 1건마다 5점 +0.5 / 4점 +0.2 / 3점 0 / 2점 −0.5 / 1점 −1.0, 한 건마다 0.0~99.9 로 보정. `reviewCount` +1.
+  - 평가자 활동 점수: 리뷰 1건마다 `REVIEW_WRITE` +5 (`activity_point_log`), 누적 점수로 `level` 재계산 (지급으로 레벨이 내려가지는 않음).
+  - 그 결과는 마이페이지 프로필(`mannerTemp` · `reviewCount` · `averageRating` · `topTags`), 공고 상세 `host`, 매너 랭킹에 바로 보입니다.
+- 데이터 보정: `backend/` 에서 `npm run recalc:manner` (전체) 또는 `npm run recalc:manner -- 3 9` (회원 id) 로 리뷰 행만으로 매너 온도·받은 평가 수를 다시 계산합니다.
+- 오류: 400 `INVALID_INPUT`(필드별, 예: `reviews[0].rating` — 없거나 비활성인 태그 포함), 401 `UNAUTHORIZED`, 403 `NOT_PARTY_MEMBER`(평가자) · `REVIEW_TARGET_NOT_PARTY_MEMBER`(대상), 404 `POST_NOT_FOUND`, 409 `POST_NOT_COMPLETED` · `ALREADY_REVIEWED`(이 공고에서 이미 평가한 파티원이 포함됨).
 
 ## 8. 마이페이지 · 랭킹
 
@@ -545,9 +593,22 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 | GET | `/api/members/me/favorites` | 즐겨찾는 유저 목록 | 🔒 |
 | POST / DELETE | `/api/members/me/favorites/{memberId}` | 즐겨찾기 추가 / 해제 → `204` | 🔒 |
 | GET | `/api/members/{memberId}` | 회원 프로필 (로그인하면 `viewer` 포함) | |
-| GET | `/api/rankings/manner` | 매너 랭킹 (메인 명예의 전당) | |
+| GET | `/api/rankings/manner?limit=` | 매너 랭킹 (메인 명예의 전당) | |
 
-구현: `backend/src/mypage/` (`/api/members` 에 마운트)
+구현: `backend/src/mypage/` (`/api/members` 에 마운트), 랭킹은 `backend/src/ranking/`
+
+**매너 랭킹 (`GET /api/rankings/manner`)**
+
+- 로그인 없이 조회합니다. `limit` 기본 10, 최대 50 (틀리면 400 `INVALID_INPUT`).
+- 정상(`ACTIVE`) 회원 중 평가를 1건 이상 받은 회원을 매너 온도 높은 순 → 받은 평가 수 많은 순 → id 순으로 정렬합니다.
+- `mainGame`: 대표 게임(없으면 `null`), `topTag`: 가장 많이 받은 평가 태그(없으면 `null`).
+
+```json
+[
+  { "rank": 1, "id": 5, "nickname": "갓공대장", "avatarUrl": null, "level": 30, "mannerTemp": 99.0, "reviewCount": 142,
+    "mainGame": { "code": "lostark", "name": "로스트아크" }, "topTag": { "code": "order", "label": "#오더장인" } }
+]
+```
 
 **프로필 (`GET /api/members/me/summary`, `GET /api/members/{memberId}`)**
 
@@ -592,9 +653,14 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
   "id": 7, "category": "mmorpg", "game": "lostark", "gameName": "로스트아크", "type": "raid",
   "title": "[카멘] 숙련 서폿 구해요", "current": 8, "max": 8,
   "schedule": "2026-11-15T12:00:00.000Z", "scheduleTbd": false, "status": "COMPLETED",
-  "views": 129, "commentCount": 3, "createdAt": "2026-11-12T11:30:00.000Z"
+  "views": 129, "commentCount": 3, "createdAt": "2026-11-12T11:30:00.000Z",
+  "canComplete": false,
+  "review": { "targetCount": 7, "reviewedCount": 2 }
 }
 ```
+
+- `canComplete`: 「활동 완료」 버튼을 보여줄지. 공고가 `OPEN`·`CLOSED` 이고 승인된 파티원(탈퇴 제외)이 1명 이상이면 `true` → `PATCH /api/posts/{postId}/status` `{ status: "COMPLETED" }`.
+- `review`: 「별점 평가」 버튼용 진행 상황. 공고가 `COMPLETED` 일 때만 있고 아니면 `null`. `targetCount` 는 나를 뺀 파티원 수, `reviewedCount` 는 그중 내가 평가한 수 (같으면 평가 완료).
 
 **내가 신청한 공고 아이템 (`/me/applications`)**
 
@@ -604,9 +670,12 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 ```json
 {
   "id": 3, "status": "PENDING", "role": "서포터", "appliedAt": "2026-11-12T00:00:00.000Z",
-  "post": { "id": 7, "category": "mmorpg", "game": "lostark", "gameName": "로스트아크", "type": "raid", "title": "...", "current": 7, "max": 8, "schedule": null, "scheduleTbd": true, "status": "OPEN", "host": "빛나는오더" }
+  "post": { "id": 7, "category": "mmorpg", "game": "lostark", "gameName": "로스트아크", "type": "raid", "title": "...", "current": 7, "max": 8, "schedule": null, "scheduleTbd": true, "status": "OPEN", "host": "빛나는오더" },
+  "review": null
 }
 ```
+
+- `review`: 신청이 `ACCEPTED` 이고 공고가 `COMPLETED` 이면 「별점 평가」 진행 상황 `{ targetCount, reviewedCount }` (내 공고 아이템과 같은 의미), 아니면 `null`.
 
 **내가 쓴 댓글 아이템 (`/me/comments`)**
 
