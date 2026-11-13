@@ -2,7 +2,7 @@
 
 const { ApiError } = require('../common/ApiError');
 const { boardMessages } = require('./boardConstants');
-const { parseListQuery, parseFeaturedQuery } = require('./boardValidator');
+const { parseListQuery, parseFeaturedQuery, parseRelatedQuery } = require('./boardValidator');
 
 const toIso = (value) => (value ? new Date(value).toISOString() : null);
 
@@ -128,7 +128,16 @@ function createBoardService({ boardRepository, now = () => new Date() }) {
     return rows.map((row) => toPostListItem(row, tagsByPost.get(row.id) ?? []));
   }
 
-  return { getPostDetail, listPosts, listFeatured };
+  /** GET /api/posts/{postId}/related — 같은 게임의 다른 모집 중 공고(배열, 목록 아이템과 같은 모양). 조회수는 올리지 않습니다. */
+  async function listRelated(postId, query) {
+    const { limit } = parseRelatedQuery(query);
+    const rows = await boardRepository.findRelatedPosts({ postId, limit, now: now() });
+    if (!rows) throw new ApiError(404, 'POST_NOT_FOUND', boardMessages.postNotFound);
+    const tagsByPost = await boardRepository.findTagNamesByPostIds(rows.map((row) => row.id));
+    return rows.map((row) => toPostListItem(row, tagsByPost.get(row.id) ?? []));
+  }
+
+  return { getPostDetail, listPosts, listFeatured, listRelated };
 }
 
 module.exports = { createBoardService };
