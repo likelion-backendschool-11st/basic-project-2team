@@ -33,7 +33,18 @@ const POST_STATUS_OPEN = 'OPEN';
 const POST_STATUS_CLOSED = 'CLOSED';
 const POST_STATUS_COMPLETED = 'COMPLETED';
 
+/** notification.type — 파티 모듈(NOTIFICATION_TYPE)·관리자 삭제 알림과 같은 값입니다. */
+const NOTIFICATION_TYPE = Object.freeze({ postUpdated: 'POST_UPDATED', postDeleted: 'POST_DELETED' });
+/** 공고 제목이 길면 이 글자 수에서 줄임표로 잘라 알림 문구(VARCHAR 200)에 넣습니다. */
+const NOTICE_TITLE_MAX = 40;
+/** 공고 수정·삭제를 알리는 대상: 대기 중·수락된 신청자 */
+const NOTICE_TARGET_STATUSES = Object.freeze(['PENDING', 'ACCEPTED']);
+
 const postMessages = Object.freeze({
+  notice: Object.freeze({
+    updated: (title) => `'${title}' 공고의 일정 또는 모집 내용이 수정되었습니다.`,
+    deleted: (title) => `'${title}' 공고가 작성자에 의해 삭제되었습니다.`,
+  }),
   invalidInput: '입력값을 확인해주세요.',
   postNotFound: '존재하지 않는 공고입니다.',
   notPostAuthor: '공고 작성자만 삭제할 수 있습니다.',
@@ -75,6 +86,9 @@ module.exports = {
   PLAY_STYLES,
   DRAFT_STRING_FIELDS,
   DRAFT_BOOLEAN_FIELDS,
+  NOTIFICATION_TYPE,
+  NOTICE_TITLE_MAX,
+  NOTICE_TARGET_STATUSES,
   POST_STATUS_DELETED,
   POST_STATUS_OPEN,
   POST_STATUS_CLOSED,
