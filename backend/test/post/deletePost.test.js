@@ -11,17 +11,18 @@ const OTHER = 9;
 
 /** DB 대신 메모리에 저장하는 가짜 repository */
 function createFakeRepository() {
-  const state = { posts: new Map(), scraps: [] };
+  const state = { posts: new Map(), scraps: [], notices: [] };
   const alive = (p) => p && !p.deletedAt;
   return {
     state,
     async findPostAuthor(postId) {
       const p = state.posts.get(postId);
-      return alive(p) ? { authorId: p.authorId } : null;
+      return alive(p) ? { authorId: p.authorId, title: p.title } : null;
     },
-    async softDeletePost(postId, deletedAt) {
+    async softDeletePost(postId, deletedAt, notice) {
       const p = state.posts.get(postId);
       if (!alive(p)) return false;
+      state.notices.push(notice);
       Object.assign(p, { status: 'DELETED', deletedAt });
       state.scraps = state.scraps.filter((s) => s.postId !== postId);
       return true;
@@ -45,7 +46,8 @@ describe('DELETE /api/posts/:postId', () => {
   after(() => server.close());
   beforeEach(() => {
     repo.state.posts.clear();
-    repo.state.posts.set(1, { authorId: AUTHOR, status: 'OPEN', deletedAt: null });
+    repo.state.posts.set(1, { authorId: AUTHOR, status: 'OPEN', deletedAt: null, title: '카멘 숙련팟' });
+    repo.state.notices = [];
     repo.state.scraps = [{ postId: 1, memberId: OTHER }];
   });
 
@@ -55,10 +57,19 @@ describe('DELETE /api/posts/:postId', () => {
       headers: memberId ? { Authorization: `Bearer ${tokens.createAccessToken(memberId)}` } : {},
     });
 
+  it('지울 때 신청자에게 보낼 POST_DELETED 알림 문구를 만든다 (긴 제목은 줄임표)', async () => {
+    await del(1);
+    assert.deepEqual(repo.state.notices, [{ type: 'POST_DELETED', message: "'카멘 숙련팟' 공고가 작성자에 의해 삭제되었습니다." }]);
+
+    repo.state.posts.set(2, { authorId: AUTHOR, status: 'OPEN', deletedAt: null, title: '가'.repeat(60) });
+    await del(2);
+    assert.equal(repo.state.notices[1].message, `'${'가'.repeat(40)}…' 공고가 작성자에 의해 삭제되었습니다.`);
+  });
+
   it('작성자가 지우면 204 이고 소프트 삭제되며 스크랩이 정리된다', async () => {
     const res = await del(1);
     assert.equal(res.status, 204);
-    assert.deepEqual(repo.state.posts.get(1), { authorId: AUTHOR, status: 'DELETED', deletedAt: new Date('2026-11-14T00:00:00Z') });
+    assert.deepEqual(repo.state.posts.get(1), { authorId: AUTHOR, status: 'DELETED', deletedAt: new Date('2026-11-14T00:00:00Z'), title: '카멘 숙련팟' });
     assert.equal(repo.state.scraps.length, 0);
   });
 

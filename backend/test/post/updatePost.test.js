@@ -13,7 +13,7 @@ const FUTURE = '2026-11-20T12:00:00.000Z';
 
 /** DB 대신 메모리에 저장하는 가짜 repository. updatePost 는 실제 repository 와 같은 규칙으로 판정합니다. */
 function createFakeRepository() {
-  const state = { posts: new Map() };
+  const state = { posts: new Map(), notices: [] };
   return {
     state,
     async findGameByCode(code) {
@@ -24,10 +24,11 @@ function createFakeRepository() {
     },
     async findPostAuthor(postId) {
       const p = state.posts.get(postId);
-      return p && p.status !== 'DELETED' ? { authorId: p.authorId, status: p.status, scheduleAt: p.scheduleAt } : null;
+      return p && p.status !== 'DELETED' ? { authorId: p.authorId, title: p.title, status: p.status, scheduleAt: p.scheduleAt } : null;
     },
-    async updatePost({ postId, post, tags }) {
+    async updatePost({ postId, post, tags, notice }) {
       const p = state.posts.get(postId);
+      state.notices.push(notice);
       if (!p || p.status === 'DELETED') return { result: 'NOT_FOUND' };
       if (p.status === 'COMPLETED') return { result: 'NOT_EDITABLE' };
       if (post.headcount < p.currentCount) return { result: 'HEADCOUNT_BELOW', currentCount: p.currentCount };
@@ -53,6 +54,7 @@ describe('PUT /api/posts/:postId', () => {
   });
   after(() => server.close());
   beforeEach(() => {
+    repo.state.notices = [];
     repo.state.posts.clear();
     repo.state.posts.set(1, { authorId: AUTHOR, status: 'OPEN', currentCount: 3, headcount: 8, scheduleAt: new Date(FUTURE), title: '옛 제목' });
   });
@@ -85,6 +87,11 @@ describe('PUT /api/posts/:postId', () => {
     assert.equal(saved.headcount, 6);
     assert.deepEqual(saved.tags, ['숙련']);
     assert.equal(saved.status, 'OPEN');
+  });
+
+  it('신청자에게 보낼 POST_UPDATED 알림 문구를 넘긴다 (변경 여부 판단은 repository 가 한다)', async () => {
+    await put(1, body({ title: '수정한 제목' }));
+    assert.deepEqual(repo.state.notices, [{ type: 'POST_UPDATED', message: "'수정한 제목' 공고의 일정 또는 모집 내용이 수정되었습니다." }]);
   });
 
   it('인원을 확정 인원까지 줄이면 모집 마감이 되고, 그보다 적으면 400 이다', async () => {

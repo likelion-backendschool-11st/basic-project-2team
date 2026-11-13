@@ -296,9 +296,9 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
   - `popular`: 조회수 → 댓글 수 순
   - `urgent`: 남은 자리가 2 이하이거나 출발이 24시간 이내인 공고를 출발이 가까운 순(일정 미정은 뒤) → 남은 자리가 적은 순으로 정렬 (기준은 `boardConstants.js` 의 `URGENT_*`)
 - **관련 공고** (`GET /api/posts/{postId}/related?limit=`): 응답은 목록 아이템(`GET /api/posts` 의 `items[]`)과 같은 모양의 **배열**이며 비로그인도 쓸 수 있고 **조회수는 올리지 않습니다**. 기준 공고와 **같은 게임**의, 모집 중(`OPEN`)이고 아직 출발하지 않은(일정 미정 포함) **다른 공고**를 같은 상세 분류 → 겹치는 태그가 많은 순 → 최신순으로 돌려줍니다. `limit` 기본 4, 1~20(그 밖은 400 `INVALID_INPUT`). 없으면 빈 배열, 기준 공고가 없거나 삭제됐거나 `postId` 형식이 틀리면 404 `POST_NOT_FOUND`.
-- **공고 수정** (`PUT /api/posts/{postId}`) 🔒 작성자: 요청 본문은 공고 작성(`POST /api/posts`)과 같고 모든 필드를 다시 보냅니다(태그는 보낸 것으로 교체). 응답 `200 { id }`. 작성과 같은 규칙으로 검증하되, **기존 일정을 그대로 보내면 이미 지난 일정이어도 허용**하고 새로 지정하는 과거 일정은 400 입니다. 모집 인원은 파티장 포함 **확정 인원보다 줄일 수 없고**(400 `INVALID_INPUT`, `fields[headcount]`), 모집 중인 공고의 인원을 확정 인원과 같게 줄이면 `CLOSED` 로 바뀝니다. 마감(`CLOSED`) 공고는 수정할 수 있고 상태는 그대로이며, 모집 중으로 되돌리려면 `PATCH .../status` 를 씁니다. 오류: 401 `UNAUTHORIZED`, 403 `NOT_POST_AUTHOR`, 404 `POST_NOT_FOUND`(없음·삭제됨·`postId` 형식 오류) · `GAME_NOT_FOUND` · `GAME_CONTENT_NOT_FOUND`, 409 `POST_NOT_EDITABLE`(완료된 공고).
+- **공고 수정** (`PUT /api/posts/{postId}`) 🔒 작성자(일정·게임·상세 분류가 바뀌면 신청자에게 알림 — 알림 전송 표 참고): 요청 본문은 공고 작성(`POST /api/posts`)과 같고 모든 필드를 다시 보냅니다(태그는 보낸 것으로 교체). 응답 `200 { id }`. 작성과 같은 규칙으로 검증하되, **기존 일정을 그대로 보내면 이미 지난 일정이어도 허용**하고 새로 지정하는 과거 일정은 400 입니다. 모집 인원은 파티장 포함 **확정 인원보다 줄일 수 없고**(400 `INVALID_INPUT`, `fields[headcount]`), 모집 중인 공고의 인원을 확정 인원과 같게 줄이면 `CLOSED` 로 바뀝니다. 마감(`CLOSED`) 공고는 수정할 수 있고 상태는 그대로이며, 모집 중으로 되돌리려면 `PATCH .../status` 를 씁니다. 오류: 401 `UNAUTHORIZED`, 403 `NOT_POST_AUTHOR`, 404 `POST_NOT_FOUND`(없음·삭제됨·`postId` 형식 오류) · `GAME_NOT_FOUND` · `GAME_CONTENT_NOT_FOUND`, 409 `POST_NOT_EDITABLE`(완료된 공고).
 - **스크랩** (`POST /api/posts/{postId}/scrap`, `DELETE /api/posts/{postId}/scrap`) 🔒: 둘 다 응답 `204` 이고 **멱등**입니다(이미 스크랩했거나 스크랩하지 않았어도 성공). 내 스크랩만 다루며 내 공고도 스크랩할 수 있습니다. 상세(`GET /api/posts/{postId}`)의 `viewer.scrapped` 에 반영됩니다. 오류: 401 `UNAUTHORIZED`, 404 `POST_NOT_FOUND`(없음·삭제됨·`postId` 형식 오류). 공고가 삭제되면 그 공고의 스크랩도 함께 지워집니다.
-- **공고 삭제** (`DELETE /api/posts/{postId}`) 🔒 작성자: 응답 `204`. 소프트 삭제(`status = DELETED`, `deleted_at`)라 신청·댓글·리뷰는 보존하고, 그 공고의 스크랩은 삭제합니다. 삭제된 공고는 목록·상세·카테고리 공고 수에서 빠집니다. 오류: 401 `UNAUTHORIZED`, 403 `NOT_POST_AUTHOR`, 404 `POST_NOT_FOUND`(없음, 이미 삭제됨, `postId` 가 1 이상의 정수가 아님). 활동 점수 회수(`POST_REVOKE`)는 점수 지급이 구현될 때 함께 합니다.
+- **공고 삭제** (`DELETE /api/posts/{postId}`) 🔒 작성자: 응답 `204`. 소프트 삭제(`status = DELETED`, `deleted_at`)라 신청·댓글·리뷰는 보존하고, 그 공고의 스크랩은 삭제합니다. 삭제된 공고는 목록·상세·카테고리 공고 수에서 빠지고, 대기 중·수락된 신청자에게 알림을 보냅니다. 오류: 401 `UNAUTHORIZED`, 403 `NOT_POST_AUTHOR`, 404 `POST_NOT_FOUND`(없음, 이미 삭제됨, `postId` 가 1 이상의 정수가 아님). 활동 점수 회수(`POST_REVOKE`)는 점수 지급이 구현될 때 함께 합니다.
 - **모집 상태 변경** (`PATCH /api/posts/{postId}/status`) 🔒 작성자: 규칙·응답·오류는 4절 「모집 상태 변경」을 보세요(`backend/src/party`).
 - **임시저장** (`POST /api/posts/drafts`, `GET /api/posts/drafts/latest`): 회원당 1개이며 새로 저장하면 덮어씁니다. 요청 본문은 작성 폼 값 `{ title, body, partyName, game, type, detail, headcount, style, tbd, date, time, voice }` 중 보낸 것만 저장하고(미완성·빈 값 허용, 알 수 없는 필드는 버림), 타입이 틀리거나 너무 긴 값은 400 `INVALID_INPUT`(필드별) 입니다. 두 API 모두 `{ draft, savedAt }` 를 돌려주며, 저장한 적이 없으면 `GET` 은 `data: null` 입니다. 공고를 등록하면 그 회원의 임시저장은 삭제됩니다.
 - `GET /api/categories` 는 `[{ code, name, postCount }]` 를 `sort_order` 순으로 돌려줍니다. `postCount` 는 삭제되지 않은 공고 수(마감 포함)입니다.
@@ -439,6 +439,8 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 | 수락된 파티원의 신청 취소 (대기 중 취소는 알리지 않음) | 파티장 | `APPLICATION_CANCELED` |
 | 승인으로 정원이 차서 자동 마감 | 아직 대기 중인 신청자 | `POST_UPDATED` |
 | 작성자가 마감(`CLOSED`)·완료(`COMPLETED`) 처리 (재개는 알리지 않음) | 대기 중·수락된 신청자 | `POST_UPDATED` |
+| 작성자가 공고 수정(`PUT`)에서 **일정 · 게임 · 상세 분류를 바꿈** (제목·본문·태그만 고치면 알리지 않음) | 대기 중·수락된 신청자 | `POST_UPDATED` |
+| 작성자가 공고 삭제(`DELETE`) | 대기 중·수락된 신청자 | `POST_DELETED` (공고가 사라지므로 `postId` 는 `null`) |
 
 ### 알림함 (Notification)
 

@@ -1,8 +1,11 @@
 'use strict';
 
 const { ApiError } = require('../common/ApiError');
-const { postMessages, POST_STATUS_COMPLETED } = require('./postConstants');
+const { postMessages, NOTIFICATION_TYPE, NOTICE_TITLE_MAX, POST_STATUS_COMPLETED } = require('./postConstants');
 const { validateCreatePost, validateDraft } = require('./postValidator');
+
+/** 알림 문구에 넣는 공고 제목 (길면 줄임표로 자름) */
+const clipTitle = (title) => (Array.from(title).length > NOTICE_TITLE_MAX ? `${Array.from(title).slice(0, NOTICE_TITLE_MAX).join('')}…` : title);
 
 /**
  * 공고 작성 비즈니스 로직.
@@ -81,7 +84,9 @@ function createPostService({ postRepository, now = () => new Date() }) {
     const input = validateCreatePost(body, now(), current.scheduleAt ? new Date(current.scheduleAt) : null);
     const fields = await resolvePostFields(input);
 
-    const { result, currentCount } = await postRepository.updatePost({ postId, post: fields, tags: input.tags });
+    // 일정이나 게임·상세 분류가 바뀐 경우에만 신청자에게 알립니다(오타 수정까지 알리지 않도록 repository 가 비교).
+    const notice = { type: NOTIFICATION_TYPE.postUpdated, message: postMessages.notice.updated(clipTitle(input.title)) };
+    const { result, currentCount } = await postRepository.updatePost({ postId, post: fields, tags: input.tags, notice });
     if (result === 'NOT_FOUND') throw new ApiError(404, 'POST_NOT_FOUND', postMessages.postNotFound);
     if (result === 'NOT_EDITABLE') throw new ApiError(409, 'POST_NOT_EDITABLE', postMessages.notEditable);
     if (result === 'HEADCOUNT_BELOW') throw headcountBelowCurrent(currentCount);
@@ -116,7 +121,8 @@ function createPostService({ postRepository, now = () => new Date() }) {
     const post = await postRepository.findPostAuthor(id);
     if (!post) throw notFound();
     if (post.authorId !== memberId) throw new ApiError(403, 'NOT_POST_AUTHOR', postMessages.notPostAuthor);
-    if (!(await postRepository.softDeletePost(id, now()))) throw notFound();
+    const notice = { type: NOTIFICATION_TYPE.postDeleted, message: postMessages.notice.deleted(clipTitle(post.title)) };
+    if (!(await postRepository.softDeletePost(id, now(), notice))) throw notFound();
   }
 
   /** 스크랩이 걸린 공고인지 확인합니다. 없거나 삭제된 공고는 404 입니다. */
