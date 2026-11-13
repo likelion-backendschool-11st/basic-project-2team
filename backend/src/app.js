@@ -42,6 +42,15 @@ function createApp({
   const requireAuth = createRequireAuth(tokenProvider);
   const requireAdmin = createRequireAdmin(tokenProvider);
 
+  const emailVerification = createEmailVerificationModule({
+    pool,
+    emailVerificationRepository,
+    tokenProvider,
+    mailer,
+    now,
+  });
+  app.use('/api/auth/email', emailVerification.router);
+
   const member = createMemberModule({ pool, memberRepository, tokenProvider, requireAuth, bcryptRounds, now });
   app.use('/api/auth', member.router);
 
