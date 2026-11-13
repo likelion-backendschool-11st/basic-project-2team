@@ -27,6 +27,9 @@ function verifyBearerToken(tokenProvider, token) {
  */
 function createRequireAuth(tokenProvider) {
   return function requireAuth(req, res, next) {
+/** Bearer 토큰을 verify 로 검증해 req.auth 를 채우는 미들웨어를 만듭니다. */
+function createBearerAuth(verify) {
+  return function bearerAuth(req, res, next) {
     const match = BEARER_PATTERN.exec(req.get('Authorization') ?? '');
     if (!match) throw new ApiError(401, 'UNAUTHORIZED', authMessages.unauthorized);
     req.auth = verifyBearerToken(tokenProvider, match[1]);
@@ -46,6 +49,12 @@ function createOptionalAuth(tokenProvider) {
     if (!header) {
       req.auth = null;
       return next();
+    try {
+      req.auth = verify(match[1]);
+    } catch (err) {
+      throw err.expired
+        ? new ApiError(401, 'TOKEN_EXPIRED', authMessages.tokenExpired)
+        : new ApiError(401, 'UNAUTHORIZED', authMessages.unauthorized);
     }
     const match = BEARER_PATTERN.exec(header);
     if (!match) throw new ApiError(401, 'UNAUTHORIZED', authMessages.unauthorized);
@@ -55,3 +64,18 @@ function createOptionalAuth(tokenProvider) {
 }
 
 module.exports = { createRequireAuth, createOptionalAuth };
+/**
+ * 🔒 로그인 필요 API 앞에 붙이는 미들웨어.
+ * `Authorization: Bearer {accessToken}` 을 검증하고 `req.auth = { memberId }` 를 채웁니다.
+ * @param {ReturnType<typeof import('./tokenProvider').createTokenProvider>} tokenProvider
+ */
+const createRequireAuth = (tokenProvider) => createBearerAuth(tokenProvider.verifyAccessToken);
+
+/**
+ * 🛡️ 관리자 API 앞에 붙이는 미들웨어. 관리자 토큰을 검증하고 `req.auth = { adminId }` 를 채웁니다.
+ * 회원 토큰은 typ 가 달라 401 이 됩니다. 계정 상태 확인은 admin 모듈에서 합니다.
+ * @param {ReturnType<typeof import('./tokenProvider').createTokenProvider>} tokenProvider
+ */
+const createRequireAdmin = (tokenProvider) => createBearerAuth(tokenProvider.verifyAdminAccessToken);
+
+module.exports = { createRequireAuth, createRequireAdmin };

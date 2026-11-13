@@ -100,11 +100,9 @@ backend/
 │   ├── server.js           # 엔트리 (listen)
 │   ├── app.js              # Express 앱 조립 (cors, json, 라우터, 에러 핸들러)
 │   ├── config/             # env.js (환경 변수), db.js (mysql2 pool)
-│   ├── common/             # ApiError, 응답 헬퍼, 에러 핸들러, JWT(tokenProvider), 인증 미들웨어(requireAuth · optionalAuth), 메일(mailer)
-│   ├── emailVerification/  # 이메일 인증코드 발송·확인 (/api/auth/email)
-│   ├── member/             # 회원가입·중복 확인·로그인·토큰 재발급·로그아웃·아이디/비밀번호 찾기 (Routes / Controller / Service / Repository / Validator / Constants)
-│   ├── post/               # 공고 작성 (POST /api/posts)
-│   └── board/              # 공고 상세 조회 (GET /api/posts/{postId}, 조회수 +1)
+│   ├── common/             # ApiError, 응답 헬퍼, 에러 핸들러, JWT(tokenProvider), 인증 미들웨어(requireAuth, requireAdmin)
+│   ├── member/             # 회원가입·중복 확인·로그인·토큰 재발급·로그아웃 (Routes / Controller / Service / Repository / Validator / Constants)
+│   └── admin/              # 관리자 로그인·대시보드·신고/공고/회원/댓글 관리·처리 이력 (같은 구조)
 └── test/                   # node:test 테스트
 ```
 
