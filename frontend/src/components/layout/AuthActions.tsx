@@ -1,15 +1,17 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { authLinks } from '../../data/layoutData';
+import { useAuth } from '../../hooks/useAuth';
+import UserHeaderSlot from '../user/UserHeaderSlot';
 
-interface AuthActionsProps {
-  /** Optional slot for logged-in UI; when given, replaces login/signup pills. */
-  readonly children?: React.ReactNode;
-}
-
-export const AuthActions: React.FC<AuthActionsProps> = ({ children }) => (
+/** 로그인 상태면 사용자 메뉴, 아니면 로그인/회원가입 버튼을 보여줍니다. */
+export const AuthActions: React.FC = () => {
+  const { user } = useAuth();
+  return (
   <div className="flex items-center gap-3">
-    {children ?? (
+    {user ? (
+      <UserHeaderSlot user={user} />
+    ) : (
       <div className="flex items-center bg-night-surface border border-night-borderLight rounded-full p-1 shadow-inner">
         <Link
           to={authLinks.login.to}
@@ -27,6 +29,7 @@ export const AuthActions: React.FC<AuthActionsProps> = ({ children }) => (
       </div>
     )}
   </div>
-);
+  );
+};
 
 export default AuthActions;

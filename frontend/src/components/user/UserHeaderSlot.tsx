@@ -1,11 +1,11 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import type { LoggedInUser } from '../../data/userData';
+import type { LoginUser } from '../../api/authApi';
 import { userMenuText } from '../../data/userData';
 import { useUserMenu } from '../../hooks/useUserMenu';
 
 interface UserHeaderSlotProps {
-  readonly user: LoggedInUser;
+  readonly user: LoginUser;
 }
 
 /** Logged-in replacement for the header's login/signup pills (pass as AppLayout `headerRightSlot`). */
@@ -19,7 +19,7 @@ export const UserHeaderSlot: React.FC<UserHeaderSlotProps> = ({ user }) => {
       >
         <div className="relative">
           <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-mercury to-indigo-400 flex items-center justify-center font-bold text-white text-xs shadow-md shadow-mercury/30">
-            {user.initial}
+            {user.nickname.charAt(0)}
           </div>
           {user.online && (
             <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emeraldAccent border-2 border-night-surface" />
@@ -35,7 +35,7 @@ export const UserHeaderSlot: React.FC<UserHeaderSlotProps> = ({ user }) => {
           </div>
           <span className="text-[10px] text-fog-muted">
             {userMenuText.mannerPrefix}
-            {user.mannerShort}
+            {Math.round(user.mannerTemp)}°C
           </span>
         </div>
       </Link>
