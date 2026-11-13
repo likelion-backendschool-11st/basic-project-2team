@@ -137,14 +137,6 @@ export const boardRoutes = {
   post: ROUTES.board,
 };
 
-export const currentUser = {
-  initial: '빛',
-  name: '빛나는힐러',
-  level: 'Lv.48',
-  manner: '매너 98°C',
-  logout: '로그아웃',
-};
-
 const seedPosts: readonly Omit<BoardPost, 'id' | 'order'>[] = [
   { category: 'mmorpg', game: '로스트아크', gameTone: 'indigo', title: '종익 트라이 저녁 8시부터 가실분', current: 3, max: 8, membersTone: 'open', badge: { label: '디코', tone: 'neutral', icon: 'fa-solid fa-microphone' }, tags: ['트라이'], author: '짱구', date: '11-10', views: 38 },
   { category: 'mmorpg', game: '로스트아크', gameTone: 'indigo', title: '모르둠 익스 빡숙 11시팟 가실분', current: 2, max: 8, membersTone: 'open', badge: { label: '디코', tone: 'neutral', icon: 'fa-solid fa-microphone' }, tags: ['레이드'], author: '철수', date: '11-10', views: 31 },

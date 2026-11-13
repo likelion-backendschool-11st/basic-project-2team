@@ -1,16 +1,14 @@
 import React from 'react';
 import AppLayout from '../layout/AppLayout';
-import UserHeaderSlot from './UserHeaderSlot';
-import { currentUser } from '../../data/userData';
 
 interface LoggedInLayoutProps {
   readonly children: React.ReactNode;
   readonly contained?: boolean;
 }
 
-/** AppLayout with the logged-in user pill + logout in the header. */
+/** AppLayout (헤더는 로그인 상태에 따라 스스로 바뀝니다). */
 export const LoggedInLayout: React.FC<LoggedInLayoutProps> = ({ children, contained = true }) => (
-  <AppLayout headerRightSlot={<UserHeaderSlot user={currentUser} />} contained={contained}>
+  <AppLayout contained={contained}>
     {children}
   </AppLayout>
 );
