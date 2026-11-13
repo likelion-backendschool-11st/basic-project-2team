@@ -10,11 +10,12 @@ function createAdminModule({
   pool,
   adminRepository = createAdminRepository(pool),
   tokenProvider,
+  postEvents,
   requireAdmin,
   bcryptRounds,
   now,
 }) {
-  const adminService = createAdminService({ adminRepository, tokenProvider, bcryptRounds, now });
+  const adminService = createAdminService({ adminRepository, tokenProvider, postEvents, bcryptRounds, now });
   const adminController = createAdminController(adminService);
   return { router: createAdminRouter(adminController, { requireAdmin }) };
 }

@@ -4,6 +4,7 @@ const { describe, it, before, after, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
 const { createApp } = require('../../src/app');
 const { createTokenProvider } = require('../../src/common/tokenProvider');
+const { createRecordingEvents } = require('../helpers/recordingEvents');
 
 const AUTH = Object.freeze({
   jwtSecret: 'test-secret',
@@ -133,10 +134,11 @@ describe('댓글 API /api/posts/:postId/comments', () => {
   let server;
   let baseUrl;
   const repo = createFakeRepository();
+  const events = createRecordingEvents();
   const tokens = createTokenProvider(AUTH);
 
   before(async () => {
-    const app = createApp({ commentRepository: repo, corsOrigins: [], bcryptRounds: 4, auth: AUTH, now: () => NOW });
+    const app = createApp({ commentRepository: repo, postEvents: events, corsOrigins: [], bcryptRounds: 4, auth: AUTH, now: () => NOW });
     await new Promise((resolve) => {
       server = app.listen(0, resolve);
     });
@@ -144,6 +146,7 @@ describe('댓글 API /api/posts/:postId/comments', () => {
   });
   after(() => server.close());
   beforeEach(() => {
+    events.log.length = 0;
     repo.state.comments.length = 0;
     repo.state.reports.length = 0;
     repo.state.seconds = 0;
@@ -164,6 +167,25 @@ describe('댓글 API /api/posts/:postId/comments', () => {
     });
     return { status: res.status, body: await res.json() };
   };
+
+  describe('실시간 신호 (SSE)', () => {
+    it('댓글 작성 · 수정 · 삭제가 성공하면 그 공고에 comments 신호를 보낸다', async () => {
+      await write({ text: '첫 댓글' });
+      const id = repo.state.comments[0].id;
+      await send('PATCH', `/api/comments/${id}`, { text: '고친 댓글' });
+      await send('DELETE', `/api/comments/${id}`);
+      assert.deepEqual(events.log, [[POST_ID, 'comments'], [POST_ID, 'comments'], [POST_ID, 'comments']]);
+    });
+
+    it('실패한 요청(빈 내용 · 로그인 없음 · 남의 댓글)은 신호를 보내지 않는다', async () => {
+      const id = repo.seed({ authorId: ALICE, content: '앨리스 댓글' });
+      await write({ text: '' });
+      await write({ text: '로그인 없음' }, null);
+      await send('PATCH', `/api/comments/${id}`, { text: '남이 고침' }, BOB);
+      await send('DELETE', `/api/comments/${id}`, undefined, BOB);
+      assert.deepEqual(events.log, []);
+    });
+  });
 
   describe('댓글 달기', () => {
     it('댓글을 저장하고 201 과 작성된 댓글을 돌려준다', async () => {

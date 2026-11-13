@@ -304,8 +304,9 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 | GET | `/api/posts/search?q=&tags=&page=&size=` | 공고 검색 | |
 | GET | `/api/posts/popular?category=&limit=` | 인기 공고 (메인) | |
 | GET | `/api/posts/urgent?category=&limit=` | 마감 임박 공고 (메인) | |
-| GET | `/api/posts/{postId}` | 공고 상세 (조회수 +1) | |
+| GET | `/api/posts/{postId}` | 공고 상세 (조회수 +1, `?view=false` 이면 조회수를 올리지 않음 — 화면 자동 갱신용) | |
 | GET | `/api/posts/{postId}/related` | 관련 공고 | |
+| GET | `/api/posts/{postId}/events` | 공고 변경 실시간 신호 (SSE, `text/event-stream`) | |
 | POST | `/api/posts` | 공고 작성 | 🔒 |
 | PUT | `/api/posts/{postId}` | 공고 수정 | 🔒 작성자 |
 | DELETE | `/api/posts/{postId}` | 공고 삭제 | 🔒 작성자 |
@@ -325,6 +326,12 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 - **인기·마감 임박** (`GET /api/posts/popular`, `GET /api/posts/urgent`): 응답은 목록 아이템(위 `GET /api/posts` 의 `items[]`)과 같은 모양의 **배열**입니다. `category`(생략 시 전체), `limit`(기본 4, 1~20, 그 밖은 400 `INVALID_INPUT`). 둘 다 **모집 중(`OPEN`)이고 아직 출발하지 않은**(일정 미정 포함) 공고만 대상입니다.
   - `popular`: 조회수 → 댓글 수 순
   - `urgent`: 남은 자리가 2 이하이거나 출발이 24시간 이내인 공고를 출발이 가까운 순(일정 미정은 뒤) → 남은 자리가 적은 순으로 정렬 (기준은 `boardConstants.js` 의 `URGENT_*`)
+- **실시간 신호** (`GET /api/posts/{postId}/events`): 공고 상세 화면이 열려 있는 동안 연결해 두는 **SSE** 입니다(비로그인도 연결 가능, 없거나 삭제된 공고는 404 `POST_NOT_FOUND`). 서버는 변경이 DB 에 반영된 **뒤에** 신호만 보내고 내용은 담지 않으며(`data: {}`), 화면은 신호를 받으면 인증된 일반 API(`GET /api/posts/{postId}` 등)로 다시 조회합니다. 그래서 권한 검사는 기존 API 가 그대로 합니다.
+  - `event: post` — 공고 본문·상태(`OPEN`/`PAUSED`/`CLOSED`/`COMPLETED`/삭제)·인원·신청자·파티원이 바뀜: 참가 신청·취소, 승인/거절, 모집 상태 변경, 공고 수정·삭제(작성자·관리자)
+  - `event: comments` — 댓글이 작성·수정·삭제·가림·복구됨
+  - 연결이 끊기면 `retry: 3000`(3초)에 따라 브라우저가 다시 연결하고, 25초마다 `: ping` 주석 줄을 보내 프록시가 유휴 연결을 끊지 않게 합니다. 끊겨 있던 동안의 신호는 다시 보내지 않으므로 화면은 **재연결 직후 한 번 다시 조회**해야 합니다. 프록시 버퍼링을 끄도록 `X-Accel-Buffering: no` 를 보냅니다.
+  - 구독 목록은 서버 프로세스 메모리에 있습니다(`common/postEvents.js`). 서버를 여러 대로 늘리면 Redis 같은 공유 채널이 필요합니다.
+  - `GET /api/posts/{postId}?view=false` 로 조회하면 조회수를 올리지 않아, 신호를 받아 다시 조회할 때 쓸 수 있습니다.
 - **관련 공고** (`GET /api/posts/{postId}/related?limit=`): 응답은 목록 아이템(`GET /api/posts` 의 `items[]`)과 같은 모양의 **배열**이며 비로그인도 쓸 수 있고 **조회수는 올리지 않습니다**. 기준 공고와 **같은 게임**의, 모집 중(`OPEN`)이고 아직 출발하지 않은(일정 미정 포함) **다른 공고**를 같은 상세 분류 → 겹치는 태그가 많은 순 → 최신순으로 돌려줍니다. `limit` 기본 4, 1~20(그 밖은 400 `INVALID_INPUT`). 없으면 빈 배열, 기준 공고가 없거나 삭제됐거나 `postId` 형식이 틀리면 404 `POST_NOT_FOUND`.
 - **공고 수정** (`PUT /api/posts/{postId}`) 🔒 작성자(일정·게임·상세 분류가 바뀌면 신청자에게 알림 — 알림 전송 표 참고): 요청 본문은 공고 작성(`POST /api/posts`)과 같고 모든 필드를 다시 보냅니다(태그는 보낸 것으로 교체). 응답 `200 { id }`. 작성과 같은 규칙으로 검증하되, **기존 일정을 그대로 보내면 이미 지난 일정이어도 허용**하고 새로 지정하는 과거 일정은 400 입니다. 모집 인원은 파티장 포함 **확정 인원보다 줄일 수 없고**(400 `INVALID_INPUT`, `fields[headcount]`), 모집 중인 공고의 인원을 확정 인원과 같게 줄이면 `CLOSED` 로 바뀝니다. 마감(`CLOSED`) 공고는 수정할 수 있고 상태는 그대로이며, 모집 중으로 되돌리려면 `PATCH .../status` 를 씁니다. 오류: 401 `UNAUTHORIZED`, 403 `NOT_POST_AUTHOR`, 404 `POST_NOT_FOUND`(없음·삭제됨·`postId` 형식 오류) · `GAME_NOT_FOUND` · `GAME_CONTENT_NOT_FOUND`, 409 `POST_NOT_EDITABLE`(완료된 공고).
 - **스크랩** (`POST /api/posts/{postId}/scrap`, `DELETE /api/posts/{postId}/scrap`) 🔒: 둘 다 응답 `204` 이고 **멱등**입니다(이미 스크랩했거나 스크랩하지 않았어도 성공). 내 스크랩만 다루며 내 공고도 스크랩할 수 있습니다. 상세(`GET /api/posts/{postId}`)의 `viewer.scrapped` 에 반영됩니다. 오류: 401 `UNAUTHORIZED`, 404 `POST_NOT_FOUND`(없음·삭제됨·`postId` 형식 오류). 공고가 삭제되면 그 공고의 스크랩도 함께 지워집니다.

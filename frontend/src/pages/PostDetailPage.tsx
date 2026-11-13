@@ -20,6 +20,7 @@ import { postDetailText, postText } from '../data/postData';
 import { paths, ROUTES } from '../data/routes';
 import { useComments } from '../hooks/useComments';
 import { usePostDetail } from '../hooks/usePostDetail';
+import { usePostEvents } from '../hooks/usePostEvents';
 
 interface PostDetailPageProps {
   readonly className?: string;
@@ -39,6 +40,14 @@ const PostDetailView: React.FC<{ readonly postId: string }> = ({ postId }) => {
   const navigate = useNavigate();
   const post = usePostDetail(postId);
   const thread = useComments(postId, post.detail?.commentCount ?? 0);
+  // 다른 사람의 신청·승인·댓글 등을 새로고침 없이 반영합니다. 댓글 신호는 공고의 댓글 수도 바뀌므로 상세도 함께 불러옵니다.
+  usePostEvents(postId, {
+    onPost: post.refresh,
+    onComments: () => {
+      thread.refresh();
+      post.refresh();
+    },
+  });
   const { detail } = post;
   const leaveText = post.accepted ? postText.leave : postText.cancelApplication;
 

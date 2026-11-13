@@ -1,6 +1,7 @@
 'use strict';
 
 const { ApiError } = require('../common/ApiError');
+const { POST_EVENT, NO_EVENTS } = require('../common/postEvents');
 const { boardMessages } = require('./boardConstants');
 const { COMMENT_STATUS, MEMBER_STATUS, commentMessages } = require('./commentConstants');
 const {
@@ -66,7 +67,9 @@ function assertCanWrite(member, current) {
  * 댓글 조회·작성·수정·삭제·신고 비즈니스 로직.
  * @param {{ commentRepository: ReturnType<typeof import('./commentRepository').createCommentRepository>, now?: () => Date }} deps
  */
-function createCommentService({ commentRepository, now = () => new Date() }) {
+function createCommentService({ commentRepository, postEvents = NO_EVENTS, now = () => new Date() }) {
+  const commentsChanged = (postId) => postEvents.publish(postId, POST_EVENT.comments);
+
   /** 수정·삭제·신고 대상 댓글. 없거나 삭제됐으면 404 */
   async function loadComment(commentId) {
     const comment = await commentRepository.findCommentContext(commentId);
@@ -145,6 +148,7 @@ function createCommentService({ commentRepository, now = () => new Date() }) {
     });
 
     const row = await commentRepository.findCommentById(id);
+    commentsChanged(postId);
     return toComment(row, { viewerId: memberId, postAuthorId: post.authorId, parentAuthorId: parent?.authorId ?? null });
   }
 
@@ -164,6 +168,7 @@ function createCommentService({ commentRepository, now = () => new Date() }) {
     assertCanWrite(await commentRepository.findMemberStatus(memberId), now());
 
     await commentRepository.updateCommentContent(commentId, text);
+    commentsChanged(comment.postId);
     return toComment(
       { ...comment, content: text },
       { viewerId: memberId, postAuthorId: comment.postAuthorId, parentAuthorId: comment.parentAuthorId ?? null },
@@ -179,6 +184,7 @@ function createCommentService({ commentRepository, now = () => new Date() }) {
     const comment = await loadComment(commentId);
     assertAuthor(comment, memberId);
     await commentRepository.deleteCommentWithReplies({ commentId, postId: comment.postId, deletedAt: now() });
+    commentsChanged(comment.postId);
   }
 
   /**

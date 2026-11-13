@@ -1,6 +1,7 @@
 'use strict';
 
 const { ApiError } = require('../common/ApiError');
+const { POST_EVENT, NO_EVENTS } = require('../common/postEvents');
 const {
   APPLICATION_STATUS: S,
   POST_STATUS,
@@ -45,7 +46,9 @@ function toMember(row) {
  * 참가 신청 · 취소 · 신청자 목록 · 승인/거절 · 파티원 조회 비즈니스 로직 (docs/API_SPEC.md 4절).
  * @param {{ partyRepository: ReturnType<typeof import('./partyRepository').createPartyRepository>, now?: () => Date }} deps
  */
-function createPartyService({ partyRepository, now = () => new Date() }) {
+function createPartyService({ partyRepository, postEvents = NO_EVENTS, now = () => new Date() }) {
+  const changed = (postId) => postEvents.publish(postId, POST_EVENT.post);
+
   async function loadPost(rawPostId) {
     const postId = parseId(rawPostId);
     const post = postId === null ? null : await partyRepository.findPost(postId);
@@ -82,11 +85,13 @@ function createPartyService({ partyRepository, now = () => new Date() }) {
       if ([S.pending, S.accepted].includes(existing.status)) throw alreadyApplied();
       if (existing.status !== S.canceled) throw new ApiError(403, 'REAPPLY_NOT_ALLOWED', m.reapplyNotAllowed);
       if (!(await partyRepository.reapply({ id: existing.id, postId: post.id, notice, ...input }))) throw alreadyApplied();
+      changed(post.id);
       return { id: existing.id, status: S.pending };
     }
 
     const id = await partyRepository.createApplication({ postId: post.id, applicantId: memberId, notice, ...input });
     if (id === null) throw alreadyApplied();
+    changed(post.id);
     return { id, status: S.pending };
   }
 
@@ -105,6 +110,7 @@ function createPartyService({ partyRepository, now = () => new Date() }) {
     };
     const canceled = await partyRepository.cancelApplication({ postId: post.id, applicantId: memberId, canceledAt: current, lateCancel, notice });
     if (!canceled) throw applicationNotFound();
+    changed(post.id);
   }
 
   /** GET /api/posts/:postId/applications?status= — 작성자만 */
@@ -142,6 +148,7 @@ function createPartyService({ partyRepository, now = () => new Date() }) {
     });
     switch (outcome.result) {
       case 'OK':
+        changed(post.id);
         return { id: applicationId, status, current: outcome.current, max: outcome.max, postStatus: outcome.postStatus };
       case 'ALREADY_DECIDED':
         throw new ApiError(409, 'ALREADY_DECIDED', m.alreadyDecided);
@@ -163,6 +170,7 @@ function createPartyService({ partyRepository, now = () => new Date() }) {
     const outcome = await partyRepository.changePostStatus({ postId: post.id, status, now: now(), notice });
     switch (outcome.result) {
       case 'OK':
+        changed(post.id);
         return { id: post.id, status: outcome.status, current: outcome.current, max: outcome.max };
       case 'COMPLETED':
         throw new ApiError(409, 'POST_COMPLETED', m.postCompleted);

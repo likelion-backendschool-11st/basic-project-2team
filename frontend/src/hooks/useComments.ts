@@ -65,7 +65,10 @@ export function useComments(postId: string, initialTotal: number) {
 
   const paging = usePagination(rootTotal, COMMENT_PAGE_SIZE, `${postId}${sort}`);
   const page = paging.page;
-  const reload = () => setReloadKey((k) => k + 1);
+  const reload = useCallback(() => setReloadKey((k) => k + 1), []);
+
+  // 서버가 내려준 댓글 수가 바뀌면(다시 불러오면) 내가 화면에서 더해 둔 보정값은 이미 반영된 것이므로 비웁니다.
+  useEffect(() => setTotalDelta(0), [initialTotal]);
 
   useEffect(() => {
     let cancelled = false;
@@ -184,7 +187,7 @@ export function useComments(postId: string, initialTotal: number) {
   };
 
   return {
-    comments, total: Math.max(0, initialTotal + totalDelta), visible, repliesOf, sort, setSort, paging, loading, error,
+    comments, refresh: reload, total: Math.max(0, initialTotal + totalDelta), visible, repliesOf, sort, setSort, paging, loading, error,
     replyTo, setReplyTo, editing, setEditing, popoverFor, setPopoverFor, profileOf,
     add, saveEdit, askDelete, confirmDelete, askReport, confirmReport, deleteDialog, reportDialog, toast,
   };

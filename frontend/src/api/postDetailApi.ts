@@ -41,8 +41,9 @@ export interface PostDetailResponse {
   readonly updatedAt: string;
 }
 
-export const getPostDetail = (postId: string) =>
-  request<PostDetailResponse>('GET', `/api/posts/${encodeURIComponent(postId)}`);
+/** countView=false 이면 조회수를 올리지 않습니다(화면 자동 갱신 · 변경 후 다시 불러오기용). */
+export const getPostDetail = (postId: string, countView = true) =>
+  request<PostDetailResponse>('GET', `/api/posts/${encodeURIComponent(postId)}${countView ? '' : '?view=false'}`);
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
 const pad = (n: number) => String(n).padStart(2, '0');

@@ -1,6 +1,7 @@
 'use strict';
 
 const { ApiError } = require('../common/ApiError');
+const { POST_EVENT, NO_EVENTS } = require('../common/postEvents');
 const { postMessages, NOTIFICATION_TYPE, NOTICE_TITLE_MAX, POST_STATUS_COMPLETED } = require('./postConstants');
 const { validateCreatePost, validateDraft } = require('./postValidator');
 
@@ -11,7 +12,7 @@ const clipTitle = (title) => (Array.from(title).length > NOTICE_TITLE_MAX ? `${A
  * 공고 작성 비즈니스 로직.
  * @param {{ postRepository: ReturnType<typeof import('./postRepository').createPostRepository>, now?: () => Date }} deps
  */
-function createPostService({ postRepository, now = () => new Date() }) {
+function createPostService({ postRepository, postEvents = NO_EVENTS, now = () => new Date() }) {
   /** 게임·상세 분류·인원 규칙을 확인해 저장할 post 컬럼 값을 만듭니다. 작성과 수정이 같이 씁니다. */
   async function resolvePostFields(input) {
     const game = await postRepository.findGameByCode(input.game);
@@ -90,6 +91,7 @@ function createPostService({ postRepository, now = () => new Date() }) {
     if (result === 'NOT_FOUND') throw new ApiError(404, 'POST_NOT_FOUND', postMessages.postNotFound);
     if (result === 'NOT_EDITABLE') throw new ApiError(409, 'POST_NOT_EDITABLE', postMessages.notEditable);
     if (result === 'HEADCOUNT_BELOW') throw headcountBelowCurrent(currentCount);
+    postEvents.publish(postId, POST_EVENT.post);
     return { id: postId };
   }
 
@@ -123,6 +125,7 @@ function createPostService({ postRepository, now = () => new Date() }) {
     if (post.authorId !== memberId) throw new ApiError(403, 'NOT_POST_AUTHOR', postMessages.notPostAuthor);
     const notice = { type: NOTIFICATION_TYPE.postDeleted, message: postMessages.notice.deleted(clipTitle(post.title)) };
     if (!(await postRepository.softDeletePost(id, now(), notice))) throw notFound();
+    postEvents.publish(id, POST_EVENT.post);
   }
 
   /** 스크랩이 걸린 공고인지 확인합니다. 없거나 삭제된 공고는 404 입니다. */

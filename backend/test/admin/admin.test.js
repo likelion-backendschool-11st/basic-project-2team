@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { createApp } = require('../../src/app');
+const { createRecordingEvents } = require('../helpers/recordingEvents');
 
 const AUTH = Object.freeze({
   jwtSecret: 'test-secret',
@@ -192,11 +193,13 @@ describe('admin API', () => {
   let baseUrl;
   let repo;
   let passwordHash;
+  const events = createRecordingEvents();
 
   before(async () => {
     passwordHash = await bcrypt.hash(PASSWORD, 4);
     repo = createFakeRepository();
     const app = createApp({
+      postEvents: events,
       adminRepository: repo,
       memberRepository: {},
       corsOrigins: ['http://localhost:5173'],
@@ -213,6 +216,7 @@ describe('admin API', () => {
   after(() => new Promise((resolve) => server.close(resolve)));
 
   beforeEach(() => {
+    events.log.length = 0;
     repo.reset();
     repo.state.admins.push(
       { id: 1, loginId: 'master', passwordHash, name: '관리자 마스터', role: 'ADMIN', status: 'ACTIVE' },
@@ -373,6 +377,27 @@ describe('admin API', () => {
       const { body } = await json(await request('PATCH', '/reports/1', { body: { status: 'REJECTED', memo: '증빙 부족' } }));
       assert.equal(body.data.action, 'DISMISS');
       assert.equal(repo.state.sanctions.length, 0);
+    });
+  });
+
+  describe('실시간 신호 (SSE)', () => {
+    it('관리자가 공고를 삭제하면 post, 댓글을 가림·복구·삭제하면 comments 신호를 커밋 뒤에 보낸다', async () => {
+      await request('PATCH', '/comments/200', { body: { status: 'HIDDEN', reason: '욕설' } });
+      await request('PATCH', '/comments/200', { body: { status: 'VISIBLE', reason: '오신고' } });
+      await request('DELETE', '/posts/100', { body: { reason: '허위 공고' } });
+      assert.deepEqual(events.log, [[100, 'comments'], [100, 'comments'], [100, 'post']]);
+    });
+
+    it('실패한 처리(사유 없음 · 이미 삭제 · 없는 대상)는 신호를 보내지 않는다', async () => {
+      await request('DELETE', '/posts/100', { body: {} });
+      await request('DELETE', '/posts/999', { body: { reason: 'x' } });
+      await request('PATCH', '/comments/999', { body: { status: 'HIDDEN', reason: 'x' } });
+      assert.deepEqual(events.log, []);
+    });
+
+    it('신고 처리에서 공고·댓글을 삭제(DELETE_CONTENT)하면 신호를 보낸다', async () => {
+      await request('PATCH', '/reports/2', { body: { status: 'DONE', action: 'DELETE_CONTENT', memo: '광고' } });
+      assert.deepEqual(events.log, [[100, 'post']]);
     });
   });
 

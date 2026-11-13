@@ -5,6 +5,7 @@ const cors = require('cors');
 const { env } = require('./config/env');
 const { notFoundHandler, errorHandler } = require('./common/errorHandler');
 const { createTokenProvider } = require('./common/tokenProvider');
+const { createPostEvents } = require('./common/postEvents');
 const { createRequireAuth, createOptionalAuth, createRequireAdmin } = require('./common/authMiddleware');
 const { createMemberModule } = require('./member');
 const { createPostModule } = require('./post');
@@ -36,6 +37,7 @@ const { createRankingModule } = require('./ranking');
  *   accountRepository?: object,
  *   reviewRepository?: object,
  *   rankingRepository?: object,
+ *   postEvents?: ReturnType<typeof createPostEvents>,
  *   corsOrigins: string[],
  *   bcryptRounds: number,
  *   auth?: typeof env.auth,
@@ -57,6 +59,7 @@ function createApp({
   accountRepository,
   reviewRepository,
   rankingRepository,
+  postEvents = createPostEvents(),
   corsOrigins,
   bcryptRounds,
   auth = env.auth,
@@ -75,10 +78,10 @@ function createApp({
   const member = createMemberModule({ pool, memberRepository, tokenProvider, requireAuth, bcryptRounds, now });
   app.use('/api/auth', member.router);
 
-  const post = createPostModule({ pool, postRepository, requireAuth, now });
+  const post = createPostModule({ pool, postRepository, postEvents, requireAuth, now });
   app.use('/api/posts', post.router);
   app.use('/api/games', createGameModule({ pool, gameRepository }).router);
-  app.use('/api/posts', createPartyModule({ pool, partyRepository, requireAuth, now }).router);
+  app.use('/api/posts', createPartyModule({ pool, partyRepository, postEvents, requireAuth, now }).router);
   app.use('/api/notifications', createNotificationModule({ pool, notificationRepository, requireAuth }).router);
   app.use('/api/categories', createCategoryModule({ pool, categoryRepository }).router);
 
@@ -92,6 +95,7 @@ function createApp({
     pool,
     boardRepository,
     commentRepository,
+    postEvents,
     requireAuth,
     optionalAuth,
     now,
@@ -100,7 +104,7 @@ function createApp({
   app.use('/api/comments', board.commentRouter);
   app.use('/api/reports', board.reportRouter);
 
-  const admin = createAdminModule({ pool, adminRepository, tokenProvider, requireAdmin, bcryptRounds, now });
+  const admin = createAdminModule({ pool, adminRepository, tokenProvider, postEvents, requireAdmin, bcryptRounds, now });
   app.use('/api/admin', admin.router);
   // GET /api/members/:memberId(mypage)가 /me 를 잡지 않도록 account 를 먼저 마운트합니다.
   const account = createAccountModule({ pool, accountRepository, requireAuth, bcryptRounds, now });

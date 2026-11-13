@@ -4,6 +4,7 @@ const { describe, it, before, after, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
 const { createApp } = require('../../src/app');
 const { createTokenProvider } = require('../../src/common/tokenProvider');
+const { createRecordingEvents } = require('../helpers/recordingEvents');
 
 const AUTH = Object.freeze({ jwtSecret: 'test-secret', accessTokenTtlSeconds: 1800, refreshTokenTtlDays: 1, rememberMeTtlDays: 14 });
 const AUTHOR = 7;
@@ -34,10 +35,11 @@ describe('DELETE /api/posts/:postId', () => {
   let server;
   let baseUrl;
   const repo = createFakeRepository();
+  const events = createRecordingEvents();
   const tokens = createTokenProvider(AUTH);
 
   before(async () => {
-    const app = createApp({ postRepository: repo, corsOrigins: [], bcryptRounds: 4, auth: AUTH, now: () => new Date('2026-11-14T00:00:00Z') });
+    const app = createApp({ postRepository: repo, postEvents: events, corsOrigins: [], bcryptRounds: 4, auth: AUTH, now: () => new Date('2026-11-14T00:00:00Z') });
     await new Promise((resolve) => {
       server = app.listen(0, resolve);
     });
@@ -45,6 +47,7 @@ describe('DELETE /api/posts/:postId', () => {
   });
   after(() => server.close());
   beforeEach(() => {
+    events.log.length = 0;
     repo.state.posts.clear();
     repo.state.posts.set(1, { authorId: AUTHOR, status: 'OPEN', deletedAt: null, title: '카멘 숙련팟' });
     repo.state.notices = [];
@@ -71,6 +74,14 @@ describe('DELETE /api/posts/:postId', () => {
     assert.equal(res.status, 204);
     assert.deepEqual(repo.state.posts.get(1), { authorId: AUTHOR, status: 'DELETED', deletedAt: new Date('2026-11-14T00:00:00Z'), title: '카멘 숙련팟' });
     assert.equal(repo.state.scraps.length, 0);
+  });
+
+  it('삭제에 성공하면 post 신호를 보내고, 권한 없음·없는 공고는 보내지 않는다', async () => {
+    await del(1, OTHER);
+    await del(999);
+    assert.deepEqual(events.log, []);
+    await del(1);
+    assert.deepEqual(events.log, [[1, 'post']]);
   });
 
   it('작성자가 아니면 403 NOT_POST_AUTHOR 이고 삭제되지 않는다', async () => {
