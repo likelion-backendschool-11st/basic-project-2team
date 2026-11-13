@@ -5,8 +5,27 @@ const { agreementTypes, duplicateErrors } = require('./memberConstants');
 /** 컬럼 이름은 SQL 에 직접 들어가므로 이 목록에 있는 값만 허용합니다. */
 const UNIQUE_COLUMNS = new Set(Object.keys(duplicateErrors));
 
+/** 로그인·토큰 재발급에 필요한 member 컬럼 */
+const AUTH_MEMBER_COLUMNS = `id, password_hash, nickname, status, suspended_until, locked_until,
+  login_fail_count, level, manner_temp, avatar_url`;
+
+/** member 행 → 서비스에서 쓰는 camelCase 객체. DECIMAL 은 문자열로 오므로 숫자로 바꿉니다. */
+const toAuthMember = (row) =>
+  row && {
+    id: row.id,
+    passwordHash: row.password_hash,
+    nickname: row.nickname,
+    status: row.status,
+    suspendedUntil: row.suspended_until,
+    lockedUntil: row.locked_until,
+    loginFailCount: row.login_fail_count,
+    level: row.level,
+    mannerTemp: Number(row.manner_temp),
+    avatarUrl: row.avatar_url,
+  };
+
 /**
- * member · member_agreement · member_withdrawal 테이블 접근.
+ * member · member_agreement · member_withdrawal · refresh_token 테이블 접근.
  * @param {import('mysql2/promise').Pool} pool
  */
 function createMemberRepository(pool) {
@@ -64,7 +83,87 @@ function createMemberRepository(pool) {
     }
   }
 
-  return { existsBy, hasActiveRejoinBlock, createMember };
+  /** 로그인 아이디로 회원 조회 (탈퇴 회원은 login_id 가 NULL 이라 조회되지 않음) */
+  async function findAuthMemberByLoginId(loginId) {
+    const [rows] = await pool.query(`SELECT ${AUTH_MEMBER_COLUMNS} FROM member WHERE login_id = ? LIMIT 1`, [loginId]);
+    return toAuthMember(rows[0]) ?? null;
+  }
+
+  async function findAuthMemberById(memberId) {
+    const [rows] = await pool.query(`SELECT ${AUTH_MEMBER_COLUMNS} FROM member WHERE id = ? LIMIT 1`, [memberId]);
+    return toAuthMember(rows[0]) ?? null;
+  }
+
+  /**
+   * 로그인 실패 횟수를 1 늘리고, maxFailures 에 닿으면 locked_until 을 걸고 횟수를 0 으로 되돌립니다.
+   * 동시 요청에도 횟수가 빠지지 않도록 현재 값을 기준으로 한 번에 갱신합니다.
+   * (MySQL 은 SET 을 왼쪽부터 적용하므로 locked_until 을 먼저 계산합니다.)
+   */
+  async function recordLoginFailure({ memberId, maxFailures, lockedUntil }) {
+    await pool.query(
+      `UPDATE member
+          SET locked_until = IF(login_fail_count + 1 >= ?, ?, locked_until),
+              login_fail_count = IF(login_fail_count + 1 >= ?, 0, login_fail_count + 1)
+        WHERE id = ?`,
+      [maxFailures, lockedUntil, maxFailures, memberId],
+    );
+  }
+
+  /** 로그인 성공: 실패 횟수·잠금 초기화, 마지막 로그인 시각 기록 */
+  async function recordLoginSuccess({ memberId, now }) {
+    await pool.query(
+      'UPDATE member SET login_fail_count = 0, locked_until = NULL, last_login_at = ? WHERE id = ?',
+      [now, memberId],
+    );
+  }
+
+  async function saveRefreshToken({ memberId, tokenHash, expiresAt }) {
+    await pool.query('INSERT INTO refresh_token (member_id, token_hash, expires_at) VALUES (?, ?, ?)', [
+      memberId,
+      tokenHash,
+      expiresAt,
+    ]);
+  }
+
+  async function findRefreshToken(tokenHash) {
+    const [rows] = await pool.query(
+      'SELECT id, member_id, expires_at, revoked_at FROM refresh_token WHERE token_hash = ? LIMIT 1',
+      [tokenHash],
+    );
+    const row = rows[0];
+    return row ? { id: row.id, memberId: row.member_id, expiresAt: row.expires_at, revokedAt: row.revoked_at } : null;
+  }
+
+  /** 토큰 하나를 폐기합니다. 이미 폐기된 토큰이면 false (동시에 재발급을 요청한 경우) */
+  async function revokeRefreshToken({ id, now }) {
+    const [result] = await pool.query(
+      'UPDATE refresh_token SET revoked_at = ? WHERE id = ? AND revoked_at IS NULL',
+      [now, id],
+    );
+    return result.affectedRows > 0;
+  }
+
+  /** 회원의 유효한 Refresh Token 을 모두 폐기합니다 (로그아웃, 토큰 재사용 감지) */
+  async function revokeAllRefreshTokens({ memberId, now }) {
+    await pool.query('UPDATE refresh_token SET revoked_at = ? WHERE member_id = ? AND revoked_at IS NULL', [
+      now,
+      memberId,
+    ]);
+  }
+
+  return {
+    existsBy,
+    hasActiveRejoinBlock,
+    createMember,
+    findAuthMemberByLoginId,
+    findAuthMemberById,
+    recordLoginFailure,
+    recordLoginSuccess,
+    saveRefreshToken,
+    findRefreshToken,
+    revokeRefreshToken,
+    revokeAllRefreshTokens,
+  };
 }
 
 module.exports = { createMemberRepository };
