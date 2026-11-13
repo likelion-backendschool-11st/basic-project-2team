@@ -15,7 +15,12 @@ function createBoardController(boardService) {
     return sendSuccess(res, 200, data);
   }
 
-  return { getDetail };
+  async function list(req, res) {
+    const data = await boardService.listPosts(req.query);
+    return sendSuccess(res, 200, data);
+  }
+
+  return { getDetail, list };
 }
 
 module.exports = { createBoardController };

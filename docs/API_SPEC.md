@@ -227,6 +227,10 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 
 - `category`: `mmorpg` · `fps` · `aos` · `steam` · `etc` (생략 시 전체)
 - `sort`: `recent`(기본) · `views` · `urgent`
+- `tags`: 쉼표로 구분한 태그(최대 5개, `#` 는 있어도 됨). 지정한 태그를 **모두** 가진 공고만 조회합니다.
+- `page`(기본 1) · `size`(기본 8, 최대 50), `excludeClosed=true` 이면 모집 중(`OPEN`) 공고만 조회합니다 (기본 `false`).
+- `urgent`: 출발 시간이 가까운 순(일정 미정은 뒤), 남은 자리가 적은 순입니다. `recent` 는 최신순, `views` 는 조회수순입니다.
+- 삭제된 공고는 목록에 나오지 않습니다. 응답은 `{ items, page, size, totalCount, totalPages }` 이고, 값이 올바르지 않으면 400 `INVALID_INPUT`(필드별) 입니다.
 
 **공고 작성 요청**
 
@@ -292,12 +296,16 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 
 ```json
 {
-  "id": "mmorpg-7", "category": "mmorpg", "game": "로스트아크",
+  "id": 7, "category": "mmorpg", "game": "lostark", "gameName": "로스트아크", "type": "raid",
   "title": "...", "current": 3, "max": 8, "tags": ["숙련"],
-  "author": "빛나는오더", "createdAt": "2026-11-12T20:30:00+09:00", "views": 128,
-  "status": "OPEN"
+  "author": "빛나는오더",
+  "schedule": "2026-11-15T12:00:00.000Z", "scheduleTbd": false, "voiceRequired": true,
+  "views": 128, "commentCount": 3, "status": "OPEN",
+  "createdAt": "2026-11-12T11:30:00.000Z"
 }
 ```
+
+- `current` / `max` 는 파티장 포함 현재 인원 / 정원입니다. 탈퇴한 작성자는 `author` 가 `"탈퇴한 회원"` 입니다. 일정 미정이면 `schedule: null`, `scheduleTbd: true` 입니다.
 
 ## 4. 파티 참가 (Application)
 
