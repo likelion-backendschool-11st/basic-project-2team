@@ -29,11 +29,17 @@ const DRAFT_STRING_FIELDS = Object.freeze({
 const DRAFT_BOOLEAN_FIELDS = Object.freeze(['tbd', 'voice']);
 
 const POST_STATUS_DELETED = 'DELETED';
+const POST_STATUS_OPEN = 'OPEN';
+const POST_STATUS_CLOSED = 'CLOSED';
+const POST_STATUS_COMPLETED = 'COMPLETED';
 
 const postMessages = Object.freeze({
   invalidInput: '입력값을 확인해주세요.',
   postNotFound: '존재하지 않는 공고입니다.',
   notPostAuthor: '공고 작성자만 삭제할 수 있습니다.',
+  notPostAuthorEdit: '공고 작성자만 수정할 수 있습니다.',
+  notEditable: '완료된 공고는 수정할 수 없습니다.',
+  headcountBelowCurrent: (current) => `이미 확정된 인원(${current}명)보다 적게 줄일 수 없습니다.`,
   draftInvalid: '임시저장할 내용이 올바르지 않습니다.',
   titleInvalid: `제목은 ${TITLE_MIN_LENGTH}~${TITLE_MAX_LENGTH}자로 입력해주세요.`,
   bodyRequired: '본문을 입력해주세요.',
@@ -70,5 +76,8 @@ module.exports = {
   DRAFT_STRING_FIELDS,
   DRAFT_BOOLEAN_FIELDS,
   POST_STATUS_DELETED,
+  POST_STATUS_OPEN,
+  POST_STATUS_CLOSED,
+  POST_STATUS_COMPLETED,
   postMessages,
 };

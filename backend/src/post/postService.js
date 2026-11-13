@@ -1,7 +1,7 @@
 'use strict';
 
 const { ApiError } = require('../common/ApiError');
-const { postMessages } = require('./postConstants');
+const { postMessages, POST_STATUS_COMPLETED } = require('./postConstants');
 const { validateCreatePost, validateDraft } = require('./postValidator');
 
 /**
@@ -9,10 +9,8 @@ const { validateCreatePost, validateDraft } = require('./postValidator');
  * @param {{ postRepository: ReturnType<typeof import('./postRepository').createPostRepository>, now?: () => Date }} deps
  */
 function createPostService({ postRepository, now = () => new Date() }) {
-  /** POST /api/posts */
-  async function createPost(authorId, body) {
-    const input = validateCreatePost(body, now());
-
+  /** 게임·상세 분류·인원 규칙을 확인해 저장할 post 컬럼 값을 만듭니다. 작성과 수정이 같이 씁니다. */
+  async function resolvePostFields(input) {
     const game = await postRepository.findGameByCode(input.game);
     if (!game) throw new ApiError(404, 'GAME_NOT_FOUND', postMessages.gameNotFound);
 
@@ -33,24 +31,61 @@ function createPostService({ postRepository, now = () => new Date() }) {
       gameContentId = content.id;
     }
 
-    const id = await postRepository.createPost({
-      post: {
-        authorId,
-        categoryCode: game.categoryCode,
-        gameId: game.id,
-        gameContentId,
-        partyType: input.type,
-        title: input.title,
-        body: input.body,
-        partyName: input.partyName,
-        playStyle: input.style,
-        headcount: input.headcount,
-        scheduleAt: input.scheduleAt,
-        voiceRequired: input.voiceRequired,
-      },
-      tags: input.tags,
-    });
+    return {
+      categoryCode: game.categoryCode,
+      gameId: game.id,
+      gameContentId,
+      partyType: input.type,
+      title: input.title,
+      body: input.body,
+      partyName: input.partyName,
+      playStyle: input.style,
+      headcount: input.headcount,
+      scheduleAt: input.scheduleAt,
+      voiceRequired: input.voiceRequired,
+    };
+  }
+
+  /** POST /api/posts */
+  async function createPost(authorId, body) {
+    const input = validateCreatePost(body, now());
+    const fields = await resolvePostFields(input);
+    const id = await postRepository.createPost({ post: { authorId, ...fields }, tags: input.tags });
     return { id };
+  }
+
+  const parsePostId = (postId) => {
+    if (!/^[1-9]\d*$/.test(postId) || !Number.isSafeInteger(Number(postId))) {
+      throw new ApiError(404, 'POST_NOT_FOUND', postMessages.postNotFound);
+    }
+    return Number(postId);
+  };
+
+  const headcountBelowCurrent = (current) =>
+    new ApiError(400, 'INVALID_INPUT', postMessages.invalidInput, [
+      { field: 'headcount', message: postMessages.headcountBelowCurrent(current) },
+    ]);
+
+  /**
+   * PUT /api/posts/:postId — 작성자만, 작성할 때와 같은 필드를 통째로 다시 보냅니다(태그는 보낸 것으로 교체).
+   * 완료된 공고는 못 고치고, 모집 인원은 확정 인원보다 줄일 수 없습니다.
+   * 모집 중인데 인원을 확정 인원까지 줄이면 자리가 없으니 모집 마감으로 바꿉니다.
+   */
+  async function updatePost(rawPostId, memberId, body) {
+    const postId = parsePostId(rawPostId);
+    const current = await postRepository.findPostAuthor(postId);
+    if (!current) throw new ApiError(404, 'POST_NOT_FOUND', postMessages.postNotFound);
+    if (current.authorId !== memberId) throw new ApiError(403, 'NOT_POST_AUTHOR', postMessages.notPostAuthorEdit);
+    if (current.status === POST_STATUS_COMPLETED) throw new ApiError(409, 'POST_NOT_EDITABLE', postMessages.notEditable);
+
+    const input = validateCreatePost(body, now(), current.scheduleAt ? new Date(current.scheduleAt) : null);
+    const fields = await resolvePostFields(input);
+
+    const { result, currentCount } = await postRepository.updatePost({ postId, post: fields, tags: input.tags });
+    if (result === 'NOT_FOUND') throw new ApiError(404, 'POST_NOT_FOUND', postMessages.postNotFound);
+    if (result === 'NOT_EDITABLE') throw new ApiError(409, 'POST_NOT_EDITABLE', postMessages.notEditable);
+    if (result === 'HEADCOUNT_BELOW') throw headcountBelowCurrent(currentCount);
+    return { id: postId };
   }
 
   /** mysql2 는 JSON 컬럼을 객체로 돌려주지만 문자열로 올 수도 있어 둘 다 받습니다. */
@@ -75,16 +110,16 @@ function createPostService({ postRepository, now = () => new Date() }) {
    * postId 가 1 이상의 정수가 아니어도 404 입니다(공고 상세와 같은 규칙).
    */
   async function deletePost(postId, memberId) {
+    const id = parsePostId(postId);
     const notFound = () => new ApiError(404, 'POST_NOT_FOUND', postMessages.postNotFound);
-    if (!/^[1-9]\d*$/.test(postId) || !Number.isSafeInteger(Number(postId))) throw notFound();
 
-    const post = await postRepository.findPostAuthor(Number(postId));
+    const post = await postRepository.findPostAuthor(id);
     if (!post) throw notFound();
     if (post.authorId !== memberId) throw new ApiError(403, 'NOT_POST_AUTHOR', postMessages.notPostAuthor);
-    if (!(await postRepository.softDeletePost(Number(postId), now()))) throw notFound();
+    if (!(await postRepository.softDeletePost(id, now()))) throw notFound();
   }
 
-  return { createPost, saveDraft, getLatestDraft, deletePost };
+  return { createPost, saveDraft, getLatestDraft, updatePost, deletePost };
 }
 
 module.exports = { createPostService };

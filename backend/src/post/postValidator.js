@@ -39,8 +39,9 @@ function normalizeTags(raw) {
  * 공고 작성 요청 본문을 검증·정규화합니다.
  * @param {object} body
  * @param {Date} now 일정이 과거인지 비교할 기준 시각
+ * @param {Date | null} [keepSchedule] 수정할 때 기존 일정. 같은 일정을 그대로 보내면 과거여도 허용합니다.
  */
-function validateCreatePost(body, now) {
+function validateCreatePost(body, now, keepSchedule = null) {
   const source = body && typeof body === 'object' ? body : {};
   const fields = [];
   const fail = (field, message) => fields.push({ field, message });
@@ -87,7 +88,7 @@ function validateCreatePost(body, now) {
       const hasZone = typeof source.schedule === 'string' && /(Z|[+-]\d{2}:?\d{2})$/i.test(source.schedule.trim());
       scheduleAt = hasZone ? new Date(source.schedule) : new Date(NaN);
       if (Number.isNaN(scheduleAt.getTime())) fail('schedule', m.scheduleInvalid);
-      else if (scheduleAt <= now) fail('schedule', m.schedulePast);
+      else if (scheduleAt <= now && scheduleAt.getTime() !== keepSchedule?.getTime()) fail('schedule', m.schedulePast);
     }
   }
 
