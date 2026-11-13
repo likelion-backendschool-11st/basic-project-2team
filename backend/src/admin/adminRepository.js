@@ -8,6 +8,25 @@ const likePattern = (q) => `%${q.replace(/[\\%_]/g, '\\$&')}%`;
 /** WHERE 조건 목록을 SQL 로 합칩니다. */
 const whereClause = (conditions) => (conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '');
 
+/**
+ * 목록 공통 필터: 기간(createdFrom 이상, createdBefore 미만)과 정렬.
+ * sort 는 validator 가 'DESC' | 'ASC' 로만 넘기므로 SQL 에 그대로 넣습니다.
+ * @returns {{ conditions: string[], params: unknown[], orderBy: string }}
+ */
+function listFilters(alias, { createdFrom, createdBefore, sort = 'DESC' }) {
+  const conditions = [];
+  const params = [];
+  if (createdFrom) {
+    conditions.push(`${alias}.created_at >= ?`);
+    params.push(createdFrom);
+  }
+  if (createdBefore) {
+    conditions.push(`${alias}.created_at < ?`);
+    params.push(createdBefore);
+  }
+  return { conditions, params, orderBy: `${alias}.created_at ${sort}, ${alias}.id ${sort}` };
+}
+
 /** 관리자 목록의 댓글 상태 필터 → SQL 조건 (REPORTED = VISIBLE + 신고 1건 이상) */
 const commentStatusConditions = Object.freeze({
   [commentStatus.visible]: `c.status = '${commentStatus.visible}' AND c.report_count = 0`,
@@ -66,12 +85,17 @@ function createAdminRepository(pool) {
       );
     }
 
-    async function listActionLogs({ actionTypes, offset, limit }) {
-      const conditions = [];
-      const params = [];
+    async function listActionLogs({ actionTypes, q, offset, limit, ...range }) {
+      const { conditions, params, orderBy } = listFilters('l', range);
       if (actionTypes) {
         conditions.push('l.action_type IN (?)');
         params.push(actionTypes);
+      }
+      if (q) {
+        conditions.push(`(a.name LIKE ?
+          OR JSON_UNQUOTE(JSON_EXTRACT(l.detail, '$.targetLabel')) LIKE ?
+          OR JSON_UNQUOTE(JSON_EXTRACT(l.detail, '$.reason')) LIKE ?)`);
+        params.push(likePattern(q), likePattern(q), likePattern(q));
       }
       return page({
         select: `l.id, l.created_at AS createdAt, l.action_type AS actionType, l.target_type AS targetType,
@@ -79,7 +103,7 @@ function createAdminRepository(pool) {
         from: 'admin_action_log l JOIN admin_account a ON a.id = l.admin_id',
         conditions,
         params,
-        orderBy: 'l.created_at DESC, l.id DESC',
+        orderBy,
         offset,
         limit,
       });
@@ -131,9 +155,8 @@ function createAdminRepository(pool) {
 
     // ───────── 신고
 
-    async function listReports({ status, type, offset, limit }) {
-      const conditions = [];
-      const params = [];
+    async function listReports({ status, type, q, offset, limit, ...range }) {
+      const { conditions, params, orderBy } = listFilters('r', range);
       if (status) {
         conditions.push('r.status = ?');
         params.push(status);
@@ -141,6 +164,10 @@ function createAdminRepository(pool) {
       if (type) {
         conditions.push('r.target_type = ?');
         params.push(type);
+      }
+      if (q) {
+        conditions.push('(tm.nickname LIKE ? OR rp.nickname LIKE ? OR r.reason_code LIKE ?)');
+        params.push(likePattern(q), likePattern(q), likePattern(q));
       }
       return page({
         select: `r.id, r.created_at AS createdAt, r.target_type AS targetType, r.target_id AS targetId,
@@ -151,7 +178,7 @@ function createAdminRepository(pool) {
                JOIN member rp ON rp.id = r.reporter_id`,
         conditions,
         params,
-        orderBy: 'r.created_at DESC, r.id DESC',
+        orderBy,
         offset,
         limit,
       });
@@ -200,7 +227,8 @@ function createAdminRepository(pool) {
     // ───────── 공고
 
     const postListSelect = `p.id, p.created_at AS createdAt, p.category_code AS category, g.name AS gameName,
-      p.party_type AS partyType, gc.name AS contentName, p.title, p.author_id AS authorId,
+      p.game_id AS gameId, g.code AS gameCode, p.party_type AS partyType, gc.name AS contentName, p.title,
+      p.author_id AS authorId,
       m.nickname AS authorNickname, p.current_count AS currentCount, p.headcount, p.status,
       (SELECT COUNT(*) FROM report r WHERE r.target_type = 'POST' AND r.target_id = p.id) AS reportCount`;
     const postFrom = `post p
@@ -208,9 +236,8 @@ function createAdminRepository(pool) {
       LEFT JOIN game_content gc ON gc.id = p.game_content_id
       JOIN member m ON m.id = p.author_id`;
 
-    async function listPosts({ status, q, offset, limit }) {
-      const conditions = [];
-      const params = [];
+    async function listPosts({ status, q, game, reported, offset, limit, ...range }) {
+      const { conditions, params, orderBy } = listFilters('p', range);
       if (status) {
         conditions.push('p.status = ?');
         params.push(status);
@@ -219,12 +246,19 @@ function createAdminRepository(pool) {
         conditions.push('(p.title LIKE ? OR m.nickname LIKE ?)');
         params.push(likePattern(q), likePattern(q));
       }
+      if (game) {
+        conditions.push('g.code = ?');
+        params.push(game);
+      }
+      if (reported !== null && reported !== undefined) {
+        conditions.push(`${reported ? '' : 'NOT '}EXISTS (SELECT 1 FROM report r WHERE r.target_type = 'POST' AND r.target_id = p.id)`);
+      }
       return page({
         select: postListSelect,
         from: postFrom,
         conditions,
         params,
-        orderBy: 'p.created_at DESC, p.id DESC',
+        orderBy,
         offset,
         limit,
       });
@@ -237,11 +271,23 @@ function createAdminRepository(pool) {
                 p.schedule_at AS scheduleAt, p.voice_required AS voiceRequired, p.view_count AS viewCount,
                 p.comment_count AS commentCount, p.updated_at AS updatedAt,
                 m.login_id AS authorLoginId, m.manner_temp AS authorMannerTemp,
+                (SELECT COUNT(*) FROM sanction s WHERE s.member_id = p.author_id) AS authorSanctionCount,
                 p.deleted_at AS deletedAt, p.delete_reason AS deleteReason, da.name AS deletedByName
            FROM ${postFrom}
            LEFT JOIN admin_account da ON da.id = p.deleted_by_admin_id
           WHERE p.id = ?`,
         [id],
+      );
+    }
+
+    /** 이 공고를 대상으로 한 신고 (공고 상세 화면) */
+    async function listReportsByPost(postId) {
+      return rowsOf(
+        `SELECT r.id, r.created_at AS createdAt, r.reason_code AS reasonCode, r.status, rp.nickname AS reporterNickname
+           FROM report r JOIN member rp ON rp.id = r.reporter_id
+          WHERE r.target_type = 'POST' AND r.target_id = ?
+          ORDER BY r.created_at DESC, r.id DESC`,
+        [postId],
       );
     }
 
@@ -258,9 +304,8 @@ function createAdminRepository(pool) {
 
     // ───────── 회원
 
-    async function listMembers({ status, q, offset, limit }) {
-      const conditions = [];
-      const params = [];
+    async function listMembers({ status, q, reported, offset, limit, ...range }) {
+      const { conditions, params, orderBy } = listFilters('m', range);
       if (status) {
         conditions.push('m.status = ?');
         params.push(status);
@@ -268,6 +313,9 @@ function createAdminRepository(pool) {
       if (q) {
         conditions.push('(m.nickname LIKE ? OR m.login_id LIKE ? OR m.email LIKE ?)');
         params.push(likePattern(q), likePattern(q), likePattern(q));
+      }
+      if (reported !== null && reported !== undefined) {
+        conditions.push(`${reported ? '' : 'NOT '}EXISTS (SELECT 1 FROM report r WHERE r.target_member_id = m.id)`);
       }
       return page({
         select: `m.id, m.nickname, m.login_id AS loginId, m.created_at AS createdAt,
@@ -278,7 +326,7 @@ function createAdminRepository(pool) {
         from: 'member m',
         conditions,
         params,
-        orderBy: 'm.created_at DESC, m.id DESC',
+        orderBy,
         offset,
         limit,
       });
@@ -347,13 +395,16 @@ function createAdminRepository(pool) {
 
     // ───────── 댓글
 
-    async function listComments({ status, q, offset, limit }) {
-      const conditions = [];
-      const params = [];
+    async function listComments({ status, q, secret, offset, limit, ...range }) {
+      const { conditions, params, orderBy } = listFilters('c', range);
       if (status) conditions.push(commentStatusConditions[status]);
       if (q) {
-        conditions.push('(c.content LIKE ? OR m.nickname LIKE ?)');
-        params.push(likePattern(q), likePattern(q));
+        conditions.push('(c.content LIKE ? OR m.nickname LIKE ? OR p.title LIKE ?)');
+        params.push(likePattern(q), likePattern(q), likePattern(q));
+      }
+      if (secret !== null && secret !== undefined) {
+        conditions.push('c.is_secret = ?');
+        params.push(secret);
       }
       return page({
         select: `c.id, c.created_at AS createdAt, c.post_id AS postId, p.title AS postTitle, c.parent_id AS parentId,
@@ -364,7 +415,7 @@ function createAdminRepository(pool) {
                JOIN member m ON m.id = c.author_id`,
         conditions,
         params,
-        orderBy: 'c.created_at DESC, c.id DESC',
+        orderBy,
         offset,
         limit,
       });
@@ -409,6 +460,7 @@ function createAdminRepository(pool) {
       updateReport,
       listPosts,
       findPostById,
+      listReportsByPost,
       lockPost,
       deletePost,
       listMembers,

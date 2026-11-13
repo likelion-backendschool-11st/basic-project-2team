@@ -522,7 +522,8 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 - 🛡️ 표시 API는 `Authorization: Bearer {관리자 accessToken}` 이 필요합니다. 관리자 토큰은 JWT `typ: "admin"` 이라 **회원 토큰으로는 401** 입니다.
   관리자 토큰은 Refresh Token 없이 Access Token 하나만 발급하며, 만료되면 다시 로그인합니다 (유효 시간 `ACCESS_TOKEN_TTL_SECONDS`).
 - 상태 값은 화면에는 한글로 표시하지만, API에서는 아래 영문 enum으로 주고받고 프론트에서 매핑합니다.
-- 목록 API는 공통 페이지네이션 `?page=1&size=10` (size 1~100, 기본 10) 을 따르고 `{ items, page, size, totalCount, totalPages }` 로 응답합니다. 최신순 정렬입니다.
+- 목록 API는 공통 페이지네이션 `?page=1&size=10` (size 1~100, 기본 10) 을 따르고 `{ items, page, size, totalCount, totalPages }` 로 응답합니다.
+- 모든 목록은 `sort=desc|asc`(작성·접수·처리 일시 기준, 기본 `desc`)와 기간 `from`·`to`(`YYYY-MM-DD`, **한국 시간 날짜**, 양 끝 포함)를 받습니다. 형식이 틀리거나 `from` 이 `to` 보다 늦으면 `400 INVALID_INPUT`.
 - 처리 API(신고 처리·공고 삭제·제재·댓글 처리)와 로그인, 회원 상세 조회는 `admin_action_log` 에 처리자·IP와 함께 기록됩니다 (REQ-ADMIN-007).
 - 시간은 UTC ISO-8601 (`2026-11-13T01:52:10.000Z`) 로 응답합니다.
 
@@ -531,18 +532,18 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 | POST | `/api/admin/auth/login` | 관리자 로그인 `{ userId, password }` → `{ accessToken, admin }` | |
 | GET | `/api/admin/me` | 로그인한 관리자 정보 `{ id, userId, name, role }` | 🛡️ |
 | GET | `/api/admin/dashboard` | 대시보드 통계 | 🛡️ |
-| GET | `/api/admin/reports?status=&type=&page=&size=` | 신고 목록 | 🛡️ |
+| GET | `/api/admin/reports?status=&type=&q=&page=&size=` | 신고 목록 (`q`: 신고 대상·신고자 닉네임, 사유) | 🛡️ |
 | GET | `/api/admin/reports/{reportId}` | 신고 상세 (피신고 회원의 제재 이력 포함) | 🛡️ |
 | PATCH | `/api/admin/reports/{reportId}` | 신고 처리 `{ status, action?, days?, memo? }` | 🛡️ |
-| GET | `/api/admin/posts?status=&q=&page=&size=` | 공고 목록 (`q`: 제목·작성자 닉네임) | 🛡️ |
-| GET | `/api/admin/posts/{postId}` | 공고 상세 (이 공고의 관리자 처리 이력 포함) | 🛡️ |
+| GET | `/api/admin/posts?status=&game=&reported=&q=&page=&size=` | 공고 목록 (`q`: 제목·작성자 닉네임, `game`: 게임 코드, `reported=true\|false`: 신고 접수 여부) | 🛡️ |
+| GET | `/api/admin/posts/{postId}` | 공고 상세 (이 공고에 접수된 신고, 관리자 처리 이력 포함) | 🛡️ |
 | DELETE | `/api/admin/posts/{postId}` | 공고 삭제 `{ reason }` → `204` | 🛡️ |
-| GET | `/api/admin/members?status=&q=&page=&size=` | 회원 목록 (`q`: 닉네임·아이디·이메일) | 🛡️ |
+| GET | `/api/admin/members?status=&reported=&q=&page=&size=` | 회원 목록 (`q`: 닉네임·아이디·이메일, `reported=true\|false`: 받은 신고 여부) | 🛡️ |
 | GET | `/api/admin/members/{memberId}` | 회원 상세 (개인정보 포함, 조회 기록 남김) | 🛡️ |
 | POST | `/api/admin/members/{memberId}/sanctions` | 제재 `{ type, days?, reason }` → `201` | 🛡️ |
-| GET | `/api/admin/comments?status=&q=&page=&size=` | 댓글 목록 (`q`: 내용·작성자 닉네임, 비밀 댓글 본문 포함) | 🛡️ |
+| GET | `/api/admin/comments?status=&secret=&q=&page=&size=` | 댓글 목록 (`q`: 내용·작성자 닉네임·공고 제목, `secret=true\|false`: 비밀 댓글 여부. 비밀 댓글 본문 포함) | 🛡️ |
 | PATCH | `/api/admin/comments/{commentId}` | 댓글 가림/복구/삭제 `{ status, reason }` | 🛡️ |
-| GET | `/api/admin/history?kind=&page=&size=` | 관리자 처리 이력 | 🛡️ |
+| GET | `/api/admin/history?kind=&q=&page=&size=` | 관리자 처리 이력 (`q`: 처리자 이름, 대상, 사유) | 🛡️ |
 
 **상태 enum**
 
@@ -590,7 +591,7 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 { "id": 1, "createdAt": "...", "type": "MEMBER", "targetId": 2, "reason": "욕설", "target": { "id": 2, "nickname": "비매너" }, "reporter": { "id": 1, "nickname": "신고자" }, "status": "PENDING" }
 
 // 공고
-{ "id": 1, "createdAt": "...", "category": "aos", "game": "리그 오브 레전드", "partyType": "rank", "content": "솔로 랭크", "title": "...",
+{ "id": 1, "createdAt": "...", "category": "aos", "game": "리그 오브 레전드", "gameCode": "lol", "partyType": "rank", "content": "솔로 랭크", "title": "...",
   "author": { "id": 2, "nickname": "비매너" }, "current": 1, "max": 4, "status": "OPEN", "reportCount": 1 }
 
 // 회원 (탈퇴 회원은 nickname · userId 가 null)
@@ -609,7 +610,7 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 | API | 추가 필드 |
 | --- | --- |
 | 신고 상세 | `detail`, `action`, `memo`, `handledBy`(관리자 이름), `handledAt`, `reporter.userId`, `target { id, nickname, userId, mannerTemp, status }`, `post { id, title }`, `comment { id, content }`(댓글 신고만), `sanctions[]`(피신고 회원의 제재 이력) |
-| 공고 상세 | `body`, `partyName`, `playStyle`, `requiredSpec`, `schedule`, `voiceRequired`, `views`, `commentCount`, `updatedAt`, `deletedAt`, `deleteReason`, `deletedBy`, `author.userId`, `author.mannerTemp`, `logs[]`(최근 20건) |
+| 공고 상세 | `body`, `partyName`, `playStyle`, `requiredSpec`, `schedule`, `voiceRequired`, `views`, `commentCount`, `updatedAt`, `deletedAt`, `deleteReason`, `deletedBy`, `author.userId`, `author.mannerTemp`, `author.sanctionCount`, `reports[] { id, createdAt, reason, status, reporter }`(이 공고 신고), `logs[]`(최근 20건) |
 | 회원 상세 | `email`, `phone`, `name`, `ageRange`, `bio`, `avatarUrl`, `reviewCount`, `level`, `withdrawnAt`, `stats { postCount, partyCount, noShowCount, reportCount }`, `games[] { game, isMain, characterName, playTimeSlot, playStyle }`, `sanctions[] { id, type, reason, startsAt, endsAt, reportId, releasedAt, adminName, createdAt }` |
 
 **신고 처리** `PATCH /api/admin/reports/{reportId}`

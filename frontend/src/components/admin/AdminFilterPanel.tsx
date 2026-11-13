@@ -1,5 +1,5 @@
 import React from 'react';
-import { adminText } from '../../data/adminData';
+import { adminText, type SelectOption } from '../../data/adminData';
 
 export const filterControl = 'w-full h-11 rounded-xl border border-night-borderLight bg-night-base px-3 text-sm text-fog-headline placeholder:text-fog-muted focus:border-mercury focus:ring-0';
 
@@ -10,7 +10,7 @@ export const FilterField: React.FC<{ readonly label: string; readonly className?
 interface SelectFieldProps {
   readonly label: string;
   readonly value: string;
-  readonly options: readonly string[];
+  readonly options: readonly SelectOption[];
   readonly onChange: (v: string) => void;
   readonly all?: string;
 }
@@ -19,7 +19,7 @@ export const SelectField: React.FC<SelectFieldProps> = ({ label, value, options,
   <FilterField label={label}>
     <select className={filterControl} value={value} onChange={(e) => onChange(e.target.value)}>
       <option value="">{all}</option>
-      {options.map((o) => <option key={o} value={o}>{o}</option>)}
+      {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
     </select>
   </FilterField>
 );

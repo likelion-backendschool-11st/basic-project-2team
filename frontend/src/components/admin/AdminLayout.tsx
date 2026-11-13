@@ -1,8 +1,8 @@
 import React from 'react';
-import { Link, NavLink, useNavigate } from 'react-router-dom';
+import { Link, NavLink } from 'react-router-dom';
 import BrandLogo from '../layout/BrandLogo';
 import { adminNav, adminText } from '../../data/adminData';
-import { ROUTES } from '../../data/routes';
+import { useAdminSession } from '../../hooks/useAdminSession';
 
 interface AdminLayoutProps {
   readonly title?: string;
@@ -12,9 +12,9 @@ interface AdminLayoutProps {
   readonly children: React.ReactNode;
 }
 
-/** Shell for every admin page: top bar, side nav, heading, footer. */
+/** Shell for every admin page: top bar, side nav, heading, footer. Sends signed-out admins to the admin login. */
 export const AdminLayout: React.FC<AdminLayoutProps> = ({ title, description, back, badge, children }) => {
-  const navigate = useNavigate();
+  const { admin, logout } = useAdminSession();
   return (
     <div className="min-h-screen flex flex-col bg-night-base text-fog-headline">
       <header className="h-[70px] border-b border-night-borderLight px-6 flex items-center justify-between">
@@ -23,8 +23,8 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ title, description, ba
           <span className="text-[11px] px-2 py-1 rounded-md bg-night-card text-fog-sub border border-night-borderLight">{adminText.tag}</span>
         </div>
         <div className="flex items-center gap-4 text-sm">
-          <span className="hidden sm:flex items-center gap-2"><span className="w-7 h-7 rounded-full bg-night-card text-[11px] flex items-center justify-center">AD</span>{adminText.admin}<span className="text-xs text-fog-muted">({adminText.role})</span></span>
-          <button type="button" onClick={() => navigate(ROUTES.home)} className="px-4 py-2 rounded-full border border-night-borderLight text-sm hover:bg-white/5">{adminText.logout}</button>
+          {admin && <span className="hidden sm:flex items-center gap-2"><span className="w-7 h-7 rounded-full bg-night-card text-[11px] flex items-center justify-center">AD</span>{admin.name}<span className="text-xs text-fog-muted">({admin.role})</span></span>}
+          <button type="button" onClick={logout} className="px-4 py-2 rounded-full border border-night-borderLight text-sm hover:bg-white/5">{adminText.logout}</button>
         </div>
       </header>
       <div className="flex-1 flex flex-col md:flex-row">

@@ -1,6 +1,7 @@
 import type { RouteObject } from 'react-router-dom';
 import { ROUTES } from '../data/routes';
 import AdminDashboardPage from '../pages/admin/AdminDashboardPage';
+import AdminLoginPage from '../pages/admin/AdminLoginPage';
 import AdminReportsPage from '../pages/admin/AdminReportsPage';
 import AdminReportDetailPage from '../pages/admin/AdminReportDetailPage';
 import AdminPostsPage from '../pages/admin/AdminPostsPage';
@@ -13,6 +14,7 @@ import AdminHistoryPage from '../pages/admin/AdminHistoryPage';
 /** 관리자 */
 export const adminRoutes: RouteObject[] = [
   { path: ROUTES.admin, element: <AdminDashboardPage /> },
+  { path: ROUTES.adminLogin, element: <AdminLoginPage /> },
   { path: ROUTES.adminReports, element: <AdminReportsPage /> },
   { path: ROUTES.adminReportDetail, element: <AdminReportDetailPage /> },
   { path: ROUTES.adminPosts, element: <AdminPostsPage /> },
