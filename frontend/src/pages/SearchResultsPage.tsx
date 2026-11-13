@@ -8,11 +8,12 @@ import BoardToolbar from '../components/board/BoardToolbar';
 import PostTable from '../components/board/PostTable';
 import BoardFooterControls from '../components/board/BoardFooterControls';
 import SearchQuerySummary from '../components/search/SearchQuerySummary';
-import { BOARD_PAGE_SIZE, boardText } from '../data/boardData';
+import { boardText } from '../data/boardData';
 import { searchTagFilters, searchText } from '../data/searchData';
 import { useSearchResults } from '../hooks/useSearchResults';
-import { useBoardFilter } from '../hooks/useBoardFilter';
-import { usePagination } from '../hooks/usePagination';
+import { useBoardCategory } from '../hooks/useBoardCategory';
+import { useBoardFilterState } from '../hooks/useBoardFilter';
+import { useBoardList } from '../hooks/useBoardList';
 
 interface SearchResultsPageProps {
   readonly className?: string;
@@ -21,10 +22,10 @@ interface SearchResultsPageProps {
 /** Stitch screen: "검색 결과 페이지" (59724bb63c7a498ab3b6a4dc4d2bd191). Route: /search?q= */
 export const SearchResultsPage: React.FC<SearchResultsPageProps> = () => {
   const search = useSearchResults();
-  const filter = useBoardFilter(search.results);
-  const pg = usePagination(filter.filtered.length, BOARD_PAGE_SIZE, `${search.q}|${filter.filterKey}`);
-  const pageItems = filter.filtered.slice(pg.startIndex, pg.endIndex);
-  const total = filter.filtered.length;
+  // 검색어는 URL(?q=)이 정하고, 태그 · 마감 제외 · 정렬은 이 화면의 필터 상태입니다. 전체 카테고리에서 서버가 검색합니다.
+  const filter = useBoardFilterState();
+  const { categories } = useBoardCategory();
+  const { posts, total, loading, error, pagination: pg } = useBoardList('all', { ...filter, text: search.q });
   const timeLabel = searchText.timeFilterFor(search.q);
 
   const reset = () => {
@@ -62,10 +63,13 @@ export const SearchResultsPage: React.FC<SearchResultsPageProps> = () => {
           />
         </SearchFilterPanel>
       }
-      sidebar={<BoardCategorySidebar activeId="all" />}
+      sidebar={<BoardCategorySidebar activeId="all" categories={categories} />}
     >
       <BoardToolbar summary={<SearchQuerySummary query={search.q} />} sort={filter.sort} onSortChange={filter.onSortChange} />
-      <PostTable posts={pageItems} startNo={pg.startIndex + 1} highlight={search.q} />
+      {error && <p role="alert" className="text-sm text-rose-300">{error}</p>}
+      <div className={loading ? 'opacity-60 transition-opacity' : 'transition-opacity'} aria-busy={loading}>
+        <PostTable posts={posts} startNo={pg.startIndex + 1} highlight={search.q} />
+      </div>
       <BoardFooterControls
         total={total}
         startIndex={pg.startIndex}
