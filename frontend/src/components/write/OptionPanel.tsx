@@ -40,7 +40,7 @@ export const OptionPanel: React.FC<OptionPanelProps> = ({ draft, onChange, summa
         <SectionTitle title={writeText.section1} side={writeText.section1Side} />
         <div>
           <Label text={writeText.partyName} side={writeText.partyNameSide} />
-          <input className={field} value={draft.partyName} onChange={(e) => onChange('partyName', e.target.value)} />
+          <input className={field} value={draft.partyName} onChange={(e) => onChange('partyName', e.target.value)} placeholder={writeText.partyNamePlaceholder} />
         </div>
         {([['game', writeText.game, choices.game], ['type', writeText.type, choices.type], ['detail', writeText.detail, choices.detail]] as const)
           // 하위 항목(모집 유형·상세 분류)은 선택지가 하나뿐이면 자동 선택되므로 표시하지 않습니다.

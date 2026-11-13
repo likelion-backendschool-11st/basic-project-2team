@@ -6,6 +6,8 @@ const { Router } = require('express');
 function createPostRouter(postController, { requireAuth }) {
   const router = Router();
   router.post('/', requireAuth, postController.create);
+  router.post('/drafts', requireAuth, postController.saveDraft);
+  router.get('/drafts/latest', requireAuth, postController.getLatestDraft);
   return router;
 }
 

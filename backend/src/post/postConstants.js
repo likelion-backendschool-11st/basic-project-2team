@@ -14,8 +14,23 @@ const TAG_MAX_LENGTH = 20;
 const PARTY_TYPES = Object.freeze(['raid', 'dungeon', 'rank', 'normal']);
 const PLAY_STYLES = Object.freeze(['hard', 'casual', 'newbie', 'any']);
 
+/** 임시저장 payload 에서 받는 필드와 타입. 작성 폼(frontend WriteDraft)의 값을 그대로 담되, 형식이 틀린 값은 버립니다. */
+const DRAFT_STRING_FIELDS = Object.freeze({
+  title: TITLE_MAX_LENGTH,
+  body: BODY_MAX_LENGTH,
+  partyName: PARTY_NAME_MAX_LENGTH,
+  game: 50,
+  type: 20,
+  detail: 50,
+  style: 20,
+  date: 10,
+  time: 5,
+});
+const DRAFT_BOOLEAN_FIELDS = Object.freeze(['tbd', 'voice']);
+
 const postMessages = Object.freeze({
   invalidInput: '입력값을 확인해주세요.',
+  draftInvalid: '임시저장할 내용이 올바르지 않습니다.',
   titleInvalid: `제목은 ${TITLE_MIN_LENGTH}~${TITLE_MAX_LENGTH}자로 입력해주세요.`,
   bodyRequired: '본문을 입력해주세요.',
   bodyTooLong: `본문은 ${BODY_MAX_LENGTH}자 이하로 입력해주세요.`,
@@ -48,5 +63,7 @@ module.exports = {
   TAG_MAX_LENGTH,
   PARTY_TYPES,
   PLAY_STYLES,
+  DRAFT_STRING_FIELDS,
+  DRAFT_BOOLEAN_FIELDS,
   postMessages,
 };

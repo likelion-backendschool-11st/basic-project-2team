@@ -57,6 +57,9 @@ function createPostRepository(pool) {
         ]);
       }
 
+      // 등록한 글의 임시저장은 더 이어 쓸 일이 없으므로 같은 트랜잭션에서 지웁니다.
+      await connection.query('DELETE FROM post_draft WHERE member_id = ?', [post.authorId]);
+
       await connection.commit();
       return postId;
     } catch (err) {
@@ -67,7 +70,23 @@ function createPostRepository(pool) {
     }
   }
 
-  return { findGameByCode, findGameContent, createPost };
+  /** 임시저장(회원당 1개)을 덮어씁니다. 내용이 같아도 저장 시각은 갱신합니다. */
+  async function saveDraft(memberId, payload) {
+    await pool.query(
+      `INSERT INTO post_draft (member_id, payload) VALUES (?, ?)
+       ON DUPLICATE KEY UPDATE payload = VALUES(payload), updated_at = CURRENT_TIMESTAMP`,
+      [memberId, JSON.stringify(payload)],
+    );
+    return findDraft(memberId);
+  }
+
+  /** 내 임시저장 → { payload, savedAt }. 없으면 null */
+  async function findDraft(memberId) {
+    const [rows] = await pool.query('SELECT payload, updated_at AS savedAt FROM post_draft WHERE member_id = ? LIMIT 1', [memberId]);
+    return rows[0] ?? null;
+  }
+
+  return { findGameByCode, findGameContent, createPost, saveDraft, findDraft };
 }
 
 module.exports = { createPostRepository };

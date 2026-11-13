@@ -5,7 +5,8 @@ import { writeText } from '../../data/writeData';
 import { ROUTES } from '../../data/routes';
 
 interface WriteTopBarProps {
-  readonly savedAt: string;
+  /** 마지막 임시저장 시각. 저장한 적이 없으면 null */
+  readonly savedAt: string | null;
   readonly onDraft: () => void;
   readonly onLeave: () => void;
 }
@@ -22,7 +23,7 @@ export const WriteTopBar: React.FC<WriteTopBarProps> = ({ savedAt, onDraft, onLe
         </nav>
       </div>
       <div className="flex items-center gap-3 text-xs">
-        <span className="hidden sm:flex items-center gap-1.5 text-emerald-300"><i className="fa-solid fa-check" />{writeText.draftSaved(savedAt)}</span>
+        {savedAt && <span className="hidden sm:flex items-center gap-1.5 text-emerald-300"><i className="fa-solid fa-check" />{writeText.draftSaved(savedAt)}</span>}
         <button type="button" onClick={onDraft} className="px-3.5 py-1.5 rounded-lg border border-night-borderLight text-fog-headline hover:bg-white/5">{writeText.draftButton}</button>
         <button type="button" onClick={onLeave} className="px-3 py-1.5 text-fog-sub hover:text-white flex items-center gap-1.5"><i className="fa-solid fa-xmark" />{writeText.leave}</button>
       </div>
