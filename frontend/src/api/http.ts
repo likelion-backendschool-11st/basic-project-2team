@@ -35,6 +35,9 @@ const readToken = (key: string) => {
   }
 };
 
+/** 로그인(accessToken 저장) 여부. 토큰이 만료됐는지는 API 응답(401)으로 알 수 있습니다. */
+export const hasAccessToken = () => Boolean(readToken(ACCESS_TOKEN_KEY));
+
 interface ApiEnvelope<T> {
   readonly success: boolean;
   readonly data?: T;
