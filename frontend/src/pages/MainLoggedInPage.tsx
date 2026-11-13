@@ -3,7 +3,7 @@ import LoggedInLayout from '../components/user/LoggedInLayout';
 import CategorySidebar from '../components/home/CategorySidebar';
 import HomeFeed from '../components/home/HomeFeed';
 import HonorSidebar from '../components/home/HonorSidebar';
-import { categories, quickFilters } from '../data/homeData';
+import { quickFilters } from '../data/homeData';
 import { useMannerRanking } from '../hooks/useMannerRanking';
 
 interface MainLoggedInPageProps {
@@ -16,9 +16,9 @@ export const MainLoggedInPage: React.FC<MainLoggedInPageProps> = () => {
   return (
     <LoggedInLayout>
       <div className="grid grid-cols-12 gap-5 xl:gap-6 items-start">
-        <CategorySidebar categories={categories} quickFilters={quickFilters} />
+        <CategorySidebar quickFilters={quickFilters} />
         <HomeFeed />
-        <HonorSidebar leaders={ranking.leaders} leadersNotice={ranking.notice} />
+        <HonorSidebar leaders={ranking.leaders} members={ranking.members} leadersNotice={ranking.notice} />
       </div>
     </LoggedInLayout>
   );
