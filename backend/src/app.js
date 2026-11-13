@@ -6,6 +6,8 @@ const { env } = require('./config/env');
 const { notFoundHandler, errorHandler } = require('./common/errorHandler');
 const { createTokenProvider } = require('./common/tokenProvider');
 const { createRequireAuth } = require('./common/authMiddleware');
+const { createMailer } = require('./common/mailer');
+const { createEmailVerificationModule } = require('./emailVerification');
 const { createMemberModule } = require('./member');
 const { createPostModule } = require('./post');
 
@@ -15,13 +17,25 @@ const { createPostModule } = require('./post');
  *   pool?: import('mysql2/promise').Pool,
  *   memberRepository?: object,
  *   postRepository?: object,
+ *   emailVerificationRepository?: object,
+ *   mailer?: ReturnType<typeof createMailer>,
  *   corsOrigins: string[],
  *   bcryptRounds: number,
  *   auth?: typeof env.auth,
  *   now?: () => Date,
  * }} options
  */
-function createApp({ pool, memberRepository, postRepository, corsOrigins, bcryptRounds, auth = env.auth, now }) {
+function createApp({
+  pool,
+  memberRepository,
+  postRepository,
+  emailVerificationRepository,
+  mailer = createMailer(env.mail),
+  corsOrigins,
+  bcryptRounds,
+  auth = env.auth,
+  now,
+}) {
   const app = express();
 
   app.use(cors({ origin: corsOrigins }));
@@ -29,6 +43,15 @@ function createApp({ pool, memberRepository, postRepository, corsOrigins, bcrypt
 
   const tokenProvider = createTokenProvider(auth);
   const requireAuth = createRequireAuth(tokenProvider);
+
+  const emailVerification = createEmailVerificationModule({
+    pool,
+    emailVerificationRepository,
+    tokenProvider,
+    mailer,
+    now,
+  });
+  app.use('/api/auth/email', emailVerification.router);
 
   const member = createMemberModule({ pool, memberRepository, tokenProvider, requireAuth, bcryptRounds, now });
   app.use('/api/auth', member.router);
