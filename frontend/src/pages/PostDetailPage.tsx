@@ -6,6 +6,7 @@ import ApplicantBanner from '../components/post/ApplicantBanner';
 import ApplicantsDialog from '../components/post/ApplicantsDialog';
 import HostCard from '../components/post/HostCard';
 import OwnerPanel from '../components/post/OwnerPanel';
+import ParticipantsCard from '../components/post/ParticipantsCard';
 import PartyStatusCard from '../components/post/PartyStatusCard';
 import PostDescription from '../components/post/PostDescription';
 import PostHeader from '../components/post/PostHeader';
@@ -73,6 +74,7 @@ const PostDetailView: React.FC<{ readonly postId: string }> = ({ postId }) => {
           ) : (
             <>
               <PartyStatusCard detail={detail} filled={post.filled} percent={post.percent} applied={post.applied} state={post.state} scrapped={post.scrapped} onApply={post.apply} onLeave={post.leave.open} onScrap={post.toggleScrap} onCopy={post.copyLink} />
+              <ParticipantsCard participants={post.participants} max={detail.max} />
               <HostCard host={detail.host} following={post.following} onFollow={post.toggleFollow} />
             </>
           )}
