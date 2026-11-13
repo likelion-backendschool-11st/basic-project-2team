@@ -10,6 +10,7 @@ const { createMemberModule } = require('./member');
 const { createPostModule } = require('./post');
 const { createGameModule } = require('./game');
 const { createPartyModule } = require('./party');
+const { createNotificationModule } = require('./notification');
 const { createCategoryModule } = require('./category');
 const { createBoardModule } = require('./board');
 const { createAdminModule } = require('./admin');
@@ -24,6 +25,7 @@ const { createAccountModule } = require('./account');
  *   postRepository?: object,
  *   gameRepository?: object,
  *   partyRepository?: object,
+ *   notificationRepository?: object,
  *   categoryRepository?: object,
  *   boardRepository?: object,
  *   commentRepository?: object,
@@ -42,6 +44,7 @@ function createApp({
   postRepository,
   gameRepository,
   partyRepository,
+  notificationRepository,
   categoryRepository,
   boardRepository,
   commentRepository,
@@ -70,6 +73,7 @@ function createApp({
   app.use('/api/posts', post.router);
   app.use('/api/games', createGameModule({ pool, gameRepository }).router);
   app.use('/api/posts', createPartyModule({ pool, partyRepository, requireAuth, now }).router);
+  app.use('/api/notifications', createNotificationModule({ pool, notificationRepository, requireAuth }).router);
   app.use('/api/categories', createCategoryModule({ pool, categoryRepository }).router);
 
   // GET /api/posts/:postId 를 잡으므로 /api/posts 아래 고정 경로(popular, urgent …)는 이보다 먼저 마운트된 라우터에 둡니다.
