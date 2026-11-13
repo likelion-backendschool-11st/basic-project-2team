@@ -7,6 +7,7 @@ const { notFoundHandler, errorHandler } = require('./common/errorHandler');
 const { createTokenProvider } = require('./common/tokenProvider');
 const { createRequireAuth, createRequireAdmin } = require('./common/authMiddleware');
 const { createMemberModule } = require('./member');
+const { createPostModule } = require('./post');
 const { createAdminModule } = require('./admin');
 
 /**
@@ -14,6 +15,7 @@ const { createAdminModule } = require('./admin');
  * @param {{
  *   pool?: import('mysql2/promise').Pool,
  *   memberRepository?: object,
+ *   postRepository?: object,
  *   adminRepository?: object,
  *   corsOrigins: string[],
  *   bcryptRounds: number,
@@ -21,7 +23,16 @@ const { createAdminModule } = require('./admin');
  *   now?: () => Date,
  * }} options
  */
-function createApp({ pool, memberRepository, adminRepository, corsOrigins, bcryptRounds, auth = env.auth, now }) {
+function createApp({
+  pool,
+  memberRepository,
+  postRepository,
+  adminRepository,
+  corsOrigins,
+  bcryptRounds,
+  auth = env.auth,
+  now,
+}) {
   const app = express();
 
   app.use(cors({ origin: corsOrigins }));
@@ -33,6 +44,9 @@ function createApp({ pool, memberRepository, adminRepository, corsOrigins, bcryp
 
   const member = createMemberModule({ pool, memberRepository, tokenProvider, requireAuth, bcryptRounds, now });
   app.use('/api/auth', member.router);
+
+  const post = createPostModule({ pool, postRepository, requireAuth, now });
+  app.use('/api/posts', post.router);
 
   const admin = createAdminModule({ pool, adminRepository, tokenProvider, requireAdmin, bcryptRounds, now });
   app.use('/api/admin', admin.router);
