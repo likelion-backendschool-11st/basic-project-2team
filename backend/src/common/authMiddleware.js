@@ -9,25 +9,59 @@ const authMessages = Object.freeze({
   tokenExpired: '로그인이 만료되었습니다. 다시 로그인해주세요.',
 });
 
+/** 토큰을 verify 로 검증해 결과를 돌려줍니다. 실패하면 401 ApiError 를 throw 합니다. */
+function verifyBearerToken(verify, token) {
+  try {
+    return verify(token);
+  } catch (err) {
+    throw err.expired
+      ? new ApiError(401, 'TOKEN_EXPIRED', authMessages.tokenExpired)
+      : new ApiError(401, 'UNAUTHORIZED', authMessages.unauthorized);
+  }
+}
+
+/** Bearer 토큰을 verify 로 검증해 req.auth 를 채우는 미들웨어를 만듭니다. */
+function createBearerAuth(verify) {
+  return function bearerAuth(req, res, next) {
+    const match = BEARER_PATTERN.exec(req.get('Authorization') ?? '');
+    if (!match) throw new ApiError(401, 'UNAUTHORIZED', authMessages.unauthorized);
+    req.auth = verifyBearerToken(verify, match[1]);
+    return next();
+  };
+}
+
 /**
  * 🔒 로그인 필요 API 앞에 붙이는 미들웨어.
  * `Authorization: Bearer {accessToken}` 을 검증하고 `req.auth = { memberId }` 를 채웁니다.
  * @param {ReturnType<typeof import('./tokenProvider').createTokenProvider>} tokenProvider
  */
-function createRequireAuth(tokenProvider) {
-  return function requireAuth(req, res, next) {
-    const match = BEARER_PATTERN.exec(req.get('Authorization') ?? '');
-    if (!match) throw new ApiError(401, 'UNAUTHORIZED', authMessages.unauthorized);
+const createRequireAuth = (tokenProvider) => createBearerAuth(tokenProvider.verifyAccessToken);
 
-    try {
-      req.auth = tokenProvider.verifyAccessToken(match[1]);
-    } catch (err) {
-      throw err.expired
-        ? new ApiError(401, 'TOKEN_EXPIRED', authMessages.tokenExpired)
-        : new ApiError(401, 'UNAUTHORIZED', authMessages.unauthorized);
+/**
+ * 🛡️ 관리자 API 앞에 붙이는 미들웨어. 관리자 토큰을 검증하고 `req.auth = { adminId }` 를 채웁니다.
+ * 회원 토큰은 typ 가 달라 401 이 됩니다. 계정 상태 확인은 admin 모듈에서 합니다.
+ * @param {ReturnType<typeof import('./tokenProvider').createTokenProvider>} tokenProvider
+ */
+const createRequireAdmin = (tokenProvider) => createBearerAuth(tokenProvider.verifyAdminAccessToken);
+
+/**
+ * 비로그인도 쓸 수 있지만 로그인하면 응답이 달라지는 API (예: 공고 상세) 앞에 붙이는 미들웨어.
+ * - Authorization 헤더가 없으면 `req.auth = null` 로 통과합니다.
+ * - 헤더가 있는데 토큰이 틀리거나 만료됐으면 401 을 보내 프론트가 토큰을 재발급하게 합니다.
+ * @param {ReturnType<typeof import('./tokenProvider').createTokenProvider>} tokenProvider
+ */
+function createOptionalAuth(tokenProvider) {
+  return function optionalAuth(req, res, next) {
+    const header = req.get('Authorization');
+    if (!header) {
+      req.auth = null;
+      return next();
     }
+    const match = BEARER_PATTERN.exec(header);
+    if (!match) throw new ApiError(401, 'UNAUTHORIZED', authMessages.unauthorized);
+    req.auth = verifyBearerToken(tokenProvider.verifyAccessToken, match[1]);
     return next();
   };
 }
 
-module.exports = { createRequireAuth };
+module.exports = { createRequireAuth, createRequireAdmin, createOptionalAuth };

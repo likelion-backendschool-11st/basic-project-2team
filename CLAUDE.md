@@ -65,7 +65,7 @@ npm run lint      # ESLint 검사
 ### 백엔드
 
 - 스택(JavaScript + Node.js + express + MySQL )
-  - Express 5 (CommonJS), mysql2 (promise pool, UTC), bcryptjs, jsonwebtoken, cors, 테스트는 Node 내장 `node:test`
+  - Express 5 (CommonJS), mysql2 (promise pool, UTC), bcryptjs, jsonwebtoken, nodemailer, cors, 테스트는 Node 내장 `node:test`
 - `backend/.env.example` 을 `.env` 로 복사해 DB 접속 정보를 넣습니다 (`.env` 는 커밋 금지).
 
 ```bash
@@ -100,8 +100,9 @@ backend/
 │   ├── server.js           # 엔트리 (listen)
 │   ├── app.js              # Express 앱 조립 (cors, json, 라우터, 에러 핸들러)
 │   ├── config/             # env.js (환경 변수), db.js (mysql2 pool)
-│   ├── common/             # ApiError, 응답 헬퍼, 에러 핸들러, JWT(tokenProvider), 인증 미들웨어(requireAuth)
-│   └── member/             # 회원가입·중복 확인·로그인·토큰 재발급·로그아웃 (Routes / Controller / Service / Repository / Validator / Constants)
+│   ├── common/             # ApiError, 응답 헬퍼, 에러 핸들러, JWT(tokenProvider), 인증 미들웨어(requireAuth, requireAdmin)
+│   ├── member/             # 회원가입·중복 확인·로그인·토큰 재발급·로그아웃 (Routes / Controller / Service / Repository / Validator / Constants)
+│   └── admin/              # 관리자 로그인·대시보드·신고/공고/회원/댓글 관리·처리 이력 (같은 구조)
 └── test/                   # node:test 테스트
 ```
 

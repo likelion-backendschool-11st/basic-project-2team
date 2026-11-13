@@ -12,7 +12,15 @@ const {
   memberStatus,
   memberMessages,
 } = require('./memberConstants');
-const { validateSignup, validateCheckQuery, validateLogin, validateRefresh } = require('./memberValidator');
+const {
+  validateSignup,
+  validateCheckQuery,
+  validateLogin,
+  validateRefresh,
+  validateFindId,
+  validateFindPassword,
+  validateResetPassword,
+} = require('./memberValidator');
 
 /** 존재하지 않는 아이디에도 bcrypt 비교를 한 번 해서, 응답 시간으로 아이디 존재 여부를 알 수 없게 합니다. */
 const DUMMY_PASSWORD = 'ourparty-dummy-password';
@@ -20,6 +28,8 @@ const DUMMY_PASSWORD = 'ourparty-dummy-password';
 const invalidCredentials = () => new ApiError(401, 'INVALID_CREDENTIALS', memberMessages.invalidCredentials);
 const accountLocked = () => new ApiError(403, 'ACCOUNT_LOCKED', memberMessages.accountLocked);
 const invalidRefreshToken = () => new ApiError(401, 'INVALID_REFRESH_TOKEN', memberMessages.invalidRefreshToken);
+const memberNotFound = () => new ApiError(404, 'MEMBER_NOT_FOUND', memberMessages.memberNotFound);
+const invalidResetToken = () => new ApiError(401, 'INVALID_RESET_TOKEN', memberMessages.invalidResetToken);
 
 /** 제재 중인 회원이면 403 (정지 기간이 지난 SUSPENDED 는 로그인 허용) */
 function assertNotSanctioned(member, current) {
@@ -196,7 +206,64 @@ function createMemberService({ memberRepository, tokenProvider, bcryptRounds, no
     await memberRepository.revokeAllRefreshTokens({ memberId, now: now() });
   }
 
-  return { checkAvailability, signup, login, refresh, logout };
+  /** 이메일 인증 토큰이 유효하고, 요청한 이메일로 인증한 것인지 확인합니다. */
+  function assertEmailVerified({ verificationToken, email }, current) {
+    let verifiedEmail;
+    try {
+      ({ email: verifiedEmail } = tokenProvider.verifyEmailVerificationToken(verificationToken, current));
+    } catch {
+      verifiedEmail = null;
+    }
+    if (verifiedEmail !== email) throw new ApiError(401, 'EMAIL_NOT_VERIFIED', memberMessages.emailNotVerified);
+  }
+
+  /** POST /api/auth/find-id — 이메일 인증 후 닉네임·이메일이 일치하는 회원의 아이디 */
+  async function findId(body) {
+    const input = validateFindId(body);
+    assertEmailVerified(input, now());
+
+    const userId = await memberRepository.findLoginIdByNicknameAndEmail(input);
+    if (!userId) throw memberNotFound();
+    return { userId };
+  }
+
+  /** POST /api/auth/find-password — 이메일 인증 후 아이디·이메일이 일치하면 재설정 토큰 발급 */
+  async function findPassword(body) {
+    const input = validateFindPassword(body);
+    const current = now();
+    assertEmailVerified(input, current);
+
+    const memberId = await memberRepository.findMemberIdByLoginIdAndEmail({ loginId: input.userId, email: input.email });
+    if (!memberId) throw memberNotFound();
+
+    const { token, tokenHash, expiresAt } = tokenProvider.createPasswordResetToken({ memberId, now: current });
+    await memberRepository.savePasswordResetToken({ memberId, tokenHash, expiresAt });
+    return { resetToken: token, expiresAt: expiresAt.toISOString() };
+  }
+
+  /** POST /api/auth/reset-password — 재설정 토큰은 한 번만 쓸 수 있습니다. */
+  async function resetPassword(body) {
+    const { resetToken, newPassword } = validateResetPassword(body);
+    const current = now();
+
+    let memberId;
+    try {
+      ({ memberId } = tokenProvider.verifyPasswordResetToken(resetToken, current));
+    } catch {
+      throw invalidResetToken();
+    }
+
+    const stored = await memberRepository.findPasswordResetToken(tokenProvider.hashToken(resetToken));
+    if (!stored || stored.memberId !== memberId || stored.usedAt || stored.expiresAt <= current) {
+      throw invalidResetToken();
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, bcryptRounds);
+    const reset = await memberRepository.resetPassword({ tokenId: stored.id, memberId, passwordHash, now: current });
+    if (!reset) throw invalidResetToken();
+  }
+
+  return { checkAvailability, signup, login, refresh, logout, findId, findPassword, resetPassword };
 }
 
 module.exports = { createMemberService };

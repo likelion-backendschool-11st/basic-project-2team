@@ -25,7 +25,7 @@ const toAuthMember = (row) =>
   };
 
 /**
- * member · member_agreement · member_withdrawal · refresh_token 테이블 접근.
+ * member · member_agreement · member_withdrawal · refresh_token · password_reset_token 테이블 접근.
  * @param {import('mysql2/promise').Pool} pool
  */
 function createMemberRepository(pool) {
@@ -151,6 +151,82 @@ function createMemberRepository(pool) {
     ]);
   }
 
+  /** 아이디 찾기: 닉네임과 이메일이 모두 일치하는 회원의 login_id (탈퇴 회원은 둘 다 NULL 이라 제외) */
+  async function findLoginIdByNicknameAndEmail({ nickname, email }) {
+    const [rows] = await pool.query('SELECT login_id FROM member WHERE nickname = ? AND email = ? LIMIT 1', [
+      nickname,
+      email,
+    ]);
+    return rows[0]?.login_id ?? null;
+  }
+
+  /** 비밀번호 찾기: 아이디와 이메일이 모두 일치하는 회원 id */
+  async function findMemberIdByLoginIdAndEmail({ loginId, email }) {
+    const [rows] = await pool.query('SELECT id FROM member WHERE login_id = ? AND email = ? LIMIT 1', [
+      loginId,
+      email,
+    ]);
+    return rows[0]?.id ?? null;
+  }
+
+  async function savePasswordResetToken({ memberId, tokenHash, expiresAt }) {
+    await pool.query('INSERT INTO password_reset_token (member_id, token_hash, expires_at) VALUES (?, ?, ?)', [
+      memberId,
+      tokenHash,
+      expiresAt,
+    ]);
+  }
+
+  async function findPasswordResetToken(tokenHash) {
+    const [rows] = await pool.query(
+      'SELECT id, member_id, expires_at, used_at FROM password_reset_token WHERE token_hash = ? LIMIT 1',
+      [tokenHash],
+    );
+    const row = rows[0];
+    return row ? { id: row.id, memberId: row.member_id, expiresAt: row.expires_at, usedAt: row.used_at } : null;
+  }
+
+  /**
+   * 재설정 토큰을 사용 처리하고 비밀번호를 바꿉니다 (한 트랜잭션).
+   * - 로그인 실패 횟수·잠금 초기화
+   * - 아직 쓰지 않은 다른 재설정 토큰도 사용 처리
+   * - 모든 Refresh Token 폐기 → 다른 기기의 로그인도 끊김 (docs/03-db-design.md refresh_token)
+   * @returns {Promise<boolean>} 토큰이 이미 사용됐으면(동시 요청) false
+   */
+  async function resetPassword({ tokenId, memberId, passwordHash, now }) {
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+      const [used] = await connection.query(
+        'UPDATE password_reset_token SET used_at = ? WHERE id = ? AND used_at IS NULL',
+        [now, tokenId],
+      );
+      if (used.affectedRows === 0) {
+        await connection.rollback();
+        return false;
+      }
+      await connection.query(
+        'UPDATE member SET password_hash = ?, login_fail_count = 0, locked_until = NULL WHERE id = ?',
+        [passwordHash, memberId],
+      );
+      await connection.query(
+        'UPDATE password_reset_token SET used_at = ? WHERE member_id = ? AND used_at IS NULL',
+        [now, memberId],
+      );
+      await connection.query(
+        'UPDATE refresh_token SET revoked_at = ? WHERE member_id = ? AND revoked_at IS NULL',
+        [now, memberId],
+      );
+      await connection.commit();
+      return true;
+    } catch (err) {
+      await connection.rollback();
+      throw err;
+    } finally {
+      connection.release();
+    }
+  }
+
   return {
     existsBy,
     hasActiveRejoinBlock,
@@ -163,6 +239,11 @@ function createMemberRepository(pool) {
     findRefreshToken,
     revokeRefreshToken,
     revokeAllRefreshTokens,
+    findLoginIdByNicknameAndEmail,
+    findMemberIdByLoginIdAndEmail,
+    savePasswordResetToken,
+    findPasswordResetToken,
+    resetPassword,
   };
 }
 

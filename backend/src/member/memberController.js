@@ -30,7 +30,22 @@ function createMemberController(memberService) {
     return res.status(204).end();
   }
 
-  return { signup, check, login, refresh, logout };
+  async function findId(req, res) {
+    const data = await memberService.findId(req.body);
+    return sendSuccess(res, 200, data);
+  }
+
+  async function findPassword(req, res) {
+    const data = await memberService.findPassword(req.body);
+    return sendSuccess(res, 200, data);
+  }
+
+  async function resetPassword(req, res) {
+    await memberService.resetPassword(req.body);
+    return res.status(204).end();
+  }
+
+  return { signup, check, login, refresh, logout, findId, findPassword, resetPassword };
 }
 
 module.exports = { createMemberController };

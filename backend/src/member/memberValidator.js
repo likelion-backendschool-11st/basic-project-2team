@@ -146,4 +146,60 @@ function validateRefresh(body) {
   return { refreshToken };
 }
 
-module.exports = { validateSignup, validateCheckQuery, validateLogin, validateRefresh };
+/** 아이디·비밀번호 찾기의 공통 입력: email + 이메일 인증 토큰 */
+function collectRecoveryFields(source, fields) {
+  const email = normalizeEmail(source.email);
+  const emailMessage = fieldRules.email(email);
+  if (emailMessage) fields.push({ field: 'email', message: emailMessage });
+
+  const verificationToken = asTrimmedString(source.verificationToken);
+  if (!verificationToken) {
+    fields.push({ field: 'verificationToken', message: memberMessages.verificationTokenRequired });
+  }
+  return { email, verificationToken };
+}
+
+/** 아이디 찾기 `{ nickname, email, verificationToken }` */
+function validateFindId(body) {
+  const source = body && typeof body === 'object' ? body : {};
+  const fields = [];
+  const nickname = asTrimmedString(source.nickname);
+  if (!nickname) fields.push({ field: 'nickname', message: memberMessages.nicknameRequired });
+  const recovery = collectRecoveryFields(source, fields);
+  if (fields.length > 0) throw invalidInput(fields);
+  return { nickname, ...recovery };
+}
+
+/** 비밀번호 찾기 `{ userId, email, verificationToken }` */
+function validateFindPassword(body) {
+  const source = body && typeof body === 'object' ? body : {};
+  const fields = [];
+  const userId = asTrimmedString(source.userId);
+  if (!userId) fields.push({ field: 'userId', message: memberMessages.userIdRequired });
+  const recovery = collectRecoveryFields(source, fields);
+  if (fields.length > 0) throw invalidInput(fields);
+  return { userId, ...recovery };
+}
+
+/** 비밀번호 재설정 `{ resetToken, newPassword }` — 새 비밀번호는 회원가입과 같은 규칙 */
+function validateResetPassword(body) {
+  const source = body && typeof body === 'object' ? body : {};
+  const fields = [];
+  const resetToken = asTrimmedString(source.resetToken);
+  if (!resetToken) fields.push({ field: 'resetToken', message: memberMessages.resetTokenRequired });
+  const newPassword = typeof source.newPassword === 'string' ? source.newPassword : '';
+  const passwordMessage = fieldRules.password(newPassword);
+  if (passwordMessage) fields.push({ field: 'newPassword', message: passwordMessage });
+  if (fields.length > 0) throw invalidInput(fields);
+  return { resetToken, newPassword };
+}
+
+module.exports = {
+  validateSignup,
+  validateCheckQuery,
+  validateLogin,
+  validateRefresh,
+  validateFindId,
+  validateFindPassword,
+  validateResetPassword,
+};
