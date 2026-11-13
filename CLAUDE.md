@@ -99,7 +99,8 @@ backend/
 ├── .env.example
 ├── src/
 │   ├── server.js           # 엔트리 (listen)
-│   ├── app.js              # Express 앱 조립 (cors, json, 라우터, 에러 핸들러)
+│   ├── app.js              # Express 앱 조립 (cors, json, 인증 미들웨어, 에러 핸들러) — 보통 수정하지 않음
+│   ├── modules.js          # 도메인 모듈 목록 (새 도메인은 여기에만 추가)
 │   ├── config/             # env.js (환경 변수), db.js (mysql2 pool)
 │   ├── common/             # ApiError, 응답 헬퍼, 에러 핸들러, JWT(tokenProvider), 인증 미들웨어(requireAuth, requireAdmin)
 │   ├── member/             # 회원가입·중복 확인·로그인·토큰 재발급·로그아웃·아이디/비밀번호 찾기 (Routes / Controller / Service / Repository / Validator / Constants)

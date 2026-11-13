@@ -6,61 +6,39 @@ const { env } = require('./config/env');
 const { notFoundHandler, errorHandler } = require('./common/errorHandler');
 const { createTokenProvider } = require('./common/tokenProvider');
 const { createRequireAuth, createOptionalAuth, createRequireAdmin } = require('./common/authMiddleware');
-const { createMemberModule } = require('./member');
-const { createPostModule } = require('./post');
-const { createGameModule } = require('./game');
-const { createBoardModule } = require('./board');
-const { createAdminModule } = require('./admin');
+const { modules } = require('./modules');
 
 /**
  * Express 앱을 만듭니다. 서버 실행(server.js)과 분리해 테스트에서 DB 없이 띄울 수 있게 합니다.
+ * 도메인 모듈은 modules.js 에서 가져오므로, 모듈이 늘어도 이 파일은 바꾸지 않습니다.
+ * `xxxRepository` 옵션(예: memberRepository)은 이름 그대로 해당 모듈에 전달돼 테스트에서 DB 대신 쓰입니다.
  * @param {{
  *   pool?: import('mysql2/promise').Pool,
- *   memberRepository?: object,
- *   postRepository?: object,
- *   gameRepository?: object,
- *   boardRepository?: object,
- *   adminRepository?: object,
  *   corsOrigins: string[],
  *   bcryptRounds: number,
  *   auth?: typeof env.auth,
  *   now?: () => Date,
- * }} options
+ * } & Record<string, unknown>} options
  */
-function createApp({
-  pool,
-  memberRepository,
-  postRepository,
-  gameRepository,
-  boardRepository,
-  adminRepository,
-  corsOrigins,
-  bcryptRounds,
-  auth = env.auth,
-  now,
-}) {
+function createApp({ pool, corsOrigins, bcryptRounds, auth = env.auth, now, ...repositories }) {
   const app = express();
 
   app.use(cors({ origin: corsOrigins }));
   app.use(express.json());
 
   const tokenProvider = createTokenProvider(auth);
-  const requireAuth = createRequireAuth(tokenProvider);
-  const optionalAuth = createOptionalAuth(tokenProvider);
-  const requireAdmin = createRequireAdmin(tokenProvider);
+  const deps = {
+    ...repositories,
+    pool,
+    bcryptRounds,
+    now,
+    tokenProvider,
+    requireAuth: createRequireAuth(tokenProvider),
+    optionalAuth: createOptionalAuth(tokenProvider),
+    requireAdmin: createRequireAdmin(tokenProvider),
+  };
 
-  const member = createMemberModule({ pool, memberRepository, tokenProvider, requireAuth, bcryptRounds, now });
-  app.use('/api/auth', member.router);
-
-  const post = createPostModule({ pool, postRepository, requireAuth, now });
-  app.use('/api/posts', post.router);
-  app.use('/api/games', createGameModule({ pool, gameRepository }).router);
-
-  // GET /api/posts/:postId 를 잡으므로 /api/posts 아래 고정 경로(popular, urgent …)는 이보다 먼저 마운트된 라우터에 둡니다.
-  const board = createBoardModule({ pool, boardRepository, optionalAuth });
-  app.use('/api/posts', board.router);
-  const admin = createAdminModule({ pool, adminRepository, tokenProvider, requireAdmin, bcryptRounds, now });
-  app.use('/api/admin', admin.router);
+  for (const { path, create } of modules) app.use(path, create(deps).router);
 
   app.use(notFoundHandler);
   app.use(errorHandler);
