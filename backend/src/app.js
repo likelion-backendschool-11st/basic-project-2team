@@ -5,15 +5,12 @@ const cors = require('cors');
 const { env } = require('./config/env');
 const { notFoundHandler, errorHandler } = require('./common/errorHandler');
 const { createTokenProvider } = require('./common/tokenProvider');
-const { createRequireAuth, createOptionalAuth } = require('./common/authMiddleware');
+const { createRequireAuth, createOptionalAuth, createRequireAdmin } = require('./common/authMiddleware');
 const { createMailer } = require('./common/mailer');
 const { createEmailVerificationModule } = require('./emailVerification');
 const { createMemberModule } = require('./member');
 const { createPostModule } = require('./post');
 const { createBoardModule } = require('./board');
-const { createRequireAuth, createRequireAdmin } = require('./common/authMiddleware');
-const { createMemberModule } = require('./member');
-const { createPostModule } = require('./post');
 const { createAdminModule } = require('./admin');
 
 /**
