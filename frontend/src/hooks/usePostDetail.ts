@@ -54,14 +54,18 @@ export function usePostDetail(postId: string) {
 
   useEffect(() => {
     let cancelled = false;
-    getPostDetail(postId)
+    // 처음 열 때만 조회수를 올리고, 이후 다시 불러오기(자동 갱신 · 버튼 동작 뒤)는 올리지 않습니다.
+    getPostDetail(postId, version === 0)
       .then((res) => {
         if (cancelled) return;
         setDetail(toPostDetail(res));
         setError(null);
       })
       .catch((err: unknown) => {
-        if (!cancelled) setError(err instanceof ApiRequestError ? err.message : postDetailText.loadFailed);
+        if (cancelled) return;
+        // 갱신 중 공고가 삭제됐으면 화면을 오류 안내로 바꾸고, 일시적인 네트워크 오류는 이전 화면을 유지합니다.
+        if (err instanceof ApiRequestError && err.status === 404) setDetail(null);
+        setError(err instanceof ApiRequestError ? err.message : postDetailText.loadFailed);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -208,7 +212,7 @@ export function usePostDetail(postId: string) {
   const filled = detail?.current ?? 0;
   const state: PartyState = detail ? toPartyState(detail.status) : 'open';
   return {
-    detail, loading, error, related,
+    detail, loading, error, related, refresh: reload,
     applied: accepted || detail?.applicationStatus === 'PENDING', accepted,
     apply, scrapped, toggleScrap, copyLink,
     following, toggleFollow, state, togglePause: () => setStatus(state === 'open' ? 'PAUSED' : 'OPEN'),

@@ -4,6 +4,7 @@ const { describe, it, before, after, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
 const { createApp } = require('../../src/app');
 const { createTokenProvider } = require('../../src/common/tokenProvider');
+const { createRecordingEvents } = require('../helpers/recordingEvents');
 
 const AUTH = Object.freeze({ jwtSecret: 'test-secret', accessTokenTtlSeconds: 1800, refreshTokenTtlDays: 1, rememberMeTtlDays: 14 });
 const NOW = new Date('2026-11-14T00:00:00Z');
@@ -113,10 +114,11 @@ describe('party application API', () => {
   let server;
   let baseUrl;
   const repo = createFakeRepository();
+  const events = createRecordingEvents();
   const tokens = createTokenProvider(AUTH);
 
   before(async () => {
-    const app = createApp({ partyRepository: repo, corsOrigins: [], bcryptRounds: 4, auth: AUTH, now: () => NOW });
+    const app = createApp({ partyRepository: repo, postEvents: events, corsOrigins: [], bcryptRounds: 4, auth: AUTH, now: () => NOW });
     await new Promise((resolve) => {
       server = app.listen(0, resolve);
     });
@@ -124,6 +126,7 @@ describe('party application API', () => {
   });
   after(() => server.close());
   beforeEach(() => {
+    events.log.length = 0;
     Object.assign(repo.state, { applications: [], notifications: [], nextId: 1 });
     repo.state.members.clear();
     repo.state.posts.clear();
@@ -425,6 +428,34 @@ describe('party application API', () => {
       repo.state.posts.get(1).status = 'CLOSED';
       await call('DELETE', '/1/applications/me', undefined, A);
       assert.equal(repo.state.posts.get(1).status, 'CLOSED');
+    });
+  });
+
+  describe('실시간 신호 (SSE)', () => {
+    it('신청 · 승인 · 취소 · 모집 상태 변경이 성공하면 그 공고에 post 신호를 보낸다', async () => {
+      await apply(A);
+      await decide(1, 'ACCEPTED');
+      await call('DELETE', '/1/applications/me', undefined, A);
+      await call('PATCH', '/1/status', { status: 'CLOSED' }, HOST);
+      assert.deepEqual(events.log, [[1, 'post'], [1, 'post'], [1, 'post'], [1, 'post']]);
+    });
+
+    it('취소했던 신청을 되살려 다시 신청해도 신호를 보낸다', async () => {
+      await apply(A);
+      await call('DELETE', '/1/applications/me', undefined, A);
+      events.log.length = 0;
+      assert.equal((await apply(A)).status, 201);
+      assert.deepEqual(events.log, [[1, 'post']]);
+    });
+
+    it('실패한 요청(중복 신청 · 권한 없음 · 잘못된 상태)은 신호를 보내지 않는다', async () => {
+      await apply(A);
+      events.log.length = 0;
+      assert.equal((await apply(A)).status, 409);
+      assert.equal((await decide(1, 'ACCEPTED', B)).status, 403);
+      assert.equal((await call('PATCH', '/1/status', { status: 'DELETED' }, HOST)).status, 400);
+      assert.equal((await call('DELETE', '/1/applications/me', undefined, C)).status, 404);
+      assert.deepEqual(events.log, []);
     });
   });
 

@@ -1,5 +1,6 @@
 'use strict';
 
+const { createPostEvents } = require('../common/postEvents');
 const { createBoardRepository } = require('./boardRepository');
 const { createBoardService } = require('./boardService');
 const { createBoardController } = require('./boardController');
@@ -19,12 +20,13 @@ function createBoardModule({
   pool,
   boardRepository = createBoardRepository(pool),
   commentRepository = createCommentRepository(pool),
+  postEvents = createPostEvents(),
   requireAuth,
   optionalAuth,
   now,
 }) {
-  const boardController = createBoardController(createBoardService({ boardRepository, now }));
-  const commentController = createCommentController(createCommentService({ commentRepository, now }));
+  const boardController = createBoardController(createBoardService({ boardRepository, now }), { postEvents });
+  const commentController = createCommentController(createCommentService({ commentRepository, postEvents, now }));
 
   const postCommentRouter = createCommentRouter(commentController, { requireAuth, optionalAuth });
   return {

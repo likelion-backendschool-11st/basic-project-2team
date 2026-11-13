@@ -4,6 +4,7 @@ const { describe, it, before, after, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
 const { createApp } = require('../../src/app');
 const { createTokenProvider } = require('../../src/common/tokenProvider');
+const { createRecordingEvents } = require('../helpers/recordingEvents');
 
 const AUTH = Object.freeze({ jwtSecret: 'test-secret', accessTokenTtlSeconds: 1800, refreshTokenTtlDays: 1, rememberMeTtlDays: 14 });
 const AUTHOR = 7;
@@ -43,10 +44,11 @@ describe('PUT /api/posts/:postId', () => {
   let server;
   let baseUrl;
   const repo = createFakeRepository();
+  const events = createRecordingEvents();
   const tokens = createTokenProvider(AUTH);
 
   before(async () => {
-    const app = createApp({ postRepository: repo, corsOrigins: [], bcryptRounds: 4, auth: AUTH, now: () => NOW });
+    const app = createApp({ postRepository: repo, postEvents: events, corsOrigins: [], bcryptRounds: 4, auth: AUTH, now: () => NOW });
     await new Promise((resolve) => {
       server = app.listen(0, resolve);
     });
@@ -54,6 +56,7 @@ describe('PUT /api/posts/:postId', () => {
   });
   after(() => server.close());
   beforeEach(() => {
+    events.log.length = 0;
     repo.state.notices = [];
     repo.state.posts.clear();
     repo.state.posts.set(1, { authorId: AUTHOR, status: 'OPEN', currentCount: 3, headcount: 8, scheduleAt: new Date(FUTURE), title: '옛 제목' });
@@ -113,6 +116,14 @@ describe('PUT /api/posts/:postId', () => {
     const res = await put(1, body({ schedule: '2026-11-11T00:00:00Z' }));
     assert.equal(res.status, 400);
     assert.equal((await res.json()).error.fields[0].field, 'schedule');
+  });
+
+  it('수정에 성공하면 그 공고에 post 신호를 보내고, 실패하면 보내지 않는다', async () => {
+    assert.equal((await put(1, body({ headcount: 1 }))).status, 400);
+    assert.equal((await put(1, body(), AUTHOR + 1)).status, 403);
+    assert.deepEqual(events.log, []);
+    assert.equal((await put(1, body())).status, 200);
+    assert.deepEqual(events.log, [[1, 'post']]);
   });
 
   it('입력이 틀리면 400, 없는 게임은 404 다', async () => {

@@ -145,6 +145,14 @@ describe('GET /api/posts/:postId', () => {
     assert.equal(data.views, 2);
   });
 
+  it('?view=false 로 조회하면 조회수를 올리지 않고, 없는 공고는 그래도 404 다', async () => {
+    await get(1);
+    const res = await fetch(`${baseUrl}/api/posts/1?view=false`);
+    assert.equal((await res.json()).data.views, 1);
+    assert.equal(repo.state.posts.get(1).viewCount, 1);
+    assert.equal((await fetch(`${baseUrl}/api/posts/999?view=false`)).status, 404);
+  });
+
   it('작성자가 보면 viewer.isOwner 가 true 다', async () => {
     const { data } = await (await get(1, as(HOST_ID))).json();
     assert.deepEqual(data.viewer, { isOwner: true, scrapped: false, applicationStatus: null });

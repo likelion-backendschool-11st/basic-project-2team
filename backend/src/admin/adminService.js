@@ -2,6 +2,7 @@
 
 const bcrypt = require('bcryptjs');
 const { ApiError } = require('../common/ApiError');
+const { POST_EVENT, NO_EVENTS } = require('../common/postEvents');
 const {
   KST_OFFSET_MS,
   DAY_MS,
@@ -122,7 +123,18 @@ const toPostItem = (row) => ({
  *   now?: () => Date,
  * }} deps
  */
-function createAdminService({ adminRepository, tokenProvider, bcryptRounds, now = () => new Date() }) {
+function createAdminService({ adminRepository, tokenProvider, postEvents = NO_EVENTS, bcryptRounds, now = () => new Date() }) {
+  /**
+   * 트랜잭션을 실행하고, 커밋된 뒤에 모아 둔 공고 변경 신호를 보냅니다.
+   * 커밋 전에 보내면 클라이언트가 다시 조회했을 때 옛 값을 읽을 수 있습니다. 롤백되면 신호도 보내지 않습니다.
+   */
+  async function inTransactionWithEvents(fn) {
+    const events = [];
+    const result = await adminRepository.withTransaction((tx) => fn(tx, events));
+    for (const [postId, topic] of events) postEvents.publish(postId, topic);
+    return result;
+  }
+
   let dummyHash;
   const getDummyHash = () => (dummyHash ??= bcrypt.hash(DUMMY_PASSWORD, bcryptRounds));
 
@@ -236,8 +248,9 @@ function createAdminService({ adminRepository, tokenProvider, bcryptRounds, now 
   }
 
   /** 관리자 공고 삭제: 소프트 삭제 + 작성자에게 사유 알림 (REQ-ADMIN-003) */
-  async function removePost(tx, { post, reason, admin, current }) {
+  async function removePost(tx, { post, reason, admin, current, events }) {
     await tx.deletePost({ id: post.id, adminId: admin.id, reason, now: current });
+    events.push([post.id, POST_EVENT.post]);
     await tx.insertNotification({
       memberId: post.authorId,
       type: notificationType.postDeleted,
@@ -246,9 +259,10 @@ function createAdminService({ adminRepository, tokenProvider, bcryptRounds, now 
     });
   }
 
-  async function changeCommentStatus(tx, { comment, status, current }) {
+  async function changeCommentStatus(tx, { comment, status, current, events }) {
     const deleting = status === commentStatus.deleted;
     await tx.updateCommentStatus({ id: comment.id, status, deletedAt: deleting ? current : null });
+    events.push([comment.postId, POST_EVENT.comments]);
     if (deleting) await tx.decrementCommentCount(comment.postId);
   }
 
@@ -309,7 +323,7 @@ function createAdminService({ adminRepository, tokenProvider, bcryptRounds, now 
     const input = validateReportUpdate(body);
     const current = now();
 
-    return adminRepository.withTransaction(async (tx) => {
+    return inTransactionWithEvents(async (tx, events) => {
       const report = await tx.lockReport(reportId);
       if (!report) throw notFound('REPORT_NOT_FOUND', adminMessages.reportNotFound);
       if (closedReportStatuses.includes(report.status)) {
@@ -330,7 +344,7 @@ function createAdminService({ adminRepository, tokenProvider, bcryptRounds, now 
         });
         Object.assign(detail, { targetLabel: result.member.nickname, sanctionId: result.sanctionId, days: input.days });
       } else if (input.action === reportAction.deleteContent) {
-        detail.targetLabel = await deleteReportedContent(tx, report, input.memo ?? report.reasonCode, admin, current);
+        detail.targetLabel = await deleteReportedContent(tx, report, input.memo ?? report.reasonCode, admin, current, events);
       }
 
       const closed = closedReportStatuses.includes(input.status);
@@ -355,18 +369,18 @@ function createAdminService({ adminRepository, tokenProvider, bcryptRounds, now 
   }
 
   /** 신고된 공고·댓글을 삭제합니다. 이미 삭제된 대상이면 삭제는 건너뜁니다. @returns 이력에 남길 대상 이름 */
-  async function deleteReportedContent(tx, report, reason, admin, current) {
+  async function deleteReportedContent(tx, report, reason, admin, current, events) {
     if (report.targetType === reportTargetType.post) {
       const post = await tx.lockPost(report.targetId);
       if (!post) throw notFound('POST_NOT_FOUND', adminMessages.postNotFound);
-      if (post.status !== postStatus.deleted) await removePost(tx, { post, reason, admin, current });
+      if (post.status !== postStatus.deleted) await removePost(tx, { post, reason, admin, current, events });
       return post.title;
     }
     if (report.targetType === reportTargetType.comment) {
       const comment = await tx.lockComment(report.targetId);
       if (!comment) throw notFound('COMMENT_NOT_FOUND', adminMessages.commentNotFound);
       if (comment.status !== commentStatus.deleted) {
-        await changeCommentStatus(tx, { comment, status: commentStatus.deleted, current });
+        await changeCommentStatus(tx, { comment, status: commentStatus.deleted, current, events });
       }
       return `댓글 #${comment.id}`;
     }
@@ -431,12 +445,12 @@ function createAdminService({ adminRepository, tokenProvider, bcryptRounds, now 
     const { reason } = validatePostDelete(body);
     const current = now();
 
-    await adminRepository.withTransaction(async (tx) => {
+    await inTransactionWithEvents(async (tx, events) => {
       const post = await tx.lockPost(postId);
       if (!post) throw notFound('POST_NOT_FOUND', adminMessages.postNotFound);
       if (post.status === postStatus.deleted) throw conflict('POST_ALREADY_DELETED', adminMessages.postAlreadyDeleted);
 
-      await removePost(tx, { post, reason, admin, current });
+      await removePost(tx, { post, reason, admin, current, events });
       await tx.insertActionLog({
         adminId: admin.id,
         actionType: actionType.postDelete,
@@ -570,7 +584,7 @@ function createAdminService({ adminRepository, tokenProvider, bcryptRounds, now 
     const { status, reason } = validateCommentUpdate(body);
     const current = now();
 
-    return adminRepository.withTransaction(async (tx) => {
+    return inTransactionWithEvents(async (tx, events) => {
       const comment = await tx.lockComment(commentId);
       if (!comment) throw notFound('COMMENT_NOT_FOUND', adminMessages.commentNotFound);
       if (comment.status === commentStatus.deleted) {
@@ -578,7 +592,7 @@ function createAdminService({ adminRepository, tokenProvider, bcryptRounds, now 
       }
       if (comment.status === status) throw conflict('COMMENT_STATUS_UNCHANGED', adminMessages.commentStatusUnchanged);
 
-      await changeCommentStatus(tx, { comment, status, current });
+      await changeCommentStatus(tx, { comment, status, current, events });
       await tx.insertActionLog({
         adminId: admin.id,
         actionType: commentActionTypes[status],

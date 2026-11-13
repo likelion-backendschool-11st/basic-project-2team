@@ -81,9 +81,9 @@ function createBoardService({ boardRepository, now = () => new Date() }) {
    * @param {number} postId
    * @param {number | null} memberId 비로그인이면 null
    */
-  async function getPostDetail(postId, memberId) {
-    const increased = await boardRepository.increaseViewCount(postId);
-    if (!increased) throw new ApiError(404, 'POST_NOT_FOUND', boardMessages.postNotFound);
+  async function getPostDetail(postId, memberId, { countView = true } = {}) {
+    // 화면이 상태를 다시 불러올 때(?view=false)는 조회수를 올리지 않습니다.
+    if (countView && !(await boardRepository.increaseViewCount(postId))) throw new ApiError(404, 'POST_NOT_FOUND', boardMessages.postNotFound);
 
     const row = await boardRepository.findPostDetail(postId);
     if (!row) throw new ApiError(404, 'POST_NOT_FOUND', boardMessages.postNotFound);
@@ -129,6 +129,11 @@ function createBoardService({ boardRepository, now = () => new Date() }) {
     return rows.map((row) => toPostListItem(row, tagsByPost.get(row.id) ?? []));
   }
 
+  /** 실시간 구독 전에 공고가 있는지(삭제되지 않았는지) 확인합니다. 조회수는 올리지 않습니다. */
+  async function assertPostExists(postId) {
+    if (!(await boardRepository.findPostDetail(postId))) throw new ApiError(404, 'POST_NOT_FOUND', boardMessages.postNotFound);
+  }
+
   /** GET /api/posts/{postId}/related — 같은 게임의 다른 모집 중 공고(배열, 목록 아이템과 같은 모양). 조회수는 올리지 않습니다. */
   async function listRelated(postId, query) {
     const { limit } = parseRelatedQuery(query);
@@ -138,7 +143,7 @@ function createBoardService({ boardRepository, now = () => new Date() }) {
     return rows.map((row) => toPostListItem(row, tagsByPost.get(row.id) ?? []));
   }
 
-  return { getPostDetail, listPosts, listFeatured, listRelated };
+  return { getPostDetail, listPosts, listFeatured, listRelated, assertPostExists };
 }
 
 module.exports = { createBoardService };

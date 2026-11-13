@@ -40,6 +40,7 @@ const boardMessages = Object.freeze({
   sizeInvalid: `size 는 1~${MAX_PAGE_SIZE} 사이의 정수여야 합니다.`,
   excludeClosedInvalid: 'excludeClosed 는 true 또는 false 여야 합니다.',
   postNotFound: '존재하지 않는 공고입니다.',
+  tooManyConnections: '실시간 연결이 너무 많습니다. 잠시 후 다시 시도해 주세요.',
   withdrawnHost: '탈퇴한 회원',
 });
 

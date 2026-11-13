@@ -1,6 +1,9 @@
 /** API 서버 주소. 배포 환경에서는 VITE_API_BASE_URL 로 바꿉니다. */
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080';
 
+/** API 경로를 전체 주소로 바꿉니다(EventSource 처럼 fetch 를 거치지 않는 요청용). */
+export const apiUrl = (path: string) => `${API_BASE_URL}${path}`;
+
 /** 회원 로그인 정보를 저장하는 localStorage 키와, 로그인 상태가 바뀌었을 때 보내는 이벤트 이름 */
 export const ACCESS_TOKEN_KEY = 'accessToken';
 export const REFRESH_TOKEN_KEY = 'refreshToken';
