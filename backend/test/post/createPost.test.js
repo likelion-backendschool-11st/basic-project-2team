@@ -1,0 +1,126 @@
+'use strict';
+
+const { describe, it, before, after, beforeEach } = require('node:test');
+const assert = require('node:assert/strict');
+const { createApp } = require('../../src/app');
+
+/** DB 대신 메모리에 저장하는 가짜 repository */
+function createFakeRepository() {
+  const state = { posts: [], tags: [] };
+  return {
+    state,
+    async findGameByCode(code) {
+      return code === 'lostark' ? { id: 1, categoryCode: 'mmorpg' } : null;
+    },
+    async findGameContentId(gameId, code) {
+      return gameId === 1 && code === 'kamen' ? 10 : null;
+    },
+    async createPost({ post, tags }) {
+      state.posts.push({ ...post, tags });
+      return state.posts.length;
+    },
+  };
+}
+
+const futureIso = () => new Date(Date.now() + 86400000).toISOString();
+const validBody = () => ({
+  title: '[카멘 1-3관] 숙련 랏서폿 모십니다',
+  body: '마크다운 **본문**',
+  partyName: '카멘 숙련팟',
+  game: 'lostark',
+  type: 'raid',
+  detail: 'kamen',
+  headcount: 8,
+  style: 'hard',
+  schedule: futureIso(),
+  scheduleTbd: false,
+  voiceRequired: true,
+  tags: ['숙련', '#디코필수', '숙련'],
+});
+
+describe('POST /api/posts', () => {
+  let server;
+  let baseUrl;
+  const repo = createFakeRepository();
+
+  before(async () => {
+    // x-member-id 헤더가 있으면 로그인한 것으로 간주하는 테스트용 인증
+    const authenticate = (req, res, next) => {
+      if (req.headers['x-member-id']) req.memberId = Number(req.headers['x-member-id']);
+      next();
+    };
+    const app = createApp({ postRepository: repo, authenticate, corsOrigins: [], bcryptRounds: 4 });
+    await new Promise((resolve) => {
+      server = app.listen(0, resolve);
+    });
+    baseUrl = `http://localhost:${server.address().port}`;
+  });
+  after(() => server.close());
+  beforeEach(() => {
+    repo.state.posts.length = 0;
+  });
+
+  const post = (body, loggedIn = true) =>
+    fetch(`${baseUrl}/api/posts`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', ...(loggedIn ? { 'x-member-id': '7' } : {}) },
+      body: JSON.stringify(body),
+    });
+
+  it('공고를 저장하고 201 과 id 를 돌려준다', async () => {
+    const res = await post(validBody());
+    assert.equal(res.status, 201);
+    assert.deepEqual(await res.json(), { success: true, data: { id: 1 } });
+    const saved = repo.state.posts[0];
+    assert.equal(saved.authorId, 7);
+    assert.equal(saved.categoryCode, 'mmorpg');
+    assert.equal(saved.gameContentId, 10);
+    assert.deepEqual(saved.tags, ['숙련', '디코필수']);
+  });
+
+  it('일정 미정이면 schedule 없이도 저장된다', async () => {
+    const { schedule: _omit, ...rest } = validBody();
+    const res = await post({ ...rest, scheduleTbd: true });
+    assert.equal(res.status, 201);
+    assert.equal(repo.state.posts[0].scheduleAt, null);
+  });
+
+  it('로그인하지 않으면 401', async () => {
+    const res = await post(validBody(), false);
+    assert.equal(res.status, 401);
+    assert.equal((await res.json()).error.code, 'UNAUTHORIZED');
+  });
+
+  it('잘못된 값은 필드별 오류와 함께 400', async () => {
+    const res = await post({
+      ...validBody(),
+      title: 'a',
+      body: ' ',
+      headcount: 17,
+      type: 'x',
+      schedule: '2020-01-01T00:00:00+09:00',
+      tags: ['1', '2', '3', '4', '5', '6'],
+    });
+    assert.equal(res.status, 400);
+    const { error } = await res.json();
+    assert.equal(error.code, 'INVALID_INPUT');
+    assert.deepEqual(error.fields.map((f) => f.field).sort(), ['body', 'headcount', 'schedule', 'tags', 'title', 'type']);
+  });
+
+  it('시간대 없는 일정은 400', async () => {
+    const res = await post({ ...validBody(), schedule: '2099-01-01T10:00:00' });
+    assert.equal(res.status, 400);
+  });
+
+  it('없는 게임이면 404', async () => {
+    const res = await post({ ...validBody(), game: 'nope' });
+    assert.equal(res.status, 404);
+    assert.equal((await res.json()).error.code, 'GAME_NOT_FOUND');
+  });
+
+  it('게임에 없는 상세 분류면 404', async () => {
+    const res = await post({ ...validBody(), detail: 'nope' });
+    assert.equal(res.status, 404);
+    assert.equal((await res.json()).error.code, 'GAME_CONTENT_NOT_FOUND');
+  });
+});

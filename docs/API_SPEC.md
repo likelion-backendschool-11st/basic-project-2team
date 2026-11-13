@@ -151,6 +151,10 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 }
 ```
 
+- 응답 `201 { id }`. `title` 2~100자, `body` 필수(마크다운, 10000자 이하), `headcount` 2~16, `type` = `raid`·`rank`·`casual`, `style` = `hard`·`casual`·`newbie`·`any`(선택), `tags` 최대 5개(각 20자 이하, 공백 없음).
+- `schedule` 은 시간대(offset)를 포함한 ISO-8601 이며 현재 이후여야 합니다. `scheduleTbd: true` 이면 `schedule` 은 무시하고 NULL 로 저장합니다.
+- 오류: 400 `INVALID_INPUT`(필드별), 401 `UNAUTHORIZED`, 404 `GAME_NOT_FOUND`·`GAME_CONTENT_NOT_FOUND`.
+
 **공고 목록 아이템 (`BoardPost`)**
 
 ```json

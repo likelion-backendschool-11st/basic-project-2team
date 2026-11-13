@@ -1,0 +1,15 @@
+'use strict';
+
+const { sendSuccess } = require('../common/response');
+
+/** HTTP 요청/응답 변환만 담당하고 로직은 postService 에 맡깁니다. */
+function createPostController(postService) {
+  async function create(req, res) {
+    const data = await postService.createPost(req.memberId, req.body);
+    return sendSuccess(res, 201, data);
+  }
+
+  return { create };
+}
+
+module.exports = { createPostController };
