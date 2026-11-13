@@ -64,7 +64,19 @@ npm run lint      # ESLint 검사
 
 ### 백엔드
 
-- 미정 / 구현 예정. 스택(예: Java 17 + Spring Boot 3, JPA, MySQL 등)이 확정되면 이 섹션에 버전과 실행 방법을 추가합니다.
+- 스택(JavaScript + Node.js + express + MySQL )
+  - Express 5 (CommonJS), mysql2 (promise pool, UTC), bcryptjs, cors, 테스트는 Node 내장 `node:test`
+- `backend/.env.example` 을 `.env` 로 복사해 DB 접속 정보를 넣습니다 (`.env` 는 커밋 금지).
+
+```bash
+npm install       # 의존성 설치 (backend/ 에서)
+npm run dev       # 개발 서버 (http://localhost:8080, 파일 변경 시 재시작)
+npm start         # 서버 실행
+npm test          # 테스트 (DB 없이 가짜 repository 로 실행)
+```
+
+- 도메인별로 `backend/src/<domain>/` 폴더를 만들고 `xxxRoutes → xxxController → xxxService → xxxRepository` 로 역할을 나눕니다. 검증은 `xxxValidator`, 문구·에러 코드·정규식은 `xxxConstants` 에 둡니다.
+- 서비스에서 `ApiError(status, code, message)` 를 throw 하면 `common/errorHandler` 가 API_SPEC 응답 포맷으로 바꿉니다.
 
 ### 디렉터리 구조
 
@@ -81,6 +93,16 @@ frontend/
     ├── components/         # 도메인별 UI 컴포넌트 (auth, board, post, comments, review, mypage, admin, layout, ui …)
     ├── hooks/              # 상태·로직 커스텀 훅 (useXxx)
     └── data/               # 타입 정의 + 목 데이터 + 화면 문구(copy) + 라우트 상수
+
+backend/
+├── .env.example
+├── src/
+│   ├── server.js           # 엔트리 (listen)
+│   ├── app.js              # Express 앱 조립 (cors, json, 라우터, 에러 핸들러)
+│   ├── config/             # env.js (환경 변수), db.js (mysql2 pool)
+│   ├── common/             # ApiError, 응답 헬퍼, 에러 핸들러
+│   └── member/             # 회원가입·중복 확인 (Routes / Controller / Service / Repository / Validator / Constants)
+└── test/                   # node:test 테스트
 ```
 
 ---
