@@ -47,10 +47,10 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 | POST | `/api/auth/find-id` | 아이디 찾기 `{ nickname, email }` → `{ userId }` | |
 | POST | `/api/auth/find-password` | 비밀번호 찾기 `{ userId, email }` → `{ resetToken, expiresAt }` | |
 | POST | `/api/auth/reset-password` | 비밀번호 재설정 `{ resetToken, newPassword }` → `204` | |
-| GET | `/api/members/me` | 내 정보 (`LoggedInUser`) | 🔒 |
-| PATCH | `/api/members/me` | 프로필 수정 (닉네임, 소개, 주 게임, 플레이 스타일) | 🔒 |
-| PATCH | `/api/members/me/password` | 비밀번호 변경 `{ currentPassword, newPassword }` | 🔒 |
-| DELETE | `/api/members/me` | 회원 탈퇴 `{ password, reason }` | 🔒 |
+| GET | `/api/members/me` | 내 계정 정보 (프로필 수정 화면 초기값) | 🔒 |
+| PATCH | `/api/members/me` | 프로필 수정 (닉네임, 소개, 나이대·공개 여부, 선호 게임·대표 게임, 플레이 스타일) | 🔒 |
+| PATCH | `/api/members/me/password` | 비밀번호 변경 `{ currentPassword, newPassword }` → `204` | 🔒 |
+| DELETE | `/api/members/me` | 회원 탈퇴 `{ password, reason? }` → `204` | 🔒 |
 | GET | `/api/members/{memberId}` | 다른 회원 프로필 (닉네임, 레벨, 매너 온도, 상위 태그) — 응답은 8절 | |
 
 **회원가입 요청 예시**
@@ -199,11 +199,72 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 | 401 | `INVALID_RESET_TOKEN` | 재설정 토큰이 만료·위조됐거나 이미 사용됨 → 처음부터 다시 |
 | 404 | `MEMBER_NOT_FOUND` | 닉네임+이메일(아이디 찾기) 또는 아이디+이메일(비밀번호 찾기)이 일치하는 회원 없음 |
 
-**내 정보 응답 (`LoggedInUser`)**
+### 내 계정 관리 (내 정보 · 프로필 수정 · 비밀번호 변경 · 회원 탈퇴)
+
+구현: `backend/src/account/` (`/api/members` 에 마운트). 모든 API 는 🔒 이며, 토큰이 유효해도 탈퇴한 회원이면 401 `UNAUTHORIZED` 입니다.
+
+**내 정보 (`GET /api/members/me`)** — `PATCH /api/members/me` 도 수정 후 같은 형식으로 응답합니다.
 
 ```json
-{ "id": "u-healer", "nickname": "빛나는힐러", "level": 48, "mannerTemp": 98.4, "avatarUrl": "https://...", "online": true }
+{
+  "id": 1,
+  "userId": "healer01",
+  "nickname": "빛나는힐러",
+  "email": "healer@example.com",
+  "phone": "01012345678",
+  "name": null,
+  "bio": "멘탈 강한 힐러입니다.",
+  "ageRange": "20대",
+  "ageRangePublic": true,
+  "avatarUrl": null,
+  "level": 48,
+  "mannerTemp": 98.4,
+  "games": [{ "code": "lostark", "name": "로스트아크", "isMain": true, "playStyle": "casual" }],
+  "createdAt": "2026-10-01T00:00:00.000Z"
+}
 ```
+
+**프로필 수정 (`PATCH /api/members/me`)** — 보낸 항목만 바꿉니다.
+
+```json
+{ "nickname": "새닉네임", "bio": "소개", "ageRange": "20대", "ageRangePublic": false,
+  "games": ["lostark", "valorant"], "mainGame": "lostark", "playStyle": "casual" }
+```
+
+| 필드 | 규칙 |
+| --- | --- |
+| `nickname` | 회원가입과 같은 규칙(공백 없이 2~10자). 지금 닉네임 그대로면 변경 없음, 다른 회원이 쓰면 409 `DUPLICATE_NICKNAME` |
+| `bio` | 200자 이하. `null` 또는 빈 문자열이면 지움 |
+| `ageRange` · `ageRangePublic` | 10자 이하 문자열(`null` 이면 지움) · boolean. 비공개면 다른 사람 프로필에 나이대가 보이지 않음 |
+| `games` | 활성 게임 코드 배열(최대 10개, 중복 제거). 보내면 게이머 프로필 전체를 이 목록으로 교체하고(빈 배열이면 모두 삭제), 남는 게임의 캐릭터 정보는 유지. 없는 코드는 400(`games`) |
+| `mainGame` | `games` 중 하나. 생략하면 첫 번째 게임 |
+| `playStyle` | `hard` · `casual` · `newbie` · `any` (공고와 같은 값) 또는 `null`. 선호 게임 전체에 적용 |
+
+- `mainGame`·`playStyle` 은 `games` 와 함께 보내야 합니다(없으면 400 `games`).
+- 이메일·휴대폰 번호·아바타 변경은 이번 범위에 없습니다.
+
+**비밀번호 변경 (`PATCH /api/members/me/password`)** → `204`
+
+- 새 비밀번호는 회원가입과 같은 규칙입니다. 성공하면 로그인 실패 횟수·잠금을 초기화하고 **모든 Refresh Token 을 폐기**하므로, 프론트는 안내 후 다시 로그인하게 합니다.
+
+**회원 탈퇴 (`DELETE /api/members/me`)** `{ "password": "...", "reason": "선택, 200자 이하" }` → `204`
+
+- 진행 중인 파티(내가 파티장인 `OPEN`·`CLOSED` 공고, 또는 `ACCEPTED` 로 참여 중인 `OPEN`·`CLOSED` 공고)가 있으면 409 `ACTIVE_PARTY_EXISTS` (REQ-WITHDRAW-002).
+- 처리 (한 트랜잭션, docs/03-db-design.md 5절 삭제 정책)
+  - `member`: `status = WITHDRAWN`, 아이디·닉네임·이메일·휴대폰·이름·비밀번호·소개·나이대·아바타를 `NULL` 로 비움. 공고·댓글·리뷰는 남고 "탈퇴한 회원"으로 표시
+  - `member_withdrawal`: 휴대폰·이메일의 SHA-256 해시, 사유, 재가입 제한, 파기 예정일 보관. 제재 이력 없음 → 제한 없음·30일 뒤 파기 / 경고·기간 정지 이력 → 6개월 재가입 제한 / 영구 정지 이력 → 영구 제한 (6절 결정 사항 10·11)
+  - 대기 중(`PENDING`) 신청은 `CANCELED`, 게이머 프로필·즐겨찾기(양방향)·스크랩·임시저장·알림 설정 삭제, 모든 Refresh Token·재설정 토큰 폐기
+
+**내 계정 관리 에러 코드**
+
+| 상태 | code | 상황 |
+| --- | --- | --- |
+| 400 | `INVALID_INPUT` | 입력 규칙 위반 (`fields` 에 필드별 오류) |
+| 400 | `INVALID_PASSWORD` | 비밀번호 변경의 현재 비밀번호, 탈퇴의 비밀번호가 틀림 |
+| 400 | `SAME_PASSWORD` | 새 비밀번호가 지금 비밀번호와 같음 |
+| 401 | `UNAUTHORIZED` · `TOKEN_EXPIRED` | 토큰 없음·만료, 탈퇴한 회원 |
+| 409 | `DUPLICATE_NICKNAME` | 다른 회원이 쓰는 닉네임 |
+| 409 | `ACTIVE_PARTY_EXISTS` | 진행 중인 파티가 있어 탈퇴 불가 |
 
 ## 3. 공고 (Post)
 
