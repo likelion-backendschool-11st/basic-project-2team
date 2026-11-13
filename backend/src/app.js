@@ -5,11 +5,12 @@ const cors = require('cors');
 const { env } = require('./config/env');
 const { notFoundHandler, errorHandler } = require('./common/errorHandler');
 const { createTokenProvider } = require('./common/tokenProvider');
-const { createRequireAuth } = require('./common/authMiddleware');
+const { createRequireAuth, createOptionalAuth } = require('./common/authMiddleware');
 const { createMailer } = require('./common/mailer');
 const { createEmailVerificationModule } = require('./emailVerification');
 const { createMemberModule } = require('./member');
 const { createPostModule } = require('./post');
+const { createBoardModule } = require('./board');
 
 /**
  * Express 앱을 만듭니다. 서버 실행(server.js)과 분리해 테스트에서 DB 없이 띄울 수 있게 합니다.
@@ -17,6 +18,7 @@ const { createPostModule } = require('./post');
  *   pool?: import('mysql2/promise').Pool,
  *   memberRepository?: object,
  *   postRepository?: object,
+ *   boardRepository?: object,
  *   emailVerificationRepository?: object,
  *   mailer?: ReturnType<typeof createMailer>,
  *   corsOrigins: string[],
@@ -29,6 +31,7 @@ function createApp({
   pool,
   memberRepository,
   postRepository,
+  boardRepository,
   emailVerificationRepository,
   mailer = createMailer(env.mail),
   corsOrigins,
@@ -43,6 +46,7 @@ function createApp({
 
   const tokenProvider = createTokenProvider(auth);
   const requireAuth = createRequireAuth(tokenProvider);
+  const optionalAuth = createOptionalAuth(tokenProvider);
 
   const emailVerification = createEmailVerificationModule({
     pool,
@@ -58,6 +62,10 @@ function createApp({
 
   const post = createPostModule({ pool, postRepository, requireAuth, now });
   app.use('/api/posts', post.router);
+
+  // GET /api/posts/:postId 를 잡으므로 /api/posts 아래 고정 경로(popular, urgent …)는 이보다 먼저 마운트된 라우터에 둡니다.
+  const board = createBoardModule({ pool, boardRepository, optionalAuth });
+  app.use('/api/posts', board.router);
 
   app.use(notFoundHandler);
   app.use(errorHandler);
