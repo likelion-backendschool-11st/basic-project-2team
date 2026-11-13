@@ -124,7 +124,7 @@ function createPartyService({ partyRepository, now = () => new Date() }) {
   async function changeStatus(rawPostId, memberId, body) {
     const { status } = validatePostStatus(body);
     const post = await loadOwnedPost(rawPostId, memberId);
-    const outcome = await partyRepository.changePostStatus({ postId: post.id, status });
+    const outcome = await partyRepository.changePostStatus({ postId: post.id, status, now: now() });
     switch (outcome.result) {
       case 'OK':
         return { id: post.id, status: outcome.status, current: outcome.current, max: outcome.max };
@@ -132,6 +132,10 @@ function createPartyService({ partyRepository, now = () => new Date() }) {
         throw new ApiError(409, 'POST_COMPLETED', m.postCompleted);
       case 'FULL':
         throw new ApiError(409, 'PARTY_FULL', m.partyFull);
+      case 'NO_MEMBERS':
+        throw new ApiError(409, 'COMPLETE_NOT_ALLOWED', m.completeNoMembers);
+      case 'NOT_STARTED':
+        throw new ApiError(409, 'COMPLETE_NOT_ALLOWED', m.completeNotStarted);
       default:
         throw postNotFound();
     }

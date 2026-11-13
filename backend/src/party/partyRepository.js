@@ -152,12 +152,13 @@ function createPartyRepository(pool) {
 
   /**
    * 작성자가 공고의 모집 상태를 바꿉니다. 완료(COMPLETED)된 공고는 되돌릴 수 없고, 정원이 찬 공고는 다시 열 수 없습니다.
-   * @returns {Promise<{ result: 'OK' | 'NOT_FOUND' | 'COMPLETED' | 'FULL', status?: string, current?: number, max?: number }>}
+   * 완료 처리는 승인된 파티원이 있고 출발 시간이 지난 뒤(일정 미정이면 제외)에만 가능합니다.
+   * @returns {Promise<{ result: 'OK' | 'NOT_FOUND' | 'COMPLETED' | 'FULL' | 'NO_MEMBERS' | 'NOT_STARTED', status?: string, current?: number, max?: number }>}
    */
-  async function changePostStatus({ postId, status }) {
+  async function changePostStatus({ postId, status, now }) {
     return inTransaction(async (connection) => {
       const [[post]] = await connection.query(
-        `SELECT status, headcount, current_count AS current FROM post p WHERE p.id = ? AND ${ALIVE_POST} FOR UPDATE`,
+        `SELECT status, headcount, current_count AS current, schedule_at AS scheduleAt FROM post p WHERE p.id = ? AND ${ALIVE_POST} FOR UPDATE`,
         [postId],
       );
       if (!post) return { result: 'NOT_FOUND' };
@@ -165,6 +166,10 @@ function createPartyRepository(pool) {
       if (post.status === status) return unchanged;
       if (post.status === POST_STATUS.completed) return { result: 'COMPLETED' };
       if (status === POST_STATUS.open && post.current >= post.headcount) return { result: 'FULL' };
+      if (status === POST_STATUS.completed) {
+        if (post.current <= 1) return { result: 'NO_MEMBERS' };
+        if (post.scheduleAt && new Date(post.scheduleAt) > now) return { result: 'NOT_STARTED' };
+      }
       await connection.query('UPDATE post SET status = ? WHERE id = ?', [status, postId]);
       return { ...unchanged, status };
     });

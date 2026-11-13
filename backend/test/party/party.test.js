@@ -73,12 +73,16 @@ function createFakeRepository() {
       a.status = status;
       return { result: 'OK', current: post.currentCount, max: post.headcount, postStatus: post.status };
     },
-    async changePostStatus({ postId, status }) {
+    async changePostStatus({ postId, status, now }) {
       const post = state.posts.get(postId);
       const out = () => ({ result: 'OK', status: post.status, current: post.currentCount, max: post.headcount });
       if (post.status === status) return out();
       if (post.status === 'COMPLETED') return { result: 'COMPLETED' };
       if (status === 'OPEN' && post.currentCount >= post.headcount) return { result: 'FULL' };
+      if (status === 'COMPLETED') {
+        if (post.currentCount <= 1) return { result: 'NO_MEMBERS' };
+        if (post.scheduleAt && post.scheduleAt > now) return { result: 'NOT_STARTED' };
+      }
       post.status = status;
       return out();
     },
@@ -322,12 +326,28 @@ describe('party application API', () => {
     });
 
     it('완료 처리하면 되돌릴 수 없다 (409 POST_COMPLETED)', async () => {
+      Object.assign(repo.state.posts.get(1), { currentCount: 2, scheduleAt: new Date('2026-11-13T00:00:00Z') });
       assert.equal((await setStatus('COMPLETED')).status, 200);
       for (const status of ['OPEN', 'CLOSED']) {
         const res = await setStatus(status);
         assert.equal(res.status, 409, status);
         assert.equal((await json(res)).error.code, 'POST_COMPLETED');
       }
+      assert.equal((await setStatus('COMPLETED')).status, 200);
+    });
+
+    it('완료 처리는 파티원이 있고 출발 시간이 지난 뒤에만 가능하다 (일정 미정은 시간 조건 없음)', async () => {
+      const post = repo.state.posts.get(1);
+      const reject = async (reason) => {
+        const res = await setStatus('COMPLETED');
+        assert.equal(res.status, 409, reason);
+        assert.equal((await json(res)).error.code, 'COMPLETE_NOT_ALLOWED', reason);
+        assert.equal(post.status, 'OPEN', reason);
+      };
+      await reject('파티원 없음(혼자)');
+      post.currentCount = 2; // 출발은 NOW 보다 12시간 뒤
+      await reject('출발 전');
+      post.scheduleAt = null;
       assert.equal((await setStatus('COMPLETED')).status, 200);
     });
 

@@ -31,6 +31,8 @@ const partyMessages = Object.freeze({
   messageInvalid: `한 줄 메시지는 ${MESSAGE_MAX_LENGTH}자 이하로 입력해주세요.`,
   postStatusInvalid: `status 는 ${POST_STATUSES.join(', ')} 중 하나여야 합니다.`,
   postCompleted: '이미 완료된 파티는 상태를 바꿀 수 없습니다.',
+  completeNoMembers: '파티원이 한 명도 없는 공고는 완료 처리할 수 없습니다.',
+  completeNotStarted: '출발 시간이 지난 뒤에 완료 처리할 수 있습니다.',
   statusInvalid: `status 는 ${DECISION_STATUSES.join(', ')} 중 하나여야 합니다.`,
   listStatusInvalid: `status 는 ${LIST_STATUSES.join(', ')} 중 하나여야 합니다.`,
   unauthorized: '로그인이 필요합니다.',
