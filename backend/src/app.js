@@ -23,6 +23,7 @@ const { createMypageModule } = require('./mypage');
  *   gameRepository?: object,
  *   categoryRepository?: object,
  *   boardRepository?: object,
+ *   commentRepository?: object,
  *   adminRepository?: object,
  *   mypageRepository?: object,
  *   corsOrigins: string[],
@@ -38,6 +39,7 @@ function createApp({
   gameRepository,
   categoryRepository,
   boardRepository,
+  commentRepository,
   adminRepository,
   mypageRepository,
   corsOrigins,
@@ -64,8 +66,9 @@ function createApp({
   app.use('/api/categories', createCategoryModule({ pool, categoryRepository }).router);
 
   // GET /api/posts/:postId 를 잡으므로 /api/posts 아래 고정 경로(popular, urgent …)는 이보다 먼저 마운트된 라우터에 둡니다.
-  const board = createBoardModule({ pool, boardRepository, optionalAuth });
+  const board = createBoardModule({ pool, boardRepository, commentRepository, requireAuth, optionalAuth, now });
   app.use('/api/posts', board.router);
+
   const admin = createAdminModule({ pool, adminRepository, tokenProvider, requireAdmin, bcryptRounds, now });
   app.use('/api/admin', admin.router);
   const mypage = createMypageModule({ pool, mypageRepository, requireAuth, optionalAuth });
