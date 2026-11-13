@@ -225,9 +225,10 @@ erDiagram
     game_content {
         bigint id PK
         bigint game_id FK "UQ(game_id, code)"
-        varchar(20) content_type "RANK / DUNGEON / RAID"
+        varchar(20) content_type "RANK / NORMAL / DUNGEON / RAID"
         varchar(30) code "kamen ..."
         varchar(50) name
+        tinyint max_headcount "파티장 포함 최대 모집 인원 2~16"
     }
 
     tag {

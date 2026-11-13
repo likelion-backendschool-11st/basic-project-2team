@@ -247,6 +247,7 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 | POST | `/api/posts/drafts` | 임시저장 | 🔒 |
 | GET | `/api/posts/drafts/latest` | 임시저장 불러오기 | 🔒 |
 | POST / DELETE | `/api/posts/{postId}/scrap` | 스크랩 / 취소 | 🔒 |
+| GET | `/api/games` | 게임 목록 + 게임별 상세 분류 `[{ code, name, categoryCode, contents: [{ code, name, type, maxHeadcount }] }]` (공고 작성 폼용) | |
 | GET | `/api/categories` | 카테고리 목록 + 공고 수 | |
 
 - `category`: `mmorpg` · `fps` · `aos` · `steam` · `etc` (생략 시 전체)
@@ -271,9 +272,9 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 }
 ```
 
-- 응답 `201 { id }`. `title` 2~100자, `body` 필수(마크다운, 10000자 이하), `headcount` 2~16, `type` = `raid`·`rank`·`casual`, `style` = `hard`·`casual`·`newbie`·`any`(선택), `tags` 최대 5개(각 20자 이하, 공백 없음).
+- 응답 `201 { id }`. `title` 2~100자, `body` 필수(마크다운, 10000자 이하), `headcount` 2~16, `type` = `raid`·`dungeon`·`rank`·`normal` (게임의 상세 분류 `contents[].type` 과 같은 값), `style` = `hard`·`casual`·`newbie`·`any`(선택), `tags` 최대 5개(각 20자 이하, 공백 없음).
 - `schedule` 은 시간대(offset)를 포함한 ISO-8601 이며 현재 이후여야 합니다. `scheduleTbd: true` 이면 `schedule` 은 무시하고 NULL 로 저장합니다.
-- 오류: 400 `INVALID_INPUT`(필드별), 401 `UNAUTHORIZED`, 404 `GAME_NOT_FOUND`·`GAME_CONTENT_NOT_FOUND`.
+- 오류: 400 `INVALID_INPUT`(필드별), 401 `UNAUTHORIZED`, 404 `GAME_NOT_FOUND`·`GAME_CONTENT_NOT_FOUND`. `detail` 의 type 이 요청 `type` 과 다르거나 `headcount` 가 그 상세 분류의 `maxHeadcount` 를 넘으면 400(`detail`·`headcount` 필드 오류).
 
 **공고 상세 (`GET /api/posts/{postId}`)**
 

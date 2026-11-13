@@ -125,7 +125,7 @@ API의 `level`은 **서비스 활동 레벨**(`member.level`)입니다. 공고 �
 | --- | --- | --- |
 | `category` | code VARCHAR(20) PK, name VARCHAR(30), sort_order, is_active | `mmorpg`, `fps`, `aos`, `steam`, `etc` 5개 (프론트·API와 동일). 나중에 늘거나 줄 수 있어 데이터 행으로 관리 |
 | `game` | id, category_code FK, code VARCHAR(30) UNIQUE, name VARCHAR(50), sort_order, is_active | `lostark` 같은 코드 |
-| `game_content` | id, game_id FK, content_type VARCHAR(20), code VARCHAR(30), name VARCHAR(50), UNIQUE(game_id, code) | API의 `detail`(예: `kamen`). content_type은 RANK / DUNGEON / RAID (POST-001). 관심 알림 대상(NOTI-001) |
+| `game_content` | id, game_id FK, content_type VARCHAR(20), code VARCHAR(30), name VARCHAR(50), max_headcount TINYINT UNSIGNED DEFAULT 16, UNIQUE(game_id, code) | API의 `detail`(예: `kamen`). max_headcount는 파티장 포함 최대 모집 인원(2~16)으로, 공고 `headcount`의 상한. content_type은 RANK / NORMAL / DUNGEON / RAID (POST-001). 관심 알림 대상(NOTI-001) |
 | `tag` | id, name VARCHAR(20) UNIQUE | 공고 태그 |
 | `review_tag` | id, code VARCHAR(30) UNIQUE, label VARCHAR(30), sort_order, is_active | `on-time` → `#시간엄수` |
 

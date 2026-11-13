@@ -10,6 +10,7 @@ const { createMailer } = require('./common/mailer');
 const { createEmailVerificationModule } = require('./emailVerification');
 const { createMemberModule } = require('./member');
 const { createPostModule } = require('./post');
+const { createGameModule } = require('./game');
 const { createBoardModule } = require('./board');
 const { createAdminModule } = require('./admin');
 
@@ -19,6 +20,7 @@ const { createAdminModule } = require('./admin');
  *   pool?: import('mysql2/promise').Pool,
  *   memberRepository?: object,
  *   postRepository?: object,
+ *   gameRepository?: object,
  *   boardRepository?: object,
  *   emailVerificationRepository?: object,
  *   mailer?: ReturnType<typeof createMailer>,
@@ -33,6 +35,7 @@ function createApp({
   pool,
   memberRepository,
   postRepository,
+  gameRepository,
   boardRepository,
   emailVerificationRepository,
   mailer = createMailer(env.mail),
@@ -66,6 +69,7 @@ function createApp({
 
   const post = createPostModule({ pool, postRepository, requireAuth, now });
   app.use('/api/posts', post.router);
+  app.use('/api/games', createGameModule({ pool, gameRepository }).router);
 
   // GET /api/posts/:postId 를 잡으므로 /api/posts 아래 고정 경로(popular, urgent …)는 이보다 먼저 마운트된 라우터에 둡니다.
   const board = createBoardModule({ pool, boardRepository, optionalAuth });

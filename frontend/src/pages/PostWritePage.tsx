@@ -30,12 +30,12 @@ export const PostWritePage: React.FC<PostWritePageProps> = () => {
               <i className="fa-regular fa-eye" />{f.previewing ? writeText.previewClose : writeText.preview}
             </button>
             <p className="flex-1 min-w-48 text-xs text-fog-muted">{f.error ? <span className="text-rose-300">{f.error}</span> : writeText.syncNote}</p>
-            <button type="button" onClick={f.submit} className="h-12 px-8 rounded-xl bg-mercury hover:bg-mercury-light text-sm font-bold text-white shadow-lg shadow-mercury/30 flex items-center gap-2">
+            <button type="button" onClick={f.submit} disabled={f.submitting} className="disabled:opacity-60 h-12 px-8 rounded-xl bg-mercury hover:bg-mercury-light text-sm font-bold text-white shadow-lg shadow-mercury/30 flex items-center gap-2">
               <i className="fa-solid fa-triangle-exclamation" />{writeText.submit}
             </button>
           </section>
         </div>
-        <OptionPanel draft={f.draft} onChange={f.set} summary={f.summary} />
+        <OptionPanel draft={f.draft} onChange={f.set} summary={f.summary} options={f.options} maxHeadcount={f.maxHeadcount} />
       </main>
       <ConfirmDialog
         isOpen={f.leave.isOpen}
