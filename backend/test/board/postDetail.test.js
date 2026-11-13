@@ -145,6 +145,13 @@ describe('GET /api/posts/:postId', () => {
     assert.equal(data.views, 2);
   });
 
+  it('작성자 본인이 열어도 조회수는 오르지 않고, 다른 사람이 열면 오른다', async () => {
+    const own = await (await get(1, as(HOST_ID))).json();
+    assert.equal(own.data.views, 0);
+    assert.equal(repo.state.posts.get(1).viewCount, 0);
+    assert.equal((await (await get(1, as(HOST_ID + 1))).json()).data.views, 1);
+  });
+
   it('?view=false 로 조회하면 조회수를 올리지 않고, 없는 공고는 그래도 404 다', async () => {
     await get(1);
     const res = await fetch(`${baseUrl}/api/posts/1?view=false`);

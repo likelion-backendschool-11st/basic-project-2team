@@ -82,11 +82,14 @@ function createBoardService({ boardRepository, now = () => new Date() }) {
    * @param {number | null} memberId 비로그인이면 null
    */
   async function getPostDetail(postId, memberId, { countView = true } = {}) {
-    // 화면이 상태를 다시 불러올 때(?view=false)는 조회수를 올리지 않습니다.
-    if (countView && !(await boardRepository.increaseViewCount(postId))) throw new ApiError(404, 'POST_NOT_FOUND', boardMessages.postNotFound);
-
     const row = await boardRepository.findPostDetail(postId);
     if (!row) throw new ApiError(404, 'POST_NOT_FOUND', boardMessages.postNotFound);
+
+    // 화면이 상태를 다시 불러올 때(?view=false)와 작성자 본인이 볼 때는 조회수를 올리지 않습니다.
+    if (countView && row.hostId !== memberId) {
+      if (!(await boardRepository.increaseViewCount(postId))) throw new ApiError(404, 'POST_NOT_FOUND', boardMessages.postNotFound);
+      row.viewCount += 1;
+    }
 
     const tags = await boardRepository.findTagNames(postId);
 
