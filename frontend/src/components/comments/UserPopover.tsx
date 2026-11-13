@@ -11,12 +11,12 @@ interface UserPopoverProps {
   readonly onClose: () => void;
 }
 
-/** 댓글 작성자 프로필 카드: 마이페이지 프로필 카드와 같은 구성 + 파티 초대하기 */
+/** 댓글 작성자 프로필 카드(작성자 줄 아래에 뜨는 창): 마이페이지 프로필 카드와 같은 구성 + 파티 초대하기 */
 export const UserPopover: React.FC<UserPopoverProps> = ({ profile, onAction, onClose }) => {
   const t = commentText.popover;
   const summary = useMemo(() => (typeof profile === 'object' ? toProfileSummary(profile) : null), [profile]);
   return (
-    <div className="my-2 rounded-xl border border-mercury/30 bg-night-card p-5 shadow-2xl">
+    <div role="dialog" aria-label={t.title} className="absolute inset-x-0 top-full z-30 mt-2 rounded-xl border border-mercury/30 bg-night-card p-5 shadow-2xl">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2 text-sm font-bold text-white">
           {t.title}

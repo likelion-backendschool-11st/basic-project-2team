@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { commentText, type PostComment } from '../../data/commentData';
 import type { CommentAuthorProfile } from '../../hooks/useComments';
+import { useDismiss } from '../../hooks/useDismiss';
 import CommentComposer from './CommentComposer';
 import UserPopover from './UserPopover';
 
@@ -38,10 +39,14 @@ export const CommentItem: React.FC<CommentItemProps> = (p) => {
   const [draft, setDraft] = useState(c.text);
   const [showHidden, setShowHidden] = useState(false);
   const collapsed = c.hidden && !showHidden;
+  // 프로필 창은 작성자 줄 바로 아래에 떠서, 아래 댓글을 밀어내지 않고 스크롤 위치도 그대로 둡니다.
+  const profileAnchor = useRef<HTMLDivElement>(null);
+  useDismiss(profileAnchor, p.popoverOpen, p.onTogglePopover);
   return (
     <div className={depth ? 'ml-8 mt-2 rounded-xl bg-night-base/70 p-3' : 'rounded-xl bg-night-base/50 p-4'}>
+      <div ref={profileAnchor} className="relative">
       <div className="flex items-center gap-2 text-xs">
-        <button type="button" onClick={p.onTogglePopover} className="w-7 h-7 rounded-full bg-mercury/25 text-white text-[11px] font-bold hover:ring-2 hover:ring-mercury/50" aria-label={`${c.author} 프로필`}>{c.initial}</button>
+        <button type="button" onClick={p.onTogglePopover} className="w-7 h-7 rounded-full bg-mercury/25 text-white text-[11px] font-bold hover:ring-2 hover:ring-mercury/50" aria-label={`${c.author} 프로필`} aria-expanded={p.popoverOpen} aria-haspopup="dialog">{c.initial}</button>
         <span className="font-bold text-white">{c.author}</span>
         {c.badge === 'mine' && <span className="px-1.5 rounded bg-emeraldAccent/15 text-emerald-300 text-[10px]">{commentText.mine}</span>}
         {c.badge === 'author' && <span className="px-1.5 rounded bg-mercury/30 text-indigo-200 text-[10px]">{commentText.author}</span>}
@@ -49,6 +54,7 @@ export const CommentItem: React.FC<CommentItemProps> = (p) => {
         {c.secret && <i className="fa-solid fa-lock text-[10px] text-amberAccent" />}
       </div>
       {p.popoverOpen && <UserPopover profile={p.profile} onAction={p.onPopoverAction} onClose={p.onTogglePopover} />}
+      </div>
       {p.isEditing ? (
         <div className="mt-2">
           <textarea value={draft} onChange={(e) => setDraft(e.target.value)} rows={2} className="w-full resize-none rounded-lg bg-night-surface border-0 p-3 text-sm text-fog-headline focus:ring-1 focus:ring-mercury" />
