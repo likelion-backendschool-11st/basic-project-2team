@@ -1,16 +1,17 @@
 import React from 'react';
-import { confirmText } from '../../data/reviewData';
+import { confirmText, reviewText } from '../../data/reviewData';
 
 interface ReviewConfirmDialogProps {
   readonly targetLabel: string;
   readonly ratingLabel: string;
   readonly tagSummary: string;
+  readonly submitting?: boolean;
   readonly onCancel: () => void;
   readonly onConfirm: () => void;
 }
 
 /** ⑦⑧⑨ "리뷰를 등록 하시겠습니까?" confirmation panel. */
-export const ReviewConfirmDialog: React.FC<ReviewConfirmDialogProps> = ({ targetLabel, ratingLabel, tagSummary, onCancel, onConfirm }) => (
+export const ReviewConfirmDialog: React.FC<ReviewConfirmDialogProps> = ({ targetLabel, ratingLabel, tagSummary, submitting = false, onCancel, onConfirm }) => (
   <section
     role="alertdialog"
     aria-labelledby="review-confirm-title"
@@ -45,16 +46,18 @@ export const ReviewConfirmDialog: React.FC<ReviewConfirmDialogProps> = ({ target
       <button
         type="button"
         onClick={onCancel}
-        className="w-1/2 py-2.5 px-4 rounded-xl border border-white/20 bg-night-card text-slate-300 hover:text-white hover:bg-night-hover font-medium text-sm transition-all focus:outline-none focus:ring-2 focus:ring-slate-500 flex items-center justify-center gap-1.5"
+        disabled={submitting}
+        className="w-1/2 py-2.5 px-4 rounded-xl border border-white/20 bg-night-card text-slate-300 hover:text-white hover:bg-night-hover font-medium text-sm transition-all focus:outline-none focus:ring-2 focus:ring-slate-500 disabled:opacity-50 flex items-center justify-center gap-1.5"
       >
         <span>{confirmText.cancel}</span>
       </button>
       <button
         type="button"
         onClick={onConfirm}
-        className="w-1/2 py-2.5 px-4 rounded-xl bg-gradient-to-r from-mercury to-indigo-600 hover:from-mercury-light hover:to-indigo-500 text-white font-semibold text-sm shadow-lg shadow-mercury/30 transition-all focus:outline-none focus:ring-2 focus:ring-mercury-light flex items-center justify-center gap-1.5"
+        disabled={submitting}
+        className="w-1/2 py-2.5 px-4 rounded-xl bg-gradient-to-r from-mercury to-indigo-600 hover:from-mercury-light hover:to-indigo-500 text-white font-semibold text-sm shadow-lg shadow-mercury/30 transition-all focus:outline-none focus:ring-2 focus:ring-mercury-light disabled:opacity-50 flex items-center justify-center gap-1.5"
       >
-        <span>{confirmText.confirm}</span>
+        <span>{submitting ? reviewText.submitting : confirmText.confirm}</span>
       </button>
     </div>
     <div className="hidden lg:flex absolute -right-5 top-1/2 -translate-y-1/2 z-20 items-center justify-center">

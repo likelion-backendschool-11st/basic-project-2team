@@ -13,11 +13,21 @@ interface ProfileStatsPanelProps {
   readonly topTagsTitle: string;
   readonly topTagsCaption: string;
   readonly topTags: readonly TopTag[];
+  /** 받은 태그가 없을 때 문구 */
+  readonly emptyTopTags: string;
   readonly rankSuffix: string;
 }
 
-/** Right column of the profile card: post count, matched parties, rating + top tags. */
-export const ProfileStatsPanel: React.FC<ProfileStatsPanelProps> = ({ stats, rating, topTagsTitle, topTagsCaption, topTags, rankSuffix }) => (
+/** Right column of the profile card: post count, completed parties, rating + top tags. */
+export const ProfileStatsPanel: React.FC<ProfileStatsPanelProps> = ({
+  stats,
+  rating,
+  topTagsTitle,
+  topTagsCaption,
+  topTags,
+  emptyTopTags,
+  rankSuffix,
+}) => (
   <div className="lg:col-span-4 bg-night-card/60 border border-night-borderLight rounded-xl p-4 flex flex-col gap-3 justify-center">
     {stats.map((s) => (
       <div key={s.id} className="flex items-center justify-between pb-2 border-b border-night-borderLight/50">
@@ -57,6 +67,7 @@ export const ProfileStatsPanel: React.FC<ProfileStatsPanelProps> = ({ stats, rat
         {topTags.map((t) => (
           <TopTagChip key={t.rank} tag={t} rankSuffix={rankSuffix} />
         ))}
+        {topTags.length === 0 && <span className="text-[11px] text-slate-500">{emptyTopTags}</span>}
       </div>
     </div>
   </div>

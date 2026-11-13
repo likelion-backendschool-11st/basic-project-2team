@@ -63,8 +63,14 @@ export const homeText = {
   popularTitle: '인기 공고글',
   urgentTitle: '마감 임박 글',
   more: '더보기',
-  leaderTitle: '이달의 매너 공대장',
+  leaderTitle: '매너 온도 랭킹',
   leaderBadge: 'BEST 3',
+  leaderLimit: 3,
+  leaderNoGame: '대표 게임 없음',
+  leaderNoTag: '받은 태그 없음',
+  leaderReviewCount: (count: number) => `평가 ${count}회`,
+  leaderEmpty: '아직 평가를 받은 회원이 없습니다.',
+  leaderLoadFailed: '랭킹을 불러오지 못했습니다.',
   memberTitle: '이달의 매너 파티원',
   memberBadge: 'HONOR',
   authorPrefix: '작성자: ',
@@ -162,12 +168,6 @@ export const urgentPosts: readonly UrgentPost[] = [
     meta: '출발: 23:00 정각',
     actionLabel: '참가',
   },
-];
-
-export const mannerLeaders: readonly MannerLeader[] = [
-  { id: 'l1', rank: 1, initial: '갓', name: '갓공대장', game: '로아', accent: 'mercury', comment: '브리핑 천재 & 친절한 설명', temperature: '99°C', recommends: '추천 142회' },
-  { id: 'l2', rank: 2, initial: '아', name: '아침햇살', game: 'WoW', accent: 'purple', comment: '멘탈케어 전문 리더', temperature: '96°C', recommends: '추천 118회' },
-  { id: 'l3', rank: 3, initial: '칼', name: '칼바이스', game: 'FF14', accent: 'blue', comment: '시간 엄수 / 깔끔한 조율', temperature: '94°C', recommends: '추천 95회' },
 ];
 
 export const mannerMembers: readonly MannerMember[] = [

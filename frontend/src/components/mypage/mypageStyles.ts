@@ -1,22 +1,10 @@
-import type { AccountMenuItem, GameAccent, PresenceStatus } from '../../data/myPageData';
+import type { AccountMenuItem, GameAccent } from '../../data/myPageData';
 
 /** Static class maps so Tailwind's JIT sees every class. */
 export const gameBadgeStyles: Record<GameAccent, string> = {
   amber: 'bg-amber-500/10 text-amber-300 border-amber-500/30',
   blue: 'bg-blue-500/10 text-blue-300 border-blue-500/30',
   rose: 'bg-rose-500/10 text-rose-300 border-rose-500/30',
-};
-
-export const presenceDotStyles: Record<PresenceStatus, string> = {
-  online: 'bg-emerald-500',
-  away: 'bg-amber-500',
-  offline: 'bg-slate-500',
-};
-
-export const presenceTextStyles: Record<PresenceStatus, string> = {
-  online: 'text-emerald-400',
-  away: 'text-amber-400',
-  offline: 'text-slate-500',
 };
 
 export const accountMenuStyles: Record<AccountMenuItem['variant'], { readonly button: string; readonly icon: string }> = {

@@ -35,7 +35,7 @@ export const MemberSwitcher: React.FC<MemberSwitcherProps> = ({ member, index, t
         </div>
         <div className="text-xs text-slate-400">
           {reviewText.levelPrefix}
-          {member.level} {member.game} · {member.className} ({member.role})
+          {member.level} {[member.game, member.className].filter(Boolean).join(' · ')} ({member.role})
         </div>
       </div>
     </div>
