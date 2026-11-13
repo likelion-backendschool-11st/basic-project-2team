@@ -12,6 +12,7 @@ const { createGameModule } = require('./game');
 const { createCategoryModule } = require('./category');
 const { createBoardModule } = require('./board');
 const { createAdminModule } = require('./admin');
+const { createMypageModule } = require('./mypage');
 
 /**
  * Express 앱을 만듭니다. 서버 실행(server.js)과 분리해 테스트에서 DB 없이 띄울 수 있게 합니다.
@@ -23,6 +24,7 @@ const { createAdminModule } = require('./admin');
  *   categoryRepository?: object,
  *   boardRepository?: object,
  *   adminRepository?: object,
+ *   mypageRepository?: object,
  *   corsOrigins: string[],
  *   bcryptRounds: number,
  *   auth?: typeof env.auth,
@@ -37,6 +39,7 @@ function createApp({
   categoryRepository,
   boardRepository,
   adminRepository,
+  mypageRepository,
   corsOrigins,
   bcryptRounds,
   auth = env.auth,
@@ -65,6 +68,8 @@ function createApp({
   app.use('/api/posts', board.router);
   const admin = createAdminModule({ pool, adminRepository, tokenProvider, requireAdmin, bcryptRounds, now });
   app.use('/api/admin', admin.router);
+  const mypage = createMypageModule({ pool, mypageRepository, requireAuth, optionalAuth });
+  app.use('/api/members', mypage.router);
 
   app.use(notFoundHandler);
   app.use(errorHandler);
