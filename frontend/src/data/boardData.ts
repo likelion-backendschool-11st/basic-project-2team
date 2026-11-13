@@ -13,7 +13,8 @@ export interface BoardCategory {
   readonly label: string;
   /** Full Font Awesome class list (solid / brands). */
   readonly icon: string;
-  readonly count: number;
+  /** 카테고리별 공고 수. 서버(GET /api/categories)에서 불러오기 전에는 없습니다. */
+  readonly count?: number;
 }
 
 export interface PostBadge {
@@ -100,12 +101,35 @@ export const boardText = {
   totalSuffix: ' 표시 중',
   write: '글쓰기',
   empty: '조건에 맞는 게시글이 없습니다.',
+  loadFailed: '게시글 목록을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.',
+  badgeClosed: '모집마감',
+  badgeCompleted: '종료',
+  badgeUrgent: '마감임박',
+  badgeVoice: '음성필수',
   prevPage: '이전 페이지',
   nextPage: '다음 페이지',
   categoryPlaceholder: (label: string) => `${label} 내 검색 또는 게임명, 태그를 입력해주세요...`,
   categoryCountLabel: (label: string) => `${label} 카테고리 (총 `,
   categoryCountSuffix: '건)',
   gameFilterAll: (label: string) => (label === '전체 카테고리' ? '전체' : `전체 ${label}`),
+};
+
+/** 게임 코드(GET /api/posts 의 game) → 게임 배지 색. 목록에 없는 게임은 indigo. */
+export const gameTones: Readonly<Record<string, GameTone>> = {
+  lostark: 'indigo',
+  ff14: 'indigo',
+  valorant: 'rose',
+  apex: 'rose',
+  dota2: 'rose',
+  lol: 'amber',
+  tft: 'amber',
+  overwatch: 'orange',
+  pubg: 'amberDeep',
+  wow: 'yellow',
+  maplestory: 'sky',
+  helldivers2: 'sky',
+  monsterhunter: 'sky',
+  minecraft: 'sky',
 };
 
 export const boardRoutes = {
@@ -144,7 +168,7 @@ export const boardPosts: readonly BoardPost[] = boardCategories
   .filter((c) => c.id !== 'all')
   .flatMap((c) => {
     const seeds = seedPosts.filter((p) => p.category === c.id);
-    return Array.from({ length: c.count }, (_, i) => {
+    return Array.from({ length: c.count ?? 0 }, (_, i) => {
       const seed = seeds[i % seeds.length];
       const cycle = Math.floor(i / seeds.length);
       return { ...seed, id: `${c.id}-${i}`, order: i, views: Math.max(1, seed.views - cycle * 2) };

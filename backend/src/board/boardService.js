@@ -100,9 +100,10 @@ function createBoardService({ boardRepository }) {
 
   /** GET /api/posts — 공고 목록 (페이지네이션 응답 `{ items, page, size, totalCount, totalPages }`) */
   async function listPosts(query) {
-    const { category, sort, tags, page, size, excludeClosed } = parseListQuery(query);
+    const { category, q, sort, tags, page, size, excludeClosed } = parseListQuery(query);
     const { rows, totalCount } = await boardRepository.findPostPage({
       category,
+      q,
       sort,
       tags,
       excludeClosed,

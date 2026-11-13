@@ -8,6 +8,7 @@ const {
   DEFAULT_PAGE_SIZE,
   MAX_PAGE_SIZE,
   MAX_FILTER_TAGS,
+  MAX_SEARCH_LENGTH,
   CATEGORY_PATTERN,
   boardMessages: m,
 } = require('./boardConstants');
@@ -47,8 +48,8 @@ function parseTags(raw) {
 }
 
 /**
- * 공고 목록 쿼리(category, sort, tags, page, size, excludeClosed)를 검증·정규화합니다.
- * @returns {{ category: string | null, sort: string, tags: string[], page: number, size: number, excludeClosed: boolean }}
+ * 공고 목록 쿼리(category, q, sort, tags, page, size, excludeClosed)를 검증·정규화합니다.
+ * @returns {{ category: string | null, q: string, sort: string, tags: string[], page: number, size: number, excludeClosed: boolean }}
  */
 function parseListQuery(query) {
   const fields = [];
@@ -56,6 +57,9 @@ function parseListQuery(query) {
 
   const category = query.category === undefined ? null : asString(query.category);
   if (category !== null && !CATEGORY_PATTERN.test(category)) fail('category', m.categoryInvalid);
+
+  const q = query.q === undefined ? '' : asString(query.q);
+  if (Array.from(q).length > MAX_SEARCH_LENGTH) fail('q', m.searchInvalid);
 
   const sort = query.sort === undefined ? DEFAULT_SORT : asString(query.sort);
   if (!POST_SORTS.includes(sort)) fail('sort', m.sortInvalid);
@@ -73,7 +77,7 @@ function parseListQuery(query) {
   if (excludeClosedRaw !== 'true' && excludeClosedRaw !== 'false') fail('excludeClosed', m.excludeClosedInvalid);
 
   if (fields.length > 0) throw new ApiError(400, 'INVALID_INPUT', m.invalidInput, fields);
-  return { category, sort, tags, page, size, excludeClosed: excludeClosedRaw === 'true' };
+  return { category, q, sort, tags, page, size, excludeClosed: excludeClosedRaw === 'true' };
 }
 
 module.exports = { parsePostId, parseListQuery };

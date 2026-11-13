@@ -7,10 +7,10 @@ import BoardCategorySidebar from '../components/board/BoardCategorySidebar';
 import BoardToolbar from '../components/board/BoardToolbar';
 import PostTable from '../components/board/PostTable';
 import BoardFooterControls from '../components/board/BoardFooterControls';
-import { BOARD_PAGE_SIZE, boardTagFilters, boardText } from '../data/boardData';
+import { boardTagFilters, boardText } from '../data/boardData';
 import { useBoardCategory } from '../hooks/useBoardCategory';
-import { useBoardFilter } from '../hooks/useBoardFilter';
-import { usePagination } from '../hooks/usePagination';
+import { useBoardFilterState } from '../hooks/useBoardFilter';
+import { useBoardList } from '../hooks/useBoardList';
 
 interface BoardPageProps {
   readonly className?: string;
@@ -18,11 +18,9 @@ interface BoardPageProps {
 
 /** Stitch screen: "카테고리 게시판 (통합 레이아웃 유지형)" (1c52bc0b4b3c4c0ea50583ec66670d82). Route: /board?category= */
 export const BoardPage: React.FC<BoardPageProps> = () => {
-  const { category, posts, clearCategory } = useBoardCategory();
-  const filter = useBoardFilter(posts);
-  const pg = usePagination(filter.filtered.length, BOARD_PAGE_SIZE, `${category.id}|${filter.filterKey}`);
-  const pageItems = filter.filtered.slice(pg.startIndex, pg.endIndex);
-  const total = filter.filtered.length;
+  const { category, categories, clearCategory } = useBoardCategory();
+  const filter = useBoardFilterState();
+  const { posts, total, loading, error, pagination: pg } = useBoardList(category.id, filter);
 
   return (
     <BoardLayout
@@ -53,7 +51,7 @@ export const BoardPage: React.FC<BoardPageProps> = () => {
           />
         </SearchFilterPanel>
       }
-      sidebar={<BoardCategorySidebar activeId={category.id} />}
+      sidebar={<BoardCategorySidebar activeId={category.id} categories={categories} />}
     >
       <BoardToolbar
         summary={
@@ -66,7 +64,10 @@ export const BoardPage: React.FC<BoardPageProps> = () => {
         sort={filter.sort}
         onSortChange={filter.onSortChange}
       />
-      <PostTable posts={pageItems} startNo={pg.startIndex + 1} />
+      {error && <p role="alert" className="text-sm text-rose-300">{error}</p>}
+      <div className={loading ? 'opacity-60 transition-opacity' : 'transition-opacity'} aria-busy={loading}>
+        <PostTable posts={posts} startNo={pg.startIndex + 1} />
+      </div>
       <BoardFooterControls
         total={total}
         startIndex={pg.startIndex}

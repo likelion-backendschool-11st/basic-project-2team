@@ -46,9 +46,11 @@ export const BoardCategorySidebar: React.FC<BoardCategorySidebarProps> = ({ acti
                   <i className={`${c.icon} w-4 text-center ${active ? 'text-mercury-light' : 'text-fog-muted group-hover:text-mercury-light'}`} />
                   <span>{c.label}</span>
                 </span>
-                <span className={active ? 'text-xs px-2 py-0.5 rounded-full bg-mercury text-white font-bold' : 'text-xs text-fog-muted font-mono'}>
-                  {c.count}
-                </span>
+                {c.count !== undefined && (
+                  <span className={active ? 'text-xs px-2 py-0.5 rounded-full bg-mercury text-white font-bold' : 'text-xs text-fog-muted font-mono'}>
+                    {c.count}
+                  </span>
+                )}
               </Link>
             </li>
           );

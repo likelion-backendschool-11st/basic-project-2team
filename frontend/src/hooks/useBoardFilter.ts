@@ -9,25 +9,14 @@ const sorters: Record<SortKey, (a: BoardPost, b: BoardPost) => number> = {
   urgent: (a, b) => remaining(a) - remaining(b) || a.order - b.order,
 };
 
-/** Text / tag / closed-party filtering + sorting for a post list. */
-export function useBoardFilter(posts: readonly BoardPost[]) {
+/** 검색어 · 태그 · 마감 제외 · 정렬 상태와 핸들러. 필터링은 하지 않습니다 (서버 조회용 / useBoardFilter 의 기반). */
+export function useBoardFilterState() {
   const [text, setText] = useState('');
   const [tags, setTags] = useState<readonly string[]>([]);
   const [excludeClosed, setExcludeClosed] = useState(true);
   const [sort, setSort] = useState<SortKey>('recent');
 
-  const filtered = useMemo(() => {
-    const needle = text.trim().toLowerCase();
-    return posts
-      .filter((p) => !excludeClosed || p.current < p.max)
-      .filter((p) => tags.every((t) => p.tags.includes(t)))
-      .filter((p) => !needle || `${p.game} ${p.title} ${p.tags.join(' ')}`.toLowerCase().includes(needle))
-      .slice()
-      .sort(sorters[sort]);
-  }, [posts, text, tags, excludeClosed, sort]);
-
   return {
-    filtered,
     text,
     tags,
     excludeClosed,
@@ -47,4 +36,22 @@ export function useBoardFilter(posts: readonly BoardPost[]) {
       setSort('recent');
     },
   };
+}
+
+/** Text / tag / closed-party filtering + sorting for a post list (client-side, 검색 결과 페이지용). */
+export function useBoardFilter(posts: readonly BoardPost[]) {
+  const state = useBoardFilterState();
+  const { text, tags, excludeClosed, sort } = state;
+
+  const filtered = useMemo(() => {
+    const needle = text.trim().toLowerCase();
+    return posts
+      .filter((p) => !excludeClosed || p.current < p.max)
+      .filter((p) => tags.every((t) => p.tags.includes(t)))
+      .filter((p) => !needle || `${p.game} ${p.title} ${p.tags.join(' ')}`.toLowerCase().includes(needle))
+      .slice()
+      .sort(sorters[sort]);
+  }, [posts, text, tags, excludeClosed, sort]);
+
+  return { ...state, filtered };
 }

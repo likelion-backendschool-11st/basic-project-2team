@@ -17,6 +17,7 @@ const DEFAULT_SORT = 'recent';
 const DEFAULT_PAGE_SIZE = 8;
 const MAX_PAGE_SIZE = 50;
 const MAX_FILTER_TAGS = 5;
+const MAX_SEARCH_LENGTH = 50;
 /** category 코드 형식 (category.code). 목록에 없는 코드는 빈 결과로 응답합니다. */
 const CATEGORY_PATTERN = /^[a-z0-9_-]{1,20}$/;
 
@@ -24,6 +25,7 @@ const boardMessages = Object.freeze({
   invalidInput: '입력값을 확인해주세요.',
   categoryInvalid: 'category 형식이 올바르지 않습니다.',
   sortInvalid: `sort 는 ${POST_SORTS.join(', ')} 중 하나여야 합니다.`,
+  searchInvalid: `q 는 ${MAX_SEARCH_LENGTH}자 이하여야 합니다.`,
   tagsInvalid: `tags 는 쉼표로 구분한 태그 최대 ${MAX_FILTER_TAGS}개여야 합니다.`,
   pageInvalid: 'page 는 1 이상의 정수여야 합니다.',
   sizeInvalid: `size 는 1~${MAX_PAGE_SIZE} 사이의 정수여야 합니다.`,
@@ -40,6 +42,7 @@ module.exports = {
   DEFAULT_PAGE_SIZE,
   MAX_PAGE_SIZE,
   MAX_FILTER_TAGS,
+  MAX_SEARCH_LENGTH,
   CATEGORY_PATTERN,
   boardMessages,
 };
