@@ -17,7 +17,7 @@ OurParty 프론트엔드(`frontend/`)의 코딩 컨벤션입니다. 프로젝트
 - 경로 문자열을 직접 쓰지 말고 `data/routes.ts`의 상수를 사용합니다.
   - 정적 경로: `ROUTES.board`
   - 파라미터 경로: `paths.postDetail(id)`
-- 새 페이지 추가 시: `ROUTES`(필요하면 `paths`)에 등록 → `App.tsx`에 `<Route>` 추가.
+- 새 페이지 추가 시: `ROUTES`(필요하면 `paths`)에 등록 → 해당 도메인의 `src/routes/xxxRoutes.tsx` 에 라우트 추가. `App.tsx` 는 수정하지 않습니다 (새 도메인 파일을 만들 때만 한 줄 추가).
 
 ## 3. 네이밍
 

@@ -87,7 +87,8 @@ frontend/
 ├── vite.config.ts
 └── src/
     ├── main.tsx            # 엔트리 (HashRouter, Font Awesome, index.css)
-    ├── App.tsx             # 라우트 정의
+    ├── App.tsx             # 도메인별 라우트 묶음 조립 (보통 수정하지 않음)
+    ├── routes/             # 도메인별 라우트 정의 (mainRoutes · boardRoutes · authRoutes · myPageRoutes · adminRoutes)
     ├── index.css           # Tailwind 레이어, 전역 스타일
     ├── pages/              # 라우트 단위 페이지 (admin/ 하위에 관리자 페이지)
     ├── components/         # 도메인별 UI 컴포넌트 (auth, board, post, comments, review, mypage, admin, layout, ui …)
