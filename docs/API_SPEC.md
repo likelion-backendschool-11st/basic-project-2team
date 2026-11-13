@@ -21,6 +21,9 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 
 // 실패
 { "success": false, "error": { "code": "POST_NOT_FOUND", "message": "존재하지 않는 공고입니다." } }
+
+// 실패 (입력 검증) — 필드별 오류가 있으면 fields 를 함께 보냄
+{ "success": false, "error": { "code": "INVALID_INPUT", "message": "입력값을 확인해주세요.", "fields": [{ "field": "userId", "message": "..." }] } }
 ```
 
 | HTTP 상태 | 의미 |
@@ -65,6 +68,41 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
   "agreements": { "terms": true, "privacy": true, "marketing": false }
 }
 ```
+
+**회원가입 입력 규칙** (구현: `backend/src/member/memberValidator.js`)
+
+| 필드 | 필수 | 규칙 | 저장 |
+| --- | --- | --- | --- |
+| `userId` | O | 영문 소문자·숫자 4~20자 | `member.login_id` |
+| `nickname` | O | 공백 없이 2~10자 | `member.nickname` |
+| `password` | O | 영문·숫자·특수문자(`!` `@` `#`)를 모두 포함한 8~12자. 다른 특수문자 불가 | `member.password_hash` (BCrypt) |
+| `email` | O | 이메일 형식, 100자 이하. 소문자로 바꿔 저장 | `member.email` |
+| `phone` | O | `010-1234-5678` 또는 `01012345678` | `member.phone` (하이픈 제거) |
+| `name` | | 50자 이하, 비우면 `null` | `member.name` |
+| `address` | | 받지만 **저장하지 않음** (DB에 컬럼 없음) | – |
+| `agreements` | O | `terms`·`privacy` 는 `true` 필수, `marketing` 생략 시 `false`. 값은 boolean | `member_agreement` 3행 (TERMS / PRIVACY / MARKETING) |
+
+**회원가입 응답** `201 Created`
+
+```json
+{ "success": true, "data": { "id": 1, "userId": "healer01", "nickname": "빛나는힐러" } }
+```
+
+**중복 확인 응답** `200 OK` — `type` 이 `userId|nickname|email` 이 아니거나, 값이 비었거나, 위 입력 규칙에 맞지 않으면 `400 INVALID_INPUT`
+
+```json
+{ "success": true, "data": { "available": false } }
+```
+
+**회원가입 · 중복 확인 에러 코드**
+
+| 상태 | code | 상황 |
+| --- | --- | --- |
+| 400 | `INVALID_INPUT` | 입력 규칙 위반. `error.fields` 에 `[{ "field": "userId", "message": "..." }]` 형태로 필드별 오류를 모두 담음 |
+| 400 | `INVALID_JSON` | 요청 본문이 JSON 형식이 아님 |
+| 400 | `REQUIRED_TERMS_NOT_AGREED` | 필수 약관(`terms`, `privacy`) 미동의 |
+| 403 | `REJOIN_RESTRICTED` | 탈퇴 후 재가입 제한 기간이 남은 휴대폰/이메일 (`member_withdrawal`) |
+| 409 | `DUPLICATE_LOGIN_ID` · `DUPLICATE_NICKNAME` · `DUPLICATE_EMAIL` · `DUPLICATE_PHONE` | 이미 사용 중인 값 |
 
 **내 정보 응답 (`LoggedInUser`)**
 
