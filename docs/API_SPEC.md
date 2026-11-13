@@ -41,13 +41,14 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 | --- | --- | --- | --- |
 | POST | `/api/auth/signup` | 회원가입 | |
 | GET | `/api/auth/check?type={userId\|nickname\|email}&value=` | 중복 확인 → `{ available: boolean }` | |
-| POST | `/api/auth/email/send` | 이메일 인증코드 발송 `{ email }` | |
-| POST | `/api/auth/email/verify` | 인증코드 확인 `{ email, code }` | |
+| POST | `/api/auth/email/send` | 이메일 인증코드 발송 `{ email }` → `{ expiresInSeconds }` | |
+| POST | `/api/auth/email/verify` | 인증코드 확인 `{ email, code }` → `{ verified, verificationToken, expiresAt }` | |
 | POST | `/api/auth/login` | 로그인 `{ userId, password, rememberMe }` → `{ accessToken, refreshToken, user }` | |
 | POST | `/api/auth/logout` | 로그아웃 | 🔒 |
 | POST | `/api/auth/refresh` | 토큰 재발급 | |
-| POST | `/api/auth/find-id` | 아이디 찾기 `{ name, email }` | |
-| POST | `/api/auth/find-password` | 비밀번호 재설정 메일 발송 `{ userId, email }` | |
+| POST | `/api/auth/find-id` | 아이디 찾기 `{ nickname, email, verificationToken }` → `{ userId }` | |
+| POST | `/api/auth/find-password` | 비밀번호 찾기 `{ userId, email, verificationToken }` → `{ resetToken, expiresAt }` | |
+| POST | `/api/auth/reset-password` | 비밀번호 재설정 `{ resetToken, newPassword }` → `204` | |
 | GET | `/api/members/me` | 내 정보 (`LoggedInUser`) | 🔒 |
 | PATCH | `/api/members/me` | 프로필 수정 (닉네임, 소개, 주 게임, 플레이 스타일) | 🔒 |
 | PATCH | `/api/members/me/password` | 비밀번호 변경 `{ currentPassword, newPassword }` | 🔒 |
@@ -163,6 +164,65 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 | 403 | `ACCOUNT_BANNED` | 영구 정지 |
 
 > 정지·영구 정지 여부는 비밀번호가 맞을 때만 알려줍니다. 탈퇴 회원은 `login_id` 가 `NULL` 이라 `INVALID_CREDENTIALS` 로 응답합니다.
+
+### 이메일 인증 · 아이디/비밀번호 찾기
+
+구현: `backend/src/emailVerification/` (인증코드), `backend/src/member/memberService.js` (`findId`, `findPassword`, `resetPassword`), 메일: `backend/src/common/mailer.js`
+
+**흐름** — 아이디/비밀번호 찾기는 이메일 인증을 먼저 거칩니다 (REQ-LOGIN-007).
+
+```
+아이디 찾기    : email/send → email/verify → find-id
+비밀번호 찾기  : email/send → email/verify → find-password → reset-password
+```
+
+1. `POST /api/auth/email/send` `{ email }` — 6자리 인증코드를 메일로 보냅니다. 가입 여부와 관계없이 보내므로 응답으로 회원 존재 여부를 알 수 없습니다.
+2. `POST /api/auth/email/verify` `{ email, code }` — 코드가 맞으면 **이메일 인증 토큰**(`verificationToken`, JWT `typ=email_verification`, 15분)을 발급합니다.
+3. `POST /api/auth/find-id` `{ nickname, email, verificationToken }` → `{ userId }`
+4. `POST /api/auth/find-password` `{ userId, email, verificationToken }` → `{ resetToken, expiresAt }` — 재설정 토큰(JWT `typ=password_reset`, 15분, 해시를 `password_reset_token` 에 저장)
+5. `POST /api/auth/reset-password` `{ resetToken, newPassword }` → `204` — 새 비밀번호는 회원가입과 같은 규칙. 성공하면 로그인 실패 횟수·잠금을 초기화하고, 모든 Refresh Token 과 남은 재설정 토큰을 폐기합니다(다른 기기 로그아웃).
+
+> 프론트 비밀번호 찾기 화면은 "새 비밀번호 입력 → 비밀번호 재설정" 버튼에서 4·5번을 차례로 호출하면 됩니다.
+
+**인증코드 규칙** (`emailVerificationConstants.js`)
+
+| 항목 | 값 |
+| --- | --- |
+| 코드 | 숫자 6자리. DB 에는 SHA-256 해시만 저장 (`email_verification.code_hash`) |
+| 유효 시간 | 5분. 가장 최근에 보낸 코드만 유효 |
+| 재발송 제한 | 같은 이메일은 60초에 한 번 |
+| 확인 시도 | 코드 하나당 5번 (`attempt_count`) |
+| 메일 발송 | `.env` 의 `SMTP_HOST` 가 있으면 SMTP 로 발송, 비어 있으면 서버 콘솔에 출력(로컬 개발용) |
+
+**응답 예시**
+
+```json
+// POST /api/auth/email/send
+{ "success": true, "data": { "expiresInSeconds": 300 } }
+
+// POST /api/auth/email/verify
+{ "success": true, "data": { "verified": true, "verificationToken": "eyJ...", "expiresAt": "2026-11-13T00:15:00.000Z" } }
+
+// POST /api/auth/find-id
+{ "success": true, "data": { "userId": "healer01" } }
+
+// POST /api/auth/find-password
+{ "success": true, "data": { "resetToken": "eyJ...", "expiresAt": "2026-11-13T00:30:00.000Z" } }
+```
+
+**이메일 인증 · 아이디/비밀번호 찾기 에러 코드**
+
+| 상태 | code | 상황 |
+| --- | --- | --- |
+| 400 | `INVALID_INPUT` | 이메일 형식, 코드 형식(숫자 6자리), 필수값 누락, 새 비밀번호 규칙 위반 (`fields` 에 `newPassword` 등) |
+| 400 | `VERIFICATION_CODE_EXPIRED` | 보낸 코드가 없거나 5분이 지남 → 다시 발송 |
+| 400 | `INVALID_VERIFICATION_CODE` | 코드가 틀림 |
+| 401 | `EMAIL_NOT_VERIFIED` | `verificationToken` 이 만료·위조됐거나 다른 이메일로 인증한 토큰 |
+| 401 | `INVALID_RESET_TOKEN` | 재설정 토큰이 만료·위조됐거나 이미 사용됨 → 처음부터 다시 |
+| 404 | `MEMBER_NOT_FOUND` | 닉네임+이메일(아이디 찾기) 또는 아이디+이메일(비밀번호 찾기)이 일치하는 회원 없음 |
+| 429 | `EMAIL_SEND_TOO_FREQUENT` | 60초 안에 다시 발송 요청 |
+| 429 | `VERIFICATION_ATTEMPTS_EXCEEDED` | 코드 확인 5번 초과 → 다시 발송 |
+| 502 | `EMAIL_SEND_FAILED` | SMTP 발송 실패 |
 
 **내 정보 응답 (`LoggedInUser`)**
 
