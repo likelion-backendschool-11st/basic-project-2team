@@ -147,7 +147,7 @@ API의 `level`은 **서비스 활동 레벨**(`member.level`)입니다. 공고 �
 | current_count | TINYINT UNSIGNED | N | 1 | 파티장을 포함한 현재 인원. 승인할 때 같은 트랜잭션에서 증가하고, `headcount`에 도달하면 status를 `CLOSED`로 변경 |
 | schedule_at | DATETIME | Y | | NULL이면 출발 시간 미정 (`scheduleTbd`) |
 | voice_required | BOOLEAN | N | FALSE | |
-| status | VARCHAR(20) | N | `OPEN` | OPEN / CLOSED / COMPLETED / DELETED |
+| status | VARCHAR(20) | N | `OPEN` | OPEN / PAUSED / CLOSED / COMPLETED / DELETED |
 | view_count | INT UNSIGNED | N | 0 | |
 | comment_count | INT UNSIGNED | N | 0 | MAIN-008 "최다 Q&A" 정렬용 |
 | deleted_at | DATETIME | Y | | |

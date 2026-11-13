@@ -19,7 +19,7 @@ import { paths, ROUTES } from '../data/routes';
 import { useModal } from './useModal';
 import { useToast } from './useToast';
 
-export type PartyState = 'open' | 'closed';
+export type PartyState = 'open' | 'paused' | 'closed';
 
 export interface Applicant {
   readonly id: number;
@@ -27,7 +27,7 @@ export interface Applicant {
   readonly spec: string;
 }
 
-const toPartyState = (status: PostStatus): PartyState => (status === 'OPEN' ? 'open' : 'closed');
+const toPartyState = (status: PostStatus): PartyState => (status === 'OPEN' ? 'open' : status === 'PAUSED' ? 'paused' : 'closed');
 
 /**
  * 공고 상세를 서버(GET /api/posts/{postId})에서 불러오고, 상세 화면의 버튼(스크랩 · 참가 신청/취소 · 모집 마감/재개 ·
@@ -167,7 +167,8 @@ export function usePostDetail(postId: string) {
     return leaveToBoard(postText.deleted);
   };
 
-  const setStatus = (status: 'OPEN' | 'CLOSED') => run(() => changePostStatus(Number(postId), status), status === 'OPEN' ? postText.reopened : postText.closedDone);
+  const setStatus = (status: 'OPEN' | 'PAUSED' | 'CLOSED') =>
+    run(() => changePostStatus(Number(postId), status), { OPEN: postText.reopened, PAUSED: postText.pausedDone, CLOSED: postText.closedDone }[status]);
   const confirmClose = () => {
     closeRecruit.close();
     return setStatus('CLOSED');
@@ -192,7 +193,7 @@ export function usePostDetail(postId: string) {
     detail, loading, error, related,
     applied: detail?.applicationStatus === 'PENDING' || detail?.applicationStatus === 'ACCEPTED',
     apply, scrapped, toggleScrap, copyLink,
-    following, toggleFollow, state, togglePause: () => setStatus(state === 'closed' ? 'OPEN' : 'CLOSED'),
+    following, toggleFollow, state, togglePause: () => setStatus(state === 'open' ? 'PAUSED' : 'OPEN'),
     applicants, resolveApplicant, applicantsDialog,
     filled, percent: detail ? Math.round((filled / detail.max) * 100) : 0, toast,
     remove, disband, leave, closeRecruit, confirmLeave, confirmRemove, confirmDisband, confirmClose,

@@ -68,6 +68,7 @@ function createPartyService({ partyRepository, now = () => new Date() }) {
 
     if (post.authorId === memberId) throw new ApiError(403, 'CANNOT_APPLY_OWN_POST', m.cannotApplyOwnPost);
     if (post.currentCount >= post.headcount) throw new ApiError(409, 'PARTY_FULL', m.partyFull);
+    if (post.status === POST_STATUS.paused) throw new ApiError(409, 'POST_PAUSED', m.postPaused);
     if (post.status !== POST_STATUS.open) throw new ApiError(409, 'POST_CLOSED', m.postClosed);
 
     const notice = {
@@ -153,7 +154,7 @@ function createPartyService({ partyRepository, now = () => new Date() }) {
     }
   }
 
-  /** PATCH /api/posts/:postId/status — 작성자만. 모집 중 ↔ 마감, 완료 처리 */
+  /** PATCH /api/posts/:postId/status — 작성자만. 모집 중 ↔ 마감 · 일시 중단, 완료 처리 */
   async function changeStatus(rawPostId, memberId, body) {
     const { status } = validatePostStatus(body);
     const post = await loadOwnedPost(rawPostId, memberId);
@@ -167,6 +168,8 @@ function createPartyService({ partyRepository, now = () => new Date() }) {
         throw new ApiError(409, 'POST_COMPLETED', m.postCompleted);
       case 'FULL':
         throw new ApiError(409, 'PARTY_FULL', m.partyFull);
+      case 'NOT_PAUSABLE':
+        throw new ApiError(409, 'POST_NOT_PAUSABLE', m.pauseNotAllowed);
       case 'NO_MEMBERS':
         throw new ApiError(409, 'COMPLETE_NOT_ALLOWED', m.completeNoMembers);
       case 'NOT_STARTED':

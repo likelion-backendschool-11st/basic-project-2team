@@ -14,7 +14,7 @@ const DECISION_STATUSES = Object.freeze([APPLICATION_STATUS.accepted, APPLICATIO
 /** 신청자 목록에서 거를 수 있는 상태 (취소·노쇼는 목록에 나오지 않음) */
 const LIST_STATUSES = Object.freeze([APPLICATION_STATUS.pending, APPLICATION_STATUS.accepted, APPLICATION_STATUS.rejected]);
 
-const POST_STATUS = Object.freeze({ open: 'OPEN', closed: 'CLOSED', completed: 'COMPLETED' });
+const POST_STATUS = Object.freeze({ open: 'OPEN', paused: 'PAUSED', closed: 'CLOSED', completed: 'COMPLETED' });
 /** 작성자가 바꿀 수 있는 공고 상태 */
 const POST_STATUSES = Object.freeze(Object.values(POST_STATUS));
 const MEMBER_STATUS = Object.freeze({ suspended: 'SUSPENDED', banned: 'BANNED', withdrawn: 'WITHDRAWN' });
@@ -53,6 +53,8 @@ const partyMessages = Object.freeze({
   notPostAuthor: '공고 작성자만 할 수 있습니다.',
   cannotApplyOwnPost: '본인이 쓴 공고에는 신청할 수 없습니다.',
   postClosed: '모집이 마감된 공고입니다.',
+  postPaused: '모집이 일시 중단된 공고입니다.',
+  pauseNotAllowed: '모집 중인 공고만 일시 중단할 수 있습니다.',
   partyFull: '모집 인원이 모두 찼습니다.',
   alreadyApplied: '이미 신청한 공고입니다.',
   reapplyNotAllowed: '거절되었거나 노쇼로 처리된 공고에는 다시 신청할 수 없습니다.',

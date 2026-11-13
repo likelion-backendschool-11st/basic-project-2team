@@ -70,7 +70,7 @@ function createFakeRepository() {
       if (a.status !== 'PENDING') return { result: 'ALREADY_DECIDED' };
       if (status === 'ACCEPTED') {
         if (post.currentCount >= post.headcount) return { result: 'FULL' };
-        if (post.status !== 'OPEN') return { result: 'POST_CLOSED' };
+        if (post.status !== 'OPEN' && post.status !== 'PAUSED') return { result: 'POST_CLOSED' };
         post.currentCount += 1;
         if (post.currentCount >= post.headcount) post.status = 'CLOSED';
       }
@@ -87,6 +87,7 @@ function createFakeRepository() {
       if (post.status === status) return out();
       if (post.status === 'COMPLETED') return { result: 'COMPLETED' };
       if (status === 'OPEN' && post.currentCount >= post.headcount) return { result: 'FULL' };
+      if (status === 'PAUSED' && post.status !== 'OPEN') return { result: 'NOT_PAUSABLE' };
       if (status === 'COMPLETED') {
         if (post.currentCount <= 1) return { result: 'NO_MEMBERS' };
         if (post.scheduleAt && post.scheduleAt > now) return { result: 'NOT_STARTED' };
@@ -170,6 +171,13 @@ describe('party application API', () => {
       repo.state.posts.get(1).status = 'OPEN';
       repo.state.posts.get(1).currentCount = 3;
       assert.equal((await json(await apply(A))).error.code, 'PARTY_FULL');
+    });
+
+    it('일시 중단된 공고는 409 POST_PAUSED', async () => {
+      repo.state.posts.get(1).status = 'PAUSED';
+      assert.equal((await apply(A)).status, 409);
+      assert.equal((await json(await apply(A))).error.code, 'POST_PAUSED');
+      assert.equal(repo.state.applications.length, 0);
     });
 
     it('취소한 신청은 같은 행으로 다시 신청할 수 있고, 거절·노쇼는 403 REAPPLY_NOT_ALLOWED', async () => {
@@ -313,6 +321,13 @@ describe('party application API', () => {
       assert.equal((await json(await decide(2, 'ACCEPTED'))).error.code, 'POST_CLOSED');
     });
 
+    it('일시 중단 중에도 이미 받은 신청은 승인할 수 있고, 마지막 자리를 채우면 마감된다', async () => {
+      await apply(A);
+      repo.state.posts.get(1).status = 'PAUSED';
+      assert.equal((await decide(1, 'ACCEPTED')).status, 200);
+      assert.equal(repo.state.posts.get(1).status, 'PAUSED');
+    });
+
     it('작성자가 아니면 403, 없는·형식 틀린 신청은 404, status 가 틀리면 400', async () => {
       await apply(A);
       assert.equal((await json(await decide(1, 'ACCEPTED', B))).error.code, 'NOT_POST_AUTHOR');
@@ -330,6 +345,18 @@ describe('party application API', () => {
       assert.equal((await json(await apply(A))).error.code, 'POST_CLOSED');
       assert.deepEqual((await json(await setStatus('OPEN'))).data, { id: 1, status: 'OPEN', current: 1, max: 3 });
       assert.equal((await apply(A)).status, 201);
+    });
+
+    it('모집 중인 공고를 일시 중단했다가 재개할 수 있고, 마감 공고는 중단할 수 없다 (409 POST_NOT_PAUSABLE)', async () => {
+      assert.deepEqual((await json(await setStatus('PAUSED'))).data, { id: 1, status: 'PAUSED', current: 1, max: 3 });
+      assert.equal((await json(await apply(A))).error.code, 'POST_PAUSED');
+      assert.deepEqual((await json(await setStatus('OPEN'))).data, { id: 1, status: 'OPEN', current: 1, max: 3 });
+      assert.equal((await apply(A)).status, 201);
+      await setStatus('CLOSED');
+      const res = await setStatus('PAUSED');
+      assert.equal(res.status, 409);
+      assert.equal((await json(res)).error.code, 'POST_NOT_PAUSABLE');
+      assert.equal(repo.state.posts.get(1).status, 'CLOSED');
     });
 
     it('같은 상태로 바꾸는 요청은 그대로 200 이다', async () => {

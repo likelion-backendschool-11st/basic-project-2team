@@ -3,6 +3,7 @@
 /** post.status 값 (docs/03-db-design.md post). DELETED 는 상세에서 404 로 처리합니다. */
 const POST_STATUS = Object.freeze({
   open: 'OPEN',
+  paused: 'PAUSED',
   closed: 'CLOSED',
   completed: 'COMPLETED',
   deleted: 'DELETED',

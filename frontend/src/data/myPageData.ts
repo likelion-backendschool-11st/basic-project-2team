@@ -187,6 +187,7 @@ export const activityText = {
   /** 공고 상태 (버튼이 없을 때 그대로 표시) */
   postStatus: {
     OPEN: '모집 중',
+    PAUSED: '모집 중단',
     CLOSED: '모집 마감',
     COMPLETED: '활동 완료',
   } as Record<string, string>,

@@ -256,7 +256,7 @@ CREATE TABLE post (
   current_count        TINYINT UNSIGNED NOT NULL DEFAULT 1 COMMENT '파티장 포함 현재 인원',
   schedule_at          DATETIME         NULL COMMENT 'NULL이면 시간 미정',
   voice_required       BOOLEAN          NOT NULL DEFAULT FALSE,
-  status               VARCHAR(20)      NOT NULL DEFAULT 'OPEN' COMMENT 'OPEN / CLOSED / COMPLETED / DELETED',
+  status               VARCHAR(20)      NOT NULL DEFAULT 'OPEN' COMMENT 'OPEN / PAUSED / CLOSED / COMPLETED / DELETED',
   view_count           INT UNSIGNED     NOT NULL DEFAULT 0,
   comment_count        INT UNSIGNED     NOT NULL DEFAULT 0,
   deleted_at           DATETIME         NULL,

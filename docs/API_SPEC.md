@@ -249,7 +249,7 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 
 **회원 탈퇴 (`DELETE /api/members/me`)** `{ "password": "...", "reason": "선택, 200자 이하" }` → `204`
 
-- 진행 중인 파티(내가 파티장인 `OPEN`·`CLOSED` 공고, 또는 `ACCEPTED` 로 참여 중인 `OPEN`·`CLOSED` 공고)가 있으면 409 `ACTIVE_PARTY_EXISTS` (REQ-WITHDRAW-002).
+- 진행 중인 파티(내가 파티장인 `OPEN`·`PAUSED`·`CLOSED` 공고, 또는 `ACCEPTED` 로 참여 중인 `OPEN`·`PAUSED`·`CLOSED` 공고)가 있으면 409 `ACTIVE_PARTY_EXISTS` (REQ-WITHDRAW-002).
 - 처리 (한 트랜잭션, docs/03-db-design.md 5절 삭제 정책)
   - `member`: `status = WITHDRAWN`, 아이디·닉네임·이메일·휴대폰·이름·비밀번호·소개·나이대·아바타를 `NULL` 로 비움. 공고·댓글·리뷰는 남고 "탈퇴한 회원"으로 표시
   - `member_withdrawal`: 휴대폰·이메일의 SHA-256 해시, 사유, 재가입 제한, 파기 예정일 보관. 제재 이력 없음 → 제한 없음·30일 뒤 파기 / 경고·기간 정지 이력 → 6개월 재가입 제한 / 영구 정지 이력 → 영구 제한 (6절 결정 사항 10·11)
@@ -279,7 +279,7 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 | POST | `/api/posts` | 공고 작성 | 🔒 |
 | PUT | `/api/posts/{postId}` | 공고 수정 | 🔒 작성자 |
 | DELETE | `/api/posts/{postId}` | 공고 삭제 | 🔒 작성자 |
-| PATCH | `/api/posts/{postId}/status` | 모집 상태 변경 `{ status: "OPEN" \| "CLOSED" \| "COMPLETED" }` | 🔒 작성자 |
+| PATCH | `/api/posts/{postId}/status` | 모집 상태 변경 `{ status: "OPEN" \| "PAUSED" \| "CLOSED" \| "COMPLETED" }` | 🔒 작성자 |
 | POST | `/api/posts/drafts` | 임시저장 | 🔒 |
 | GET | `/api/posts/drafts/latest` | 임시저장 불러오기 | 🔒 |
 | POST / DELETE | `/api/posts/{postId}/scrap` | 스크랩 / 취소 | 🔒 |
@@ -394,7 +394,7 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 **참가 신청 (`POST /api/posts/{postId}/applications`)** — 본문 `{ "role": "서포터", "message": "잘 부탁드려요" }` (둘 다 선택, `role` 30자·`message` 200자 이하) → `201` `{ "id": 3, "status": "PENDING" }`
 
 - 취소(`CANCELED`)했던 신청은 같은 행을 `PENDING` 으로 되살립니다. 이때 `late_cancel` · `canceled_at` 취소 기록은 지우지 않습니다. 거절(`REJECTED`)·노쇼(`NO_SHOW`)된 신청은 다시 할 수 없습니다.
-- 오류: 400 `INVALID_INPUT`(필드별), 401 `UNAUTHORIZED`, 403 `CANNOT_APPLY_OWN_POST` · `REAPPLY_NOT_ALLOWED` · `ACCOUNT_BANNED` · `ACCOUNT_SUSPENDED`, 404 `POST_NOT_FOUND`, 409 `POST_CLOSED`(`OPEN` 이 아님) · `PARTY_FULL`(정원이 참) · `ALREADY_APPLIED`(대기 중·수락됨).
+- 오류: 400 `INVALID_INPUT`(필드별), 401 `UNAUTHORIZED`, 403 `CANNOT_APPLY_OWN_POST` · `REAPPLY_NOT_ALLOWED` · `ACCOUNT_BANNED` · `ACCOUNT_SUSPENDED`, 404 `POST_NOT_FOUND`, 409 `POST_CLOSED`(마감·완료) · `POST_PAUSED`(일시 중단) · `PARTY_FULL`(정원이 참) · `ALREADY_APPLIED`(대기 중·수락됨).
 
 **신청 취소 (`DELETE /api/posts/{postId}/applications/me`)** → `204`
 
@@ -415,12 +415,13 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 - 대기 중 신청만 처리합니다. 승인하면 `current` 가 1 늘고(정원을 넘지 않게 공고 행을 잠금), 거절은 인원을 바꾸지 않습니다. 마지막 자리를 승인해 정원이 차면 공고 `status` 가 `CLOSED` 로 바뀌고(`postStatus`), 정원이 찬 마감 공고에서 수락된 사람이 취소하면 다시 `OPEN` 이 됩니다(작성자가 직접 마감한 공고는 자리가 나도 그대로).
 - 오류: 400 `INVALID_INPUT`, 403 `NOT_POST_AUTHOR`, 404 `APPLICATION_NOT_FOUND`, 409 `ALREADY_DECIDED` · `PARTY_FULL`(승인만) · `POST_CLOSED`(승인만, 작성자가 마감하거나 완료한 공고).
 
-**모집 상태 변경 (`PATCH /api/posts/{postId}/status`)** 🔒 작성자 — 본문 `{ "status": "OPEN" | "CLOSED" | "COMPLETED" }` → `200` `{ "id": 7, "status": "CLOSED", "current": 3, "max": 8 }`
+**모집 상태 변경 (`PATCH /api/posts/{postId}/status`)** 🔒 작성자 — 본문 `{ "status": "OPEN" | "PAUSED" | "CLOSED" | "COMPLETED" }` → `200` `{ "id": 7, "status": "CLOSED", "current": 3, "max": 8 }`
 
-- `OPEN` ↔ `CLOSED`(직접 마감·재개)와 `COMPLETED`(진행 완료)로 바꿉니다. 같은 상태로 요청하면 그대로 `200` 입니다.
+- `OPEN` ↔ `CLOSED`(직접 마감·재개), `OPEN` ↔ `PAUSED`(일시 중단·재개), `COMPLETED`(진행 완료)로 바꿉니다. 같은 상태로 요청하면 그대로 `200` 입니다.
+- **`PAUSED`(모집 일시 중단)**: 새 신청만 막습니다(`POST .../applications` → 409 `POST_PAUSED`). 이미 받은 신청의 승인·거절은 할 수 있고, 마지막 자리를 승인해 정원이 차면 `CLOSED` 로 바뀝니다. 중단 알림은 보내지 않습니다. 일시 중단은 모집 중(`OPEN`)인 공고에서만 할 수 있고(마감 공고는 409 `POST_NOT_PAUSABLE`), 재개(`OPEN`)·마감(`CLOSED`)·완료(`COMPLETED`)로 바꿀 수 있습니다. 정원이 차서 마감된 공고에서 자리가 나도 `PAUSED` 는 자동으로 `OPEN` 이 되지 않습니다.
 - `COMPLETED` 는 승인된 파티원(탈퇴 회원 제외)이 있고 출발 시간이 지난 뒤에만 가능합니다(일정 미정이면 시간 조건 없음). 완료하면 되돌릴 수 없습니다.
 - 완료하면 같은 트랜잭션에서 파티장과 승인된 파티원에게 활동 점수 `PARTY_COMPLETE` +20 을 지급하고(결정 사항 8-1) 이후 파티원끼리 별점 평가(7절)를 할 수 있습니다. 같은 상태로 다시 요청해도 점수는 한 번만 지급됩니다. 정원이 찬 공고는 `OPEN` 으로 다시 열 수 없습니다.
-- 오류: 400 `INVALID_INPUT`, 401, 403 `NOT_POST_AUTHOR`, 404 `POST_NOT_FOUND`, 409 `POST_COMPLETED` · `PARTY_FULL` · `COMPLETE_NOT_ALLOWED`(파티원이 없거나 출발 전).
+- 오류: 400 `INVALID_INPUT`, 401, 403 `NOT_POST_AUTHOR`, 404 `POST_NOT_FOUND`, 409 `POST_COMPLETED` · `PARTY_FULL` · `POST_NOT_PAUSABLE` · `COMPLETE_NOT_ALLOWED`(파티원이 없거나 출발 전).
 - ⚠️ 출발 시간이 지나면 종료 처리(REQ-POST-007 후반)는 스케줄러가 필요해 아직 없습니다.
 
 **확정 파티원 (`GET /api/posts/{postId}/participants`)** — 파티장이 먼저, 이어서 수락된 순입니다.
@@ -690,7 +691,7 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 }
 ```
 
-- `canComplete`: 「활동 완료」 버튼을 보여줄지. 공고가 `OPEN`·`CLOSED` 이고 승인된 파티원(탈퇴 제외)이 1명 이상이며 출발 시간이 지났으면(일정 미정 포함) `true` → `PATCH /api/posts/{postId}/status` `{ status: "COMPLETED" }`.
+- `canComplete`: 「활동 완료」 버튼을 보여줄지. 공고가 `OPEN`·`PAUSED`·`CLOSED` 이고 승인된 파티원(탈퇴 제외)이 1명 이상이며 출발 시간이 지났으면(일정 미정 포함) `true` → `PATCH /api/posts/{postId}/status` `{ status: "COMPLETED" }`.
 - `review`: 「별점 평가」 버튼용 진행 상황. 공고가 `COMPLETED` 일 때만 있고 아니면 `null`. `targetCount` 는 나를 뺀 파티원 수, `reviewedCount` 는 그중 내가 평가한 수 (같으면 평가 완료).
 
 **내가 신청한 공고 아이템 (`/me/applications`)**
@@ -771,7 +772,7 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 | 신고 `status` | `PENDING`(접수) · `IN_PROGRESS`(처리 중) · `DONE`(완료) · `REJECTED`(기각) |
 | 신고 `type` | `MEMBER`(유저) · `NO_SHOW`(노쇼) · `POST`(공고) · `COMMENT`(댓글) |
 | 신고 `action` | `WARN`(경고) · `SUSPEND`(이용 정지) · `BAN`(영구 정지) · `DELETE_CONTENT`(공고·댓글 삭제) · `DISMISS`(기각 시 자동) |
-| 공고 `status` | `OPEN`(모집 중) · `CLOSED`(마감) · `COMPLETED`(종료) · `DELETED`(삭제됨) |
+| 공고 `status` | `OPEN`(모집 중) · `PAUSED`(모집 일시 중단) · `CLOSED`(마감) · `COMPLETED`(종료) · `DELETED`(삭제됨) |
 | 회원 `status` | `ACTIVE`(정상) · `WARNED`(경고) · `SUSPENDED`(이용 정지) · `BANNED`(영구 정지) · `WITHDRAWN`(탈퇴) |
 | 제재 `type` | `WARNING`(경고) · `SUSPEND`(기간 정지) · `BAN`(영구 정지) |
 | 댓글 `status` | `VISIBLE`(정상) · `REPORTED`(신고됨 — 목록 전용, VISIBLE 이면서 신고 1건 이상) · `HIDDEN`(가림) · `DELETED`(삭제) |

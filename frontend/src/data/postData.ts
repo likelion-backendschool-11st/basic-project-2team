@@ -1,7 +1,7 @@
 
 /** Stitch screens: "공고글 상세 - 파티원 모드 / 작성자 모드" (project 15649597777945524469), comments (project 270338861769685965) */
 
-export type PostStatus = 'OPEN' | 'CLOSED' | 'COMPLETED';
+export type PostStatus = 'OPEN' | 'PAUSED' | 'CLOSED' | 'COMPLETED';
 export type ApplicationStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'CANCELED' | 'NO_SHOW';
 
 export interface Participant {
@@ -94,6 +94,7 @@ export const postText = {
   applySuccess: '참가 신청이 완료되었습니다.',
   applyCanceled: '참가 신청을 취소했습니다.',
   closedDone: '모집을 마감했습니다.',
+  pausedDone: '모집을 일시 중단했습니다.',
   reopened: '모집을 다시 시작했습니다.',
   scrapAdded: '스크랩에 추가했습니다.',
   scrapRemoved: '스크랩을 해제했습니다.',
