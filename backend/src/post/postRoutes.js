@@ -9,6 +9,7 @@ function createPostRouter(postController, { requireAuth }) {
   router.post('/drafts', requireAuth, postController.saveDraft);
   router.get('/drafts/latest', requireAuth, postController.getLatestDraft);
   router.delete('/:postId', requireAuth, postController.remove);
+  router.patch('/:postId/status', requireAuth, postController.changeStatus);
   return router;
 }
 

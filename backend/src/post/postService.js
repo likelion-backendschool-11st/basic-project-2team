@@ -1,8 +1,12 @@
 'use strict';
 
 const { ApiError } = require('../common/ApiError');
-const { postMessages } = require('./postConstants');
-const { validateCreatePost, validateDraft } = require('./postValidator');
+const { postMessages, STATUS_CHANGE_RESULT } = require('./postConstants');
+const { validateCreatePost, validateDraft, validateStatusChange } = require('./postValidator');
+
+/** postId 가 1 이상의 정수가 아니면 null (공고 상세와 같이 404 로 처리) */
+const parsePostId = (raw) => (/^[1-9]\d*$/.test(raw) && Number.isSafeInteger(Number(raw)) ? Number(raw) : null);
+const postNotFound = () => new ApiError(404, 'POST_NOT_FOUND', postMessages.postNotFound);
 
 /**
  * 공고 작성 비즈니스 로직.
@@ -84,7 +88,32 @@ function createPostService({ postRepository, now = () => new Date() }) {
     if (!(await postRepository.softDeletePost(Number(postId), now()))) throw notFound();
   }
 
-  return { createPost, saveDraft, getLatestDraft, deletePost };
+  /**
+   * PATCH /api/posts/:postId/status — 작성자만 모집 상태를 바꿉니다.
+   * OPEN ↔ CLOSED 는 자유롭게, COMPLETED(활동 완료)는 승인된 파티원이 있을 때만이며 되돌릴 수 없습니다.
+   * 활동 완료가 되면 파티원끼리 별점 평가(POST /api/posts/:postId/reviews)를 할 수 있습니다.
+   * @returns {Promise<{ id: number, status: string }>}
+   */
+  async function changePostStatus(rawPostId, memberId, body) {
+    const postId = parsePostId(rawPostId);
+    if (postId === null) throw postNotFound();
+    const post = await postRepository.findPostAuthor(postId);
+    if (!post) throw postNotFound();
+    if (post.authorId !== memberId) throw new ApiError(403, 'NOT_POST_AUTHOR', postMessages.notPostAuthorForStatus);
+    const status = validateStatusChange(body);
+
+    const result = await postRepository.changePostStatus(postId, status);
+    if (result === STATUS_CHANGE_RESULT.notFound) throw postNotFound();
+    if (result === STATUS_CHANGE_RESULT.alreadyCompleted) {
+      throw new ApiError(409, 'POST_ALREADY_COMPLETED', postMessages.alreadyCompleted);
+    }
+    if (result === STATUS_CHANGE_RESULT.noPartyMembers) {
+      throw new ApiError(409, 'NO_PARTY_MEMBERS', postMessages.noPartyMembers);
+    }
+    return { id: postId, status };
+  }
+
+  return { createPost, saveDraft, getLatestDraft, deletePost, changePostStatus };
 }
 
 module.exports = { createPostService };

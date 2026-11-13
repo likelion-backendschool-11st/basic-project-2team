@@ -265,6 +265,8 @@ describe('마이페이지 API (/api/members)', () => {
         viewCount: 5,
         commentCount: 2,
         createdAt: new Date('2026-11-10T00:00:00Z'),
+        reviewTargetCount: 7,
+        reviewedCount: 2,
       }));
     });
 
@@ -292,8 +294,27 @@ describe('마이페이지 API (/api/members)', () => {
         views: 5,
         commentCount: 2,
         createdAt: '2026-11-10T00:00:00.000Z',
+        canComplete: false,
+        review: { targetCount: 7, reviewedCount: 2 },
       });
       assert.deepEqual(repo.state.calls.at(-1), { name: 'findMyPostPage', memberId: ME, limit: 10, offset: 0 });
+    });
+
+    it('완료 전 공고는 승인된 파티원이 있어야 canComplete, 별점 평가(review)는 활동 완료 후에만', async () => {
+      repo.state.posts = [
+        { ...repo.state.posts[0], postId: 1, postStatus: 'OPEN', reviewTargetCount: 3, reviewedCount: 0 },
+        { ...repo.state.posts[0], postId: 2, postStatus: 'CLOSED', reviewTargetCount: 0, reviewedCount: 0 },
+        { ...repo.state.posts[0], postId: 3, postStatus: 'COMPLETED', reviewTargetCount: 3, reviewedCount: 3 },
+      ];
+      const { data } = await (await get('/me/posts', as(ME))).json();
+      assert.deepEqual(
+        data.items.map(({ id, canComplete, review }) => ({ id, canComplete, review })),
+        [
+          { id: 1, canComplete: true, review: null },
+          { id: 2, canComplete: false, review: null },
+          { id: 3, canComplete: false, review: { targetCount: 3, reviewedCount: 3 } },
+        ],
+      );
     });
 
     it('page·size 로 offset 을 계산한다', async () => {
@@ -321,8 +342,8 @@ describe('마이페이지 API (/api/members)', () => {
   describe('GET /me/applications', () => {
     beforeEach(() => {
       repo.state.applications = [
-        { id: 1, status: 'PENDING', role: '서포터', appliedAt: new Date('2026-11-12T00:00:00Z'), ...postColumns({ postStatus: 'OPEN' }), hostNickname: '빛나는오더', hostStatus: 'ACTIVE' },
-        { id: 2, status: 'ACCEPTED', role: null, appliedAt: new Date('2026-11-11T00:00:00Z'), ...postColumns({ postId: 11 }), hostNickname: null, hostStatus: 'WITHDRAWN' },
+        { id: 1, status: 'PENDING', role: '서포터', appliedAt: new Date('2026-11-12T00:00:00Z'), ...postColumns({ postStatus: 'OPEN' }), hostNickname: '빛나는오더', hostStatus: 'ACTIVE', reviewTargetCount: 1, reviewedCount: 0 },
+        { id: 2, status: 'ACCEPTED', role: null, appliedAt: new Date('2026-11-11T00:00:00Z'), ...postColumns({ postId: 11 }), hostNickname: null, hostStatus: 'WITHDRAWN', reviewTargetCount: 6, reviewedCount: 1 },
       ];
     });
 
@@ -348,8 +369,22 @@ describe('마이페이지 API (/api/members)', () => {
           status: 'OPEN',
           host: '빛나는오더',
         },
+        review: null,
       });
       assert.equal(data.items[1].post.host, '탈퇴한 회원');
+    });
+
+    it('승인된 신청이고 공고가 활동 완료면 별점 평가 진행 상황(review)을 준다', async () => {
+      repo.state.applications.push({ ...repo.state.applications[1], id: 3, status: 'REJECTED' });
+      const { data } = await (await get('/me/applications', as(ME))).json();
+      assert.deepEqual(
+        data.items.map(({ id, review }) => ({ id, review })),
+        [
+          { id: 1, review: null },
+          { id: 2, review: { targetCount: 6, reviewedCount: 1 } },
+          { id: 3, review: null },
+        ],
+      );
     });
 
     it('status 로 거른다', async () => {

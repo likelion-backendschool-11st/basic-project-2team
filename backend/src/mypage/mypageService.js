@@ -5,6 +5,16 @@ const { TOP_TAG_LIMIT, RECENT_RATING_LIMIT, mypageMessages } = require('./mypage
 const { parsePageQuery, parseApplicationQuery } = require('./mypageValidator');
 
 const WITHDRAWN = 'WITHDRAWN';
+const POST_STATUS_COMPLETED = 'COMPLETED';
+const COMPLETABLE_POST_STATUSES = Object.freeze(['OPEN', 'CLOSED']);
+const APPLICATION_ACCEPTED = 'ACCEPTED';
+
+/**
+ * 「별점 평가」 버튼용 진행 상황. 평가할 수 있는 공고(활동 완료 + 내가 파티 구성원)가 아니면 null.
+ * reviewedCount 가 targetCount 와 같으면 모두 평가한 상태입니다.
+ */
+const toReviewProgress = (row, reviewable) =>
+  reviewable ? { targetCount: Number(row.reviewTargetCount), reviewedCount: Number(row.reviewedCount) } : null;
 
 const toIso = (value) => (value ? new Date(value).toISOString() : null);
 /** 소수 첫째 자리까지 (DECIMAL 은 문자열로 읽히므로 숫자로 바꿉니다) */
@@ -41,6 +51,9 @@ const toMyPost = (row) => ({
   views: row.viewCount,
   commentCount: row.commentCount,
   createdAt: toIso(row.createdAt),
+  // 「활동 완료」 버튼: 아직 완료 전이고 승인된 파티원이 있을 때 (PATCH /api/posts/{postId}/status)
+  canComplete: COMPLETABLE_POST_STATUSES.includes(row.postStatus) && Number(row.reviewTargetCount) > 0,
+  review: toReviewProgress(row, row.postStatus === POST_STATUS_COMPLETED),
 });
 
 const toMyApplication = (row) => ({
@@ -52,6 +65,7 @@ const toMyApplication = (row) => ({
     ...toPostSummary(row),
     host: row.hostStatus === WITHDRAWN ? mypageMessages.withdrawnMember : row.hostNickname,
   },
+  review: toReviewProgress(row, row.status === APPLICATION_ACCEPTED && row.postStatus === POST_STATUS_COMPLETED),
 });
 
 const toMyComment = (row) => ({

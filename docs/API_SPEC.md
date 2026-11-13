@@ -293,6 +293,11 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 - `page`(기본 1) · `size`(기본 8, 최대 50), `excludeClosed=true` 이면 모집 중(`OPEN`) 공고만 조회합니다 (기본 `false`).
 - `urgent`: 출발 시간이 가까운 순(일정 미정은 뒤), 남은 자리가 적은 순입니다. `recent` 는 최신순, `views` 는 조회수순입니다.
 - **공고 삭제** (`DELETE /api/posts/{postId}`) 🔒 작성자: 응답 `204`. 소프트 삭제(`status = DELETED`, `deleted_at`)라 신청·댓글·리뷰는 보존하고, 그 공고의 스크랩은 삭제합니다. 삭제된 공고는 목록·상세·카테고리 공고 수에서 빠집니다. 오류: 401 `UNAUTHORIZED`, 403 `NOT_POST_AUTHOR`, 404 `POST_NOT_FOUND`(없음, 이미 삭제됨, `postId` 가 1 이상의 정수가 아님). 활동 점수 회수(`POST_REVOKE`)는 점수 지급이 구현될 때 함께 합니다.
+- **모집 상태 변경** (`PATCH /api/posts/{postId}/status`) 🔒 작성자: 요청 `{ "status": "OPEN" | "CLOSED" | "COMPLETED" }`, 응답 `200 { id, status }`.
+  - `OPEN`(모집 중) ↔ `CLOSED`(모집 마감)는 자유롭게 바꿉니다. 지금과 같은 상태로 요청하면 아무것도 하지 않고 200 입니다.
+  - `COMPLETED`(활동 완료)는 마이페이지 「활동 완료」 버튼에서 호출합니다. 승인된(`ACCEPTED`) 파티원이 1명 이상 있어야 하고, 한 번 완료하면 되돌릴 수 없습니다.
+  - 완료하면 같은 트랜잭션에서 파티장과 승인된 파티원에게 활동 점수 `PARTY_COMPLETE` +20 을 지급합니다 (결정 사항 8-1). 이후 파티원끼리 별점 평가(7절)를 할 수 있습니다.
+  - 오류: 400 `INVALID_INPUT`(`status`), 401 `UNAUTHORIZED`, 403 `NOT_POST_AUTHOR`, 404 `POST_NOT_FOUND`, 409 `POST_ALREADY_COMPLETED`(완료된 공고를 바꾸려 함) · `NO_PARTY_MEMBERS`(승인된 파티원 없이 완료하려 함).
 - **임시저장** (`POST /api/posts/drafts`, `GET /api/posts/drafts/latest`): 회원당 1개이며 새로 저장하면 덮어씁니다. 요청 본문은 작성 폼 값 `{ title, body, partyName, game, type, detail, headcount, style, tbd, date, time, voice }` 중 보낸 것만 저장하고(미완성·빈 값 허용, 알 수 없는 필드는 버림), 타입이 틀리거나 너무 긴 값은 400 `INVALID_INPUT`(필드별) 입니다. 두 API 모두 `{ draft, savedAt }` 를 돌려주며, 저장한 적이 없으면 `GET` 은 `data: null` 입니다. 공고를 등록하면 그 회원의 임시저장은 삭제됩니다.
 - `GET /api/categories` 는 `[{ code, name, postCount }]` 를 `sort_order` 순으로 돌려줍니다. `postCount` 는 삭제되지 않은 공고 수(마감 포함)입니다.
 - 삭제된 공고는 목록에 나오지 않습니다. 응답은 `{ items, page, size, totalCount, totalPages }` 이고, 값이 올바르지 않으면 400 `INVALID_INPUT`(필드별) 입니다.
@@ -483,6 +488,7 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 
 - **파티원**은 파티장(공고 작성자)과 신청이 `ACCEPTED` 인 회원입니다. 탈퇴한 회원은 파티원에서 빠집니다.
 - 평가는 공고가 `COMPLETED`(작성자가 활동 완료 처리)일 때만 할 수 있습니다. 완료 처리는 `PATCH /api/posts/{postId}/status` (3절)로 합니다.
+- 화면 흐름: 마이페이지 내 공고에서 `canComplete` 이면 「활동 완료」 버튼 → 완료되면 내 공고·참여한 파티 아이템에 `review` 가 생겨 「별점 평가」 버튼 → 평가 창에서 아래 targets 조회 후 제출 (8절 참고).
 - 두 🔒 API 모두 확인 순서는 공고 존재(404) → 요청자가 파티원인지(403) → 공고 상태(409) 입니다.
 
 **평가 태그 목록 (`GET /api/review-tags`)**
@@ -602,9 +608,14 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
   "id": 7, "category": "mmorpg", "game": "lostark", "gameName": "로스트아크", "type": "raid",
   "title": "[카멘] 숙련 서폿 구해요", "current": 8, "max": 8,
   "schedule": "2026-11-15T12:00:00.000Z", "scheduleTbd": false, "status": "COMPLETED",
-  "views": 129, "commentCount": 3, "createdAt": "2026-11-12T11:30:00.000Z"
+  "views": 129, "commentCount": 3, "createdAt": "2026-11-12T11:30:00.000Z",
+  "canComplete": false,
+  "review": { "targetCount": 7, "reviewedCount": 2 }
 }
 ```
+
+- `canComplete`: 「활동 완료」 버튼을 보여줄지. 공고가 `OPEN`·`CLOSED` 이고 승인된 파티원(탈퇴 제외)이 1명 이상이면 `true` → `PATCH /api/posts/{postId}/status` `{ status: "COMPLETED" }`.
+- `review`: 「별점 평가」 버튼용 진행 상황. 공고가 `COMPLETED` 일 때만 있고 아니면 `null`. `targetCount` 는 나를 뺀 파티원 수, `reviewedCount` 는 그중 내가 평가한 수 (같으면 평가 완료).
 
 **내가 신청한 공고 아이템 (`/me/applications`)**
 
@@ -614,9 +625,12 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 ```json
 {
   "id": 3, "status": "PENDING", "role": "서포터", "appliedAt": "2026-11-12T00:00:00.000Z",
-  "post": { "id": 7, "category": "mmorpg", "game": "lostark", "gameName": "로스트아크", "type": "raid", "title": "...", "current": 7, "max": 8, "schedule": null, "scheduleTbd": true, "status": "OPEN", "host": "빛나는오더" }
+  "post": { "id": 7, "category": "mmorpg", "game": "lostark", "gameName": "로스트아크", "type": "raid", "title": "...", "current": 7, "max": 8, "schedule": null, "scheduleTbd": true, "status": "OPEN", "host": "빛나는오더" },
+  "review": null
 }
 ```
+
+- `review`: 신청이 `ACCEPTED` 이고 공고가 `COMPLETED` 이면 「별점 평가」 진행 상황 `{ targetCount, reviewedCount }` (내 공고 아이템과 같은 의미), 아니면 `null`.
 
 **내가 쓴 댓글 아이템 (`/me/comments`)**
 

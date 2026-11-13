@@ -11,6 +11,21 @@ const POST_COLUMNS = `p.id AS postId, p.category_code AS categoryCode, g.code AS
        p.schedule_at AS scheduleAt, p.status AS postStatus`;
 
 /**
+ * 별점 평가 진행 상황 컬럼 (post p). 자리표시자 3개에 모두 내 회원 id 를 넣습니다.
+ * - reviewTargetCount: 나를 뺀 파티원 수 (파티장 + 승인된 신청자, 탈퇴 회원 제외)
+ * - reviewedCount: 그중 내가 이미 평가한 수
+ */
+const REVIEW_PROGRESS_COLUMNS = `(SELECT COUNT(*) FROM member host
+          WHERE host.id = p.author_id AND host.id <> ? AND host.status <> 'WITHDRAWN')
+       + (SELECT COUNT(*) FROM post_application acc
+            JOIN member am ON am.id = acc.applicant_id
+           WHERE acc.post_id = p.id AND acc.status = 'ACCEPTED' AND acc.applicant_id <> ? AND am.status <> 'WITHDRAWN')
+         AS reviewTargetCount,
+       (SELECT COUNT(*) FROM review rv
+          JOIN member tm ON tm.id = rv.target_id
+         WHERE rv.post_id = p.id AND rv.reviewer_id = ? AND tm.status <> 'WITHDRAWN') AS reviewedCount`;
+
+/**
  * 마이페이지·회원 프로필 조회용 테이블 접근:
  * member · member_game_profile · game · post · post_application · comment · review · review_tag_map · review_tag · favorite_member
  * @param {import('mysql2/promise').Pool} pool
@@ -92,13 +107,14 @@ function createMypageRepository(pool) {
     const condition = `p.author_id = ? AND ${ALIVE_POST}`;
     const [[{ totalCount }]] = await pool.query(`SELECT COUNT(*) AS totalCount FROM post p WHERE ${condition}`, [memberId]);
     const [rows] = await pool.query(
-      `SELECT ${POST_COLUMNS}, p.view_count AS viewCount, p.comment_count AS commentCount, p.created_at AS createdAt
+      `SELECT ${POST_COLUMNS}, p.view_count AS viewCount, p.comment_count AS commentCount, p.created_at AS createdAt,
+              ${REVIEW_PROGRESS_COLUMNS}
          FROM post p
          JOIN game g ON g.id = p.game_id
         WHERE ${condition}
         ORDER BY p.created_at DESC, p.id DESC
         LIMIT ? OFFSET ?`,
-      [memberId, limit, offset],
+      [memberId, memberId, memberId, memberId, limit, offset],
     );
     return { rows, totalCount: Number(totalCount) };
   }
@@ -119,7 +135,7 @@ function createMypageRepository(pool) {
     );
     const [rows] = await pool.query(
       `SELECT pa.id, pa.status, pa.role, pa.created_at AS appliedAt, ${POST_COLUMNS},
-              m.nickname AS hostNickname, m.status AS hostStatus
+              m.nickname AS hostNickname, m.status AS hostStatus, ${REVIEW_PROGRESS_COLUMNS}
          FROM post_application pa
          JOIN post p ON p.id = pa.post_id
          JOIN game g ON g.id = p.game_id
@@ -127,7 +143,7 @@ function createMypageRepository(pool) {
         WHERE ${condition}
         ORDER BY pa.created_at DESC, pa.id DESC
         LIMIT ? OFFSET ?`,
-      [...params, limit, offset],
+      [memberId, memberId, memberId, ...params, limit, offset],
     );
     return { rows, totalCount: Number(totalCount) };
   }
