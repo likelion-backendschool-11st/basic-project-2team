@@ -1,18 +1,19 @@
 'use strict';
 
 const { ApiError } = require('../common/ApiError');
-const { postMessages } = require('./postConstants');
+const { postMessages, NOTIFICATION_TYPE, NOTICE_TITLE_MAX, POST_STATUS_COMPLETED } = require('./postConstants');
 const { validateCreatePost, validateDraft } = require('./postValidator');
+
+/** 알림 문구에 넣는 공고 제목 (길면 줄임표로 자름) */
+const clipTitle = (title) => (Array.from(title).length > NOTICE_TITLE_MAX ? `${Array.from(title).slice(0, NOTICE_TITLE_MAX).join('')}…` : title);
 
 /**
  * 공고 작성 비즈니스 로직.
  * @param {{ postRepository: ReturnType<typeof import('./postRepository').createPostRepository>, now?: () => Date }} deps
  */
 function createPostService({ postRepository, now = () => new Date() }) {
-  /** POST /api/posts */
-  async function createPost(authorId, body) {
-    const input = validateCreatePost(body, now());
-
+  /** 게임·상세 분류·인원 규칙을 확인해 저장할 post 컬럼 값을 만듭니다. 작성과 수정이 같이 씁니다. */
+  async function resolvePostFields(input) {
     const game = await postRepository.findGameByCode(input.game);
     if (!game) throw new ApiError(404, 'GAME_NOT_FOUND', postMessages.gameNotFound);
 
@@ -33,24 +34,63 @@ function createPostService({ postRepository, now = () => new Date() }) {
       gameContentId = content.id;
     }
 
-    const id = await postRepository.createPost({
-      post: {
-        authorId,
-        categoryCode: game.categoryCode,
-        gameId: game.id,
-        gameContentId,
-        partyType: input.type,
-        title: input.title,
-        body: input.body,
-        partyName: input.partyName,
-        playStyle: input.style,
-        headcount: input.headcount,
-        scheduleAt: input.scheduleAt,
-        voiceRequired: input.voiceRequired,
-      },
-      tags: input.tags,
-    });
+    return {
+      categoryCode: game.categoryCode,
+      gameId: game.id,
+      gameContentId,
+      partyType: input.type,
+      title: input.title,
+      body: input.body,
+      partyName: input.partyName,
+      playStyle: input.style,
+      headcount: input.headcount,
+      scheduleAt: input.scheduleAt,
+      voiceRequired: input.voiceRequired,
+    };
+  }
+
+  /** POST /api/posts */
+  async function createPost(authorId, body) {
+    const input = validateCreatePost(body, now());
+    const fields = await resolvePostFields(input);
+    const id = await postRepository.createPost({ post: { authorId, ...fields }, tags: input.tags });
     return { id };
+  }
+
+  const parsePostId = (postId) => {
+    if (!/^[1-9]\d*$/.test(postId) || !Number.isSafeInteger(Number(postId))) {
+      throw new ApiError(404, 'POST_NOT_FOUND', postMessages.postNotFound);
+    }
+    return Number(postId);
+  };
+
+  const headcountBelowCurrent = (current) =>
+    new ApiError(400, 'INVALID_INPUT', postMessages.invalidInput, [
+      { field: 'headcount', message: postMessages.headcountBelowCurrent(current) },
+    ]);
+
+  /**
+   * PUT /api/posts/:postId — 작성자만, 작성할 때와 같은 필드를 통째로 다시 보냅니다(태그는 보낸 것으로 교체).
+   * 완료된 공고는 못 고치고, 모집 인원은 확정 인원보다 줄일 수 없습니다.
+   * 모집 중인데 인원을 확정 인원까지 줄이면 자리가 없으니 모집 마감으로 바꿉니다.
+   */
+  async function updatePost(rawPostId, memberId, body) {
+    const postId = parsePostId(rawPostId);
+    const current = await postRepository.findPostAuthor(postId);
+    if (!current) throw new ApiError(404, 'POST_NOT_FOUND', postMessages.postNotFound);
+    if (current.authorId !== memberId) throw new ApiError(403, 'NOT_POST_AUTHOR', postMessages.notPostAuthorEdit);
+    if (current.status === POST_STATUS_COMPLETED) throw new ApiError(409, 'POST_NOT_EDITABLE', postMessages.notEditable);
+
+    const input = validateCreatePost(body, now(), current.scheduleAt ? new Date(current.scheduleAt) : null);
+    const fields = await resolvePostFields(input);
+
+    // 일정이나 게임·상세 분류가 바뀐 경우에만 신청자에게 알립니다(오타 수정까지 알리지 않도록 repository 가 비교).
+    const notice = { type: NOTIFICATION_TYPE.postUpdated, message: postMessages.notice.updated(clipTitle(input.title)) };
+    const { result, currentCount } = await postRepository.updatePost({ postId, post: fields, tags: input.tags, notice });
+    if (result === 'NOT_FOUND') throw new ApiError(404, 'POST_NOT_FOUND', postMessages.postNotFound);
+    if (result === 'NOT_EDITABLE') throw new ApiError(409, 'POST_NOT_EDITABLE', postMessages.notEditable);
+    if (result === 'HEADCOUNT_BELOW') throw headcountBelowCurrent(currentCount);
+    return { id: postId };
   }
 
   /** mysql2 는 JSON 컬럼을 객체로 돌려주지만 문자열로 올 수도 있어 둘 다 받습니다. */
@@ -75,16 +115,34 @@ function createPostService({ postRepository, now = () => new Date() }) {
    * postId 가 1 이상의 정수가 아니어도 404 입니다(공고 상세와 같은 규칙).
    */
   async function deletePost(postId, memberId) {
+    const id = parsePostId(postId);
     const notFound = () => new ApiError(404, 'POST_NOT_FOUND', postMessages.postNotFound);
-    if (!/^[1-9]\d*$/.test(postId) || !Number.isSafeInteger(Number(postId))) throw notFound();
 
-    const post = await postRepository.findPostAuthor(Number(postId));
+    const post = await postRepository.findPostAuthor(id);
     if (!post) throw notFound();
     if (post.authorId !== memberId) throw new ApiError(403, 'NOT_POST_AUTHOR', postMessages.notPostAuthor);
-    if (!(await postRepository.softDeletePost(Number(postId), now()))) throw notFound();
+    const notice = { type: NOTIFICATION_TYPE.postDeleted, message: postMessages.notice.deleted(clipTitle(post.title)) };
+    if (!(await postRepository.softDeletePost(id, now(), notice))) throw notFound();
   }
 
-  return { createPost, saveDraft, getLatestDraft, deletePost };
+  /** 스크랩이 걸린 공고인지 확인합니다. 없거나 삭제된 공고는 404 입니다. */
+  async function assertPostExists(rawPostId) {
+    const postId = parsePostId(rawPostId);
+    if (!(await postRepository.findPostAuthor(postId))) throw new ApiError(404, 'POST_NOT_FOUND', postMessages.postNotFound);
+    return postId;
+  }
+
+  /** POST /api/posts/:postId/scrap — 이미 스크랩했어도 성공합니다(멱등). */
+  async function scrapPost(rawPostId, memberId) {
+    await postRepository.addScrap(memberId, await assertPostExists(rawPostId));
+  }
+
+  /** DELETE /api/posts/:postId/scrap — 스크랩하지 않았어도 성공합니다(멱등). */
+  async function unscrapPost(rawPostId, memberId) {
+    await postRepository.removeScrap(memberId, await assertPostExists(rawPostId));
+  }
+
+  return { createPost, saveDraft, getLatestDraft, updatePost, scrapPost, unscrapPost, deletePost };
 }
 
 module.exports = { createPostService };

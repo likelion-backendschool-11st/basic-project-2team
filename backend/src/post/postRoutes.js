@@ -8,6 +8,9 @@ function createPostRouter(postController, { requireAuth }) {
   router.post('/', requireAuth, postController.create);
   router.post('/drafts', requireAuth, postController.saveDraft);
   router.get('/drafts/latest', requireAuth, postController.getLatestDraft);
+  router.put('/:postId', requireAuth, postController.update);
+  router.post('/:postId/scrap', requireAuth, postController.scrap);
+  router.delete('/:postId/scrap', requireAuth, postController.unscrap);
   router.delete('/:postId', requireAuth, postController.remove);
   return router;
 }
