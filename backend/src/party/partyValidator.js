@@ -1,7 +1,7 @@
 'use strict';
 
 const { ApiError } = require('../common/ApiError');
-const { DECISION_STATUSES, LIST_STATUSES, ROLE_MAX_LENGTH, MESSAGE_MAX_LENGTH, partyMessages: m } = require('./partyConstants');
+const { DECISION_STATUSES, LIST_STATUSES, POST_STATUSES, ROLE_MAX_LENGTH, MESSAGE_MAX_LENGTH, partyMessages: m } = require('./partyConstants');
 
 const charLength = (value) => Array.from(value).length;
 const POSITIVE_INT = /^[1-9]\d*$/;
@@ -41,6 +41,15 @@ function validateDecision(body) {
   return { status };
 }
 
+/** 공고 상태 변경 본문 { status } */
+function validatePostStatus(body) {
+  const status = body && typeof body === 'object' ? body.status : undefined;
+  if (!POST_STATUSES.includes(status)) {
+    throw new ApiError(400, 'INVALID_INPUT', m.invalidInput, [{ field: 'status', message: m.postStatusInvalid }]);
+  }
+  return { status };
+}
+
 /** 신청자 목록 쿼리 ?status= (생략하면 null) */
 function parseListStatus(query) {
   const status = query?.status;
@@ -51,4 +60,4 @@ function parseListStatus(query) {
   return status;
 }
 
-module.exports = { parseId, validateApply, validateDecision, parseListStatus };
+module.exports = { parseId, validateApply, validateDecision, validatePostStatus, parseListStatus };

@@ -403,10 +403,17 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 
 - 탈퇴한 신청자의 `nickname` 은 `"탈퇴한 회원"` 입니다. 오류: 400 `INVALID_INPUT`, 403 `NOT_POST_AUTHOR`.
 
-**승인/거절 (`PATCH /api/posts/{postId}/applications/{applicationId}`)** 🔒 작성자 — 본문 `{ "status": "ACCEPTED" | "REJECTED" }` → `200` `{ "id": 3, "status": "ACCEPTED", "current": 2, "max": 8 }`
+**승인/거절 (`PATCH /api/posts/{postId}/applications/{applicationId}`)** 🔒 작성자 — 본문 `{ "status": "ACCEPTED" | "REJECTED" }` → `200` `{ "id": 3, "status": "ACCEPTED", "current": 2, "max": 8, "postStatus": "OPEN" }`
 
-- 대기 중 신청만 처리합니다. 승인하면 `current` 가 1 늘고(정원을 넘지 않게 공고 행을 잠금), 거절은 인원을 바꾸지 않습니다. 정원이 차도 공고 `status` 는 자동으로 바뀌지 않습니다(상태 변경은 별도 API).
-- 오류: 400 `INVALID_INPUT`, 403 `NOT_POST_AUTHOR`, 404 `APPLICATION_NOT_FOUND`, 409 `ALREADY_DECIDED` · `POST_CLOSED`(승인만) · `PARTY_FULL`(승인만).
+- 대기 중 신청만 처리합니다. 승인하면 `current` 가 1 늘고(정원을 넘지 않게 공고 행을 잠금), 거절은 인원을 바꾸지 않습니다. 마지막 자리를 승인해 정원이 차면 공고 `status` 가 `CLOSED` 로 바뀌고(`postStatus`), 정원이 찬 마감 공고에서 수락된 사람이 취소하면 다시 `OPEN` 이 됩니다(작성자가 직접 마감한 공고는 자리가 나도 그대로).
+- 오류: 400 `INVALID_INPUT`, 403 `NOT_POST_AUTHOR`, 404 `APPLICATION_NOT_FOUND`, 409 `ALREADY_DECIDED` · `PARTY_FULL`(승인만) · `POST_CLOSED`(승인만, 작성자가 마감하거나 완료한 공고).
+
+**모집 상태 변경 (`PATCH /api/posts/{postId}/status`)** 🔒 작성자 — 본문 `{ "status": "OPEN" | "CLOSED" | "COMPLETED" }` → `200` `{ "id": 7, "status": "CLOSED", "current": 3, "max": 8 }`
+
+- `OPEN` ↔ `CLOSED`(직접 마감·재개)와 `COMPLETED`(진행 완료)로 바꿉니다. 같은 상태로 요청하면 그대로 `200` 입니다.
+- `COMPLETED` 는 되돌릴 수 없습니다. 정원이 찬 공고는 `OPEN` 으로 다시 열 수 없습니다.
+- 오류: 400 `INVALID_INPUT`, 401, 403 `NOT_POST_AUTHOR`, 404 `POST_NOT_FOUND`, 409 `POST_COMPLETED` · `PARTY_FULL`.
+- ⚠️ 출발 시간이 지나면 종료 처리(REQ-POST-007 후반)는 스케줄러가 필요해 아직 없습니다.
 
 **확정 파티원 (`GET /api/posts/{postId}/participants`)** — 파티장이 먼저, 이어서 수락된 순입니다.
 

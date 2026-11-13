@@ -15,6 +15,8 @@ const DECISION_STATUSES = Object.freeze([APPLICATION_STATUS.accepted, APPLICATIO
 const LIST_STATUSES = Object.freeze([APPLICATION_STATUS.pending, APPLICATION_STATUS.accepted, APPLICATION_STATUS.rejected]);
 
 const POST_STATUS = Object.freeze({ open: 'OPEN', closed: 'CLOSED', completed: 'COMPLETED' });
+/** 작성자가 바꿀 수 있는 공고 상태 */
+const POST_STATUSES = Object.freeze(Object.values(POST_STATUS));
 const MEMBER_STATUS = Object.freeze({ suspended: 'SUSPENDED', banned: 'BANNED', withdrawn: 'WITHDRAWN' });
 
 /** post_application.role VARCHAR(30), message VARCHAR(200) */
@@ -27,6 +29,8 @@ const partyMessages = Object.freeze({
   invalidInput: '입력값을 확인해주세요.',
   roleInvalid: `포지션은 ${ROLE_MAX_LENGTH}자 이하로 입력해주세요.`,
   messageInvalid: `한 줄 메시지는 ${MESSAGE_MAX_LENGTH}자 이하로 입력해주세요.`,
+  postStatusInvalid: `status 는 ${POST_STATUSES.join(', ')} 중 하나여야 합니다.`,
+  postCompleted: '이미 완료된 파티는 상태를 바꿀 수 없습니다.',
   statusInvalid: `status 는 ${DECISION_STATUSES.join(', ')} 중 하나여야 합니다.`,
   listStatusInvalid: `status 는 ${LIST_STATUSES.join(', ')} 중 하나여야 합니다.`,
   unauthorized: '로그인이 필요합니다.',
@@ -50,6 +54,7 @@ module.exports = {
   DECISION_STATUSES,
   LIST_STATUSES,
   POST_STATUS,
+  POST_STATUSES,
   MEMBER_STATUS,
   ROLE_MAX_LENGTH,
   MESSAGE_MAX_LENGTH,

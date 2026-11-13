@@ -9,6 +9,7 @@ function createPartyRouter(partyController, { requireAuth }) {
   router.delete('/:postId/applications/me', requireAuth, partyController.cancelMine);
   router.get('/:postId/applications', requireAuth, partyController.listApplications);
   router.patch('/:postId/applications/:applicationId', requireAuth, partyController.decide);
+  router.patch('/:postId/status', requireAuth, partyController.changeStatus);
   router.get('/:postId/participants', partyController.listParticipants);
   return router;
 }
