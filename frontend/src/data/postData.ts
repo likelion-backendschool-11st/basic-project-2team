@@ -92,6 +92,7 @@ export const postText = {
   loginRequired: '로그인 후 이용할 수 있습니다.',
   applySuccess: '참가 신청이 완료되었습니다.',
   applyCanceled: '참가 신청을 취소했습니다.',
+  leftParty: '파티에서 탈퇴했습니다.',
   closedDone: '모집을 마감했습니다.',
   pausedDone: '모집을 일시 중단했습니다.',
   reopened: '모집을 다시 시작했습니다.',
@@ -106,6 +107,7 @@ export const postText = {
   recruitDone: (percent: number) => `${percent}% 모집 완료`,
   apply: '파티 신청하기 (원클릭)',
   applied: '신청 완료 · 방장 수락 대기',
+  accepted: '참가 확정 · 파티원으로 승인되었습니다',
   cancelApply: '신청 취소',
   guarantee: '클린 파티 보증제 적용 - 고의 탈주/비매너 신고 시 100% 영구 감점 및 패널티 부과',
   hostProfile: '공대장 프로필',
@@ -140,6 +142,7 @@ export const postText = {
   // dialogs
   deletePost: { title: '공고를 삭제할까요?', description: '삭제한 공고는 복구할 수 없습니다. 신청 중인 파티원에게도 알림이 전송됩니다.', confirm: '삭제', cancel: '취소' },
   disband: { title: '파티를 해산할까요?', description: '해산하면 참가자 전원에게 해산 알림이 전송되고, 공고는 종료 처리됩니다.', confirm: '해산', cancel: '아니오' },
+  cancelApplication: { title: '참가 신청을 취소할까요?', description: '취소하면 방장의 수락 대기 목록에서 사라집니다. 이후 다시 신청할 수 있습니다.', confirm: '신청 취소', cancel: '아니오' },
   leave: { title: '파티에서 탈퇴할까요?', description: '탈퇴 후 재신청하려면 방장의 수락을 다시 받아야 하며, 잦은 탈퇴는 매너 점수에 반영될 수 있습니다.', confirm: '탈퇴', cancel: '아니오' },
   closeConfirm: { title: '모집을 마감할까요?', description: '마감하면 더 이상 신청을 받을 수 없고, 현재 참가자로 파티가 확정됩니다.', confirm: '마감', cancel: '취소' },
 };

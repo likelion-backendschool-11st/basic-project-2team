@@ -40,6 +40,7 @@ const PostDetailView: React.FC<{ readonly postId: string }> = ({ postId }) => {
   const post = usePostDetail(postId);
   const thread = useComments(postId, post.detail?.commentCount ?? 0);
   const { detail } = post;
+  const leaveText = post.accepted ? postText.leave : postText.cancelApplication;
 
   if (!detail) {
     return (
@@ -73,7 +74,7 @@ const PostDetailView: React.FC<{ readonly postId: string }> = ({ postId }) => {
             <OwnerPanel detail={detail} participants={post.participants} state={post.state} onClose={post.closeRecruit.open} onTogglePause={post.togglePause} onDisband={post.disband.open} />
           ) : (
             <>
-              <PartyStatusCard detail={detail} filled={post.filled} percent={post.percent} applied={post.applied} state={post.state} scrapped={post.scrapped} onApply={post.apply} onLeave={post.leave.open} onScrap={post.toggleScrap} onCopy={post.copyLink} />
+              <PartyStatusCard detail={detail} filled={post.filled} percent={post.percent} applied={post.applied} accepted={post.accepted} state={post.state} scrapped={post.scrapped} onApply={post.apply} onLeave={post.leave.open} onScrap={post.toggleScrap} onCopy={post.copyLink} />
               <ParticipantsCard participants={post.participants} max={detail.max} />
               <HostCard host={detail.host} following={post.following} onFollow={post.toggleFollow} />
             </>
@@ -84,7 +85,7 @@ const PostDetailView: React.FC<{ readonly postId: string }> = ({ postId }) => {
 
       <ConfirmDialog isOpen={post.remove.isOpen} title={postText.deletePost.title} description={postText.deletePost.description} confirmLabel={postText.deletePost.confirm} cancelLabel={postText.deletePost.cancel} icon="fa-trash-can" onConfirm={post.confirmRemove} onCancel={post.remove.close} />
       <ConfirmDialog isOpen={post.disband.isOpen} title={postText.disband.title} description={postText.disband.description} confirmLabel={postText.disband.confirm} cancelLabel={postText.disband.cancel} icon="fa-people-group" onConfirm={post.confirmDisband} onCancel={post.disband.close} />
-      <ConfirmDialog isOpen={post.leave.isOpen} title={postText.leave.title} description={postText.leave.description} confirmLabel={postText.leave.confirm} cancelLabel={postText.leave.cancel} icon="fa-right-from-bracket" tone="warning" onConfirm={post.confirmLeave} onCancel={post.leave.close} />
+      <ConfirmDialog isOpen={post.leave.isOpen} title={leaveText.title} description={leaveText.description} confirmLabel={leaveText.confirm} cancelLabel={leaveText.cancel} icon="fa-right-from-bracket" tone="warning" onConfirm={post.confirmLeave} onCancel={post.leave.close} />
       <ConfirmDialog isOpen={post.closeRecruit.isOpen} title={postText.closeConfirm.title} description={postText.closeConfirm.description} confirmLabel={postText.closeConfirm.confirm} cancelLabel={postText.closeConfirm.cancel} icon="fa-circle-check" tone="brand" onConfirm={post.confirmClose} onCancel={post.closeRecruit.close} />
       <ConfirmDialog isOpen={thread.deleteDialog.isOpen} title={commentText.deleteDialog.title} description={commentText.deleteDialog.description} confirmLabel={commentText.deleteDialog.confirm} cancelLabel={commentText.deleteDialog.cancel} icon="fa-trash-can" onConfirm={thread.confirmDelete} onCancel={thread.deleteDialog.close} />
       <ReportDialog isOpen={thread.reportDialog.isOpen} onConfirm={thread.confirmReport} onClose={thread.reportDialog.close} />

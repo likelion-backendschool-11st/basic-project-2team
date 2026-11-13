@@ -8,6 +8,8 @@ interface PartyStatusCardProps {
   readonly filled: number;
   readonly percent: number;
   readonly applied: boolean;
+  /** 신청이 수락돼 파티원이 된 상태(false 이면 방장 수락 대기) */
+  readonly accepted: boolean;
   readonly state: PartyState;
   readonly scrapped: boolean;
   readonly onApply: () => void;
@@ -17,7 +19,7 @@ interface PartyStatusCardProps {
 }
 
 /** Member view: slot status + one-click apply. */
-export const PartyStatusCard: React.FC<PartyStatusCardProps> = ({ detail, filled, percent, applied, state, scrapped, onApply, onLeave, onScrap, onCopy }) => {
+export const PartyStatusCard: React.FC<PartyStatusCardProps> = ({ detail, filled, percent, applied, accepted, state, scrapped, onApply, onLeave, onScrap, onCopy }) => {
   const ring = `conic-gradient(#10b981 ${percent * 3.6}deg, rgba(255,255,255,0.08) 0)`;
   const full = filled >= detail.max;
   return (
@@ -39,8 +41,8 @@ export const PartyStatusCard: React.FC<PartyStatusCardProps> = ({ detail, filled
       </ul>
       {applied ? (
         <div className="grid grid-cols-[1fr_auto] gap-2">
-          <div className="h-14 rounded-xl bg-emeraldAccent/15 text-emerald-300 text-sm font-bold flex items-center justify-center gap-2"><i className="fa-solid fa-circle-check" />{postText.applied}</div>
-          <button type="button" onClick={onLeave} className="h-14 px-4 rounded-xl border border-night-borderLight text-xs text-fog-sub hover:text-white hover:bg-white/5">{postText.leaveParty}</button>
+          <div className="h-14 rounded-xl bg-emeraldAccent/15 text-emerald-300 text-sm font-bold flex items-center justify-center gap-2"><i className="fa-solid fa-circle-check" />{accepted ? postText.accepted : postText.applied}</div>
+          <button type="button" onClick={onLeave} className="h-14 px-4 rounded-xl border border-night-borderLight text-xs text-fog-sub hover:text-white hover:bg-white/5">{accepted ? postText.leaveParty : postText.cancelApply}</button>
         </div>
       ) : (
         <button type="button" onClick={onApply} disabled={full || state !== 'open'} className="h-14 rounded-xl bg-gradient-to-r from-mercury to-indigo-500 text-white font-bold shadow-lg shadow-mercury/30 hover:brightness-110 disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center gap-2">
