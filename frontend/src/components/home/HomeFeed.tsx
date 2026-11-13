@@ -44,7 +44,7 @@ export const HomeFeed: React.FC<HomeFeedProps> = ({ onCreateParty }) => {
         {urgent.error && <PanelMessage error>{urgent.error}</PanelMessage>}
         {!urgent.loading && !urgent.error && urgent.data.length === 0 && <PanelMessage>{homeText.urgentEmpty}</PanelMessage>}
         {urgent.data.map((p) => (
-          <UrgentPostCard key={p.id} post={p} onApply={actions.openPost} />
+          <UrgentPostCard key={p.id} post={p} onSelect={actions.openPost} />
         ))}
       </PanelCard>
     </div>
