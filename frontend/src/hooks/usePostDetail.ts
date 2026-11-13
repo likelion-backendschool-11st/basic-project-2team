@@ -20,6 +20,21 @@ import { paths, ROUTES } from '../data/routes';
 import { useModal } from './useModal';
 import { useToast } from './useToast';
 
+/**
+ * 이 탭에서 처음 여는 공고인지 확인하며 표시해 둡니다. 새로고침·개발 모드의 effect 중복 실행으로
+ * 조회수가 여러 번 오르지 않게 합니다(탭을 닫으면 초기화).
+ */
+function markViewed(postId: string) {
+  const key = `viewed:${postId}`;
+  try {
+    if (sessionStorage.getItem(key)) return false;
+    sessionStorage.setItem(key, '1');
+  } catch {
+    // 저장소를 못 쓰면 매번 셉니다.
+  }
+  return true;
+}
+
 export type PartyState = 'open' | 'paused' | 'closed';
 
 export interface Applicant {
@@ -55,7 +70,7 @@ export function usePostDetail(postId: string) {
   useEffect(() => {
     let cancelled = false;
     // 처음 열 때만 조회수를 올리고, 이후 다시 불러오기(자동 갱신 · 버튼 동작 뒤)는 올리지 않습니다.
-    getPostDetail(postId, version === 0)
+    getPostDetail(postId, version === 0 && markViewed(postId))
       .then((res) => {
         if (cancelled) return;
         setDetail(toPostDetail(res));
