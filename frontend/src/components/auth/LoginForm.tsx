@@ -3,6 +3,7 @@ import AuthTextField from './AuthTextField';
 import FormAlert from './FormAlert';
 import RememberMeCheckbox from './RememberMeCheckbox';
 import PrimaryButton from './PrimaryButton';
+import SanctionNoticeModal from './SanctionNoticeModal';
 import { useLoginForm } from '../../hooks/useLoginForm';
 import { loginText } from '../../data/authData';
 
@@ -51,6 +52,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ className = '' }) => {
         label={loginText.submit}
         shape="pill"
       />
+      <SanctionNoticeModal onClose={form.closeSanction} sanction={form.sanction} />
     </form>
   );
 };

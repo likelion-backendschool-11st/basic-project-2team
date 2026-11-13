@@ -24,6 +24,9 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 
 // 실패 (입력 검증) — 필드별 오류가 있으면 fields 를 함께 보냄
 { "success": false, "error": { "code": "INVALID_INPUT", "message": "입력값을 확인해주세요.", "fields": [{ "field": "userId", "message": "..." }] } }
+
+// 실패 (추가 정보) — 일부 에러는 error 에 화면용 값을 더 실음 (예: 정지 회원 로그인의 sanction, 2절)
+{ "success": false, "error": { "code": "ACCOUNT_SUSPENDED", "message": "이용이 정지된 계정입니다.", "sanction": { ... } } }
 ```
 
 | HTTP 상태 | 의미 |
@@ -162,6 +165,33 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 | 403 | `ACCOUNT_BANNED` | 영구 정지 |
 
 > 정지·영구 정지 여부는 비밀번호가 맞을 때만 알려줍니다. 탈퇴 회원은 `login_id` 가 `NULL` 이라 `INVALID_CREDENTIALS` 로 응답합니다.
+
+**정지 회원 로그인 응답** — 로그인(`POST /api/auth/login`)의 `ACCOUNT_SUSPENDED` · `ACCOUNT_BANNED` 에는 로그인 화면 안내 모달(`frontend/src/components/auth/SanctionNoticeModal.tsx`)용 `error.sanction` 을 함께 보냅니다. 토큰 재발급(`/api/auth/refresh`) 등 다른 API 의 같은 코드에는 싣지 않습니다.
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "ACCOUNT_SUSPENDED",
+    "message": "이용이 정지된 계정입니다.",
+    "sanction": {
+      "type": "SUSPEND",
+      "nickname": "빛나는힐러",
+      "reason": "욕설, 공격적인 언행",
+      "days": 3,
+      "endsAt": "2026-11-16T05:30:00.000Z"
+    }
+  }
+}
+```
+
+| 필드 | 설명 |
+| --- | --- |
+| `type` | `SUSPEND`(기간 정지) / `BAN`(영구 정지) |
+| `nickname` | 로그인한 회원 닉네임 |
+| `reason` | 로그인을 막고 있는 제재(`sanction`, 해제되지 않은 같은 종류 중 가장 늦게 끝나는 것)의 사유. 제재 기록이 없으면 `null` |
+| `days` | 그 제재의 정지 일수 (`ends_at - starts_at`). `BAN` 이거나 제재 기록이 없으면 `null` |
+| `endsAt` | 해제 예정 시각 = `member.suspended_until`. `BAN` 이면 `null` |
 
 ### 아이디/비밀번호 찾기
 

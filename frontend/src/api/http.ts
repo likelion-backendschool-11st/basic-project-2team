@@ -17,12 +17,21 @@ export class ApiRequestError extends Error {
   readonly status: number;
   readonly code: string;
   readonly fields: readonly FieldError[];
+  /** error 객체에 code·message·fields 외에 함께 온 값 (예: 정지 회원 로그인의 `sanction`). 도메인 api 파일에서 좁혀 씁니다. */
+  readonly details: Readonly<Record<string, unknown>>;
 
-  constructor(status: number, code: string, message: string, fields: readonly FieldError[] = []) {
+  constructor(
+    status: number,
+    code: string,
+    message: string,
+    fields: readonly FieldError[] = [],
+    details: Readonly<Record<string, unknown>> = {},
+  ) {
     super(message);
     this.status = status;
     this.code = code;
     this.fields = fields;
+    this.details = details;
   }
 }
 
@@ -53,7 +62,12 @@ export const hasAccessToken = () => Boolean(readToken(ACCESS_TOKEN_KEY));
 interface ApiEnvelope<T> {
   readonly success: boolean;
   readonly data?: T;
-  readonly error?: { readonly code: string; readonly message: string; readonly fields?: readonly FieldError[] };
+  readonly error?: {
+    readonly code: string;
+    readonly message: string;
+    readonly fields?: readonly FieldError[];
+    readonly [key: string]: unknown;
+  };
 }
 
 export interface RequestOptions {
@@ -126,8 +140,8 @@ export async function request<T>(method: string, path: string, body?: unknown, {
 
   if (res.status === 204) return undefined as T;
   if (!res.ok || !json?.success) {
-    const error = json?.error;
-    throw new ApiRequestError(res.status, error?.code ?? 'UNKNOWN', error?.message ?? '요청에 실패했습니다.', error?.fields);
+    const { code = 'UNKNOWN', message = '요청에 실패했습니다.', fields, ...details } = json?.error ?? {};
+    throw new ApiRequestError(res.status, code, message, fields, details);
   }
   return json.data as T;
 }

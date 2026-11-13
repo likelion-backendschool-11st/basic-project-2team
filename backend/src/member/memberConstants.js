@@ -52,6 +52,9 @@ const memberStatus = Object.freeze({
   withdrawn: 'WITHDRAWN',
 });
 
+/** 로그인을 막는 sanction.type (경고 WARNING 은 로그인을 막지 않음) */
+const restrictionType = Object.freeze({ suspend: 'SUSPEND', ban: 'BAN' });
+
 const memberMessages = Object.freeze({
   invalidInput: '입력값을 확인해주세요.',
   userIdRequired: '아이디를 입력해주세요.',
@@ -100,5 +103,6 @@ module.exports = {
   MAX_LOGIN_FAILURES,
   LOGIN_LOCK_MINUTES,
   memberStatus,
+  restrictionType,
   memberMessages,
 };

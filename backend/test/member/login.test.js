@@ -18,7 +18,7 @@ const PASSWORD = 'abc123!@';
 
 /** DB 대신 메모리에 저장하는 가짜 repository (로그인·토큰 관련 메서드만) */
 function createFakeRepository() {
-  const state = { members: [], tokens: [] };
+  const state = { members: [], tokens: [], sanctions: [] };
   const byId = (id) => state.members.find((m) => m.id === id) ?? null;
   // 실제 DB 처럼 조회 시점의 복사본을 돌려줌
   const snapshot = (row) => (row ? { ...row } : null);
@@ -29,6 +29,13 @@ function createFakeRepository() {
     },
     async findAuthMemberById(id) {
       return snapshot(byId(id));
+    },
+    async findActiveRestriction({ memberId, type }) {
+      const active = state.sanctions
+        .filter((s) => s.memberId === memberId && s.type === type && !s.releasedAt)
+        .sort((a, b) => (b.endsAt?.getTime() ?? Infinity) - (a.endsAt?.getTime() ?? Infinity));
+      const row = active[0];
+      return row ? { reason: row.reason, startsAt: row.startsAt, endsAt: row.endsAt } : null;
     },
     async recordLoginFailure({ memberId, maxFailures, lockedUntil }) {
       const m = byId(memberId);
@@ -89,6 +96,7 @@ describe('member login API', () => {
     clock = new Date('2026-11-13T00:00:00Z');
     repo.state.tokens.length = 0;
     repo.state.members.length = 0;
+    repo.state.sanctions.length = 0;
     repo.state.members.push({
       id: 1,
       loginId: 'healer01',
@@ -210,11 +218,54 @@ describe('member login API', () => {
     assert.equal((await banned.json()).error.code, 'ACCOUNT_BANNED');
   });
 
+  it('정지 회원 로그인 403 응답에 안내 모달용 제재 내용(닉네임·사유·일수·해제 시각)을 싣는다', async () => {
+    const startsAt = new Date(clock.getTime() - DAY_MS);
+    const endsAt = new Date(startsAt.getTime() + 3 * DAY_MS);
+    repo.state.sanctions.push(
+      { memberId: 1, type: 'SUSPEND', reason: '이전 정지', startsAt: new Date('2026-10-01T00:00:00Z'), endsAt: new Date('2026-10-02T00:00:00Z'), releasedAt: null },
+      { memberId: 1, type: 'SUSPEND', reason: '욕설, 공격적인 언행', startsAt, endsAt, releasedAt: null },
+      { memberId: 1, type: 'WARNING', reason: '경고', startsAt, endsAt: null, releasedAt: null },
+    );
+    Object.assign(member(), { status: 'SUSPENDED', suspendedUntil: endsAt });
+
+    const res = await login();
+    assert.equal(res.status, 403);
+    const { error } = await res.json();
+    assert.equal(error.code, 'ACCOUNT_SUSPENDED');
+    assert.deepEqual(error.sanction, {
+      type: 'SUSPEND',
+      nickname: '빛나는힐러',
+      reason: '욕설, 공격적인 언행',
+      days: 3,
+      endsAt: endsAt.toISOString(),
+    });
+  });
+
+  it('영구 정지 회원 로그인 403 응답에는 사유만 있고 일수·해제 시각은 null 이다', async () => {
+    repo.state.sanctions.push({ memberId: 1, type: 'BAN', reason: '불법 프로그램 사용', startsAt: clock, endsAt: null, releasedAt: null });
+    member().status = 'BANNED';
+
+    const { error } = await (await login()).json();
+    assert.equal(error.code, 'ACCOUNT_BANNED');
+    assert.deepEqual(error.sanction, { type: 'BAN', nickname: '빛나는힐러', reason: '불법 프로그램 사용', days: null, endsAt: null });
+  });
+
+  it('제재 기록을 찾지 못해도 403 과 해제 시각은 알려주고 사유·일수는 null 이다', async () => {
+    const suspendedUntil = new Date(clock.getTime() + DAY_MS);
+    Object.assign(member(), { status: 'SUSPENDED', suspendedUntil });
+
+    const { error } = await (await login()).json();
+    assert.equal(error.code, 'ACCOUNT_SUSPENDED');
+    assert.deepEqual(error.sanction, { type: 'SUSPEND', nickname: '빛나는힐러', reason: null, days: null, endsAt: suspendedUntil.toISOString() });
+  });
+
   it('정지 회원이라도 비밀번호가 틀리면 제재 여부를 알려주지 않는다', async () => {
     member().status = 'BANNED';
     const res = await login({ password: 'wrong123!' });
     assert.equal(res.status, 401);
-    assert.equal((await res.json()).error.code, 'INVALID_CREDENTIALS');
+    const { error } = await res.json();
+    assert.equal(error.code, 'INVALID_CREDENTIALS');
+    assert.equal(error.sanction, undefined);
   });
 
   it('refresh: 새 토큰을 발급하고 이전 Refresh Token 은 더 쓸 수 없다', async () => {
@@ -251,7 +302,9 @@ describe('member login API', () => {
     member().status = 'BANNED';
     const res = await request('/refresh', { refreshToken: data.refreshToken });
     assert.equal(res.status, 403);
-    assert.equal((await res.json()).error.code, 'ACCOUNT_BANNED');
+    const { error } = await res.json();
+    assert.equal(error.code, 'ACCOUNT_BANNED');
+    assert.equal(error.sanction, undefined, '재발급 응답에는 제재 내용을 싣지 않음');
   });
 
   it('logout: Access Token 이 필요하고, 성공하면 204 와 함께 Refresh Token 을 모두 폐기한다', async () => {

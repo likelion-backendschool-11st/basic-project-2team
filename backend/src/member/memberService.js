@@ -10,6 +10,7 @@ const {
   MAX_LOGIN_FAILURES,
   LOGIN_LOCK_MINUTES,
   memberStatus,
+  restrictionType,
   memberMessages,
 } = require('./memberConstants');
 const {
@@ -31,14 +32,27 @@ const invalidRefreshToken = () => new ApiError(401, 'INVALID_REFRESH_TOKEN', mem
 const memberNotFound = () => new ApiError(404, 'MEMBER_NOT_FOUND', memberMessages.memberNotFound);
 const invalidResetToken = () => new ApiError(401, 'INVALID_RESET_TOKEN', memberMessages.invalidResetToken);
 
-/** 제재 중인 회원이면 403 (정지 기간이 지난 SUSPENDED 는 로그인 허용) */
-function assertNotSanctioned(member, current) {
-  if (member.status === memberStatus.banned) {
-    throw new ApiError(403, 'ACCOUNT_BANNED', memberMessages.accountBanned);
-  }
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** 로그인을 막는 제재 종류. 정지 기간이 지난 SUSPENDED 는 로그인을 허용하므로 null 입니다. */
+function restrictionOf(member, current) {
+  if (member.status === memberStatus.banned) return restrictionType.ban;
   if (member.status === memberStatus.suspended && (!member.suspendedUntil || member.suspendedUntil > current)) {
-    throw new ApiError(403, 'ACCOUNT_SUSPENDED', memberMessages.accountSuspended);
+    return restrictionType.suspend;
   }
+  return null;
+}
+
+/**
+ * 제재 중인 회원의 403 에러. sanction 을 넘기면 로그인 화면의 안내 모달용 정보를 error.sanction 에 싣습니다.
+ * @param {'SUSPEND' | 'BAN'} type
+ * @param {{ nickname: string, reason: string | null, days: number | null, endsAt: string | null }} [sanction]
+ */
+function restrictionError(type, sanction) {
+  const details = sanction && { sanction: { type, ...sanction } };
+  return type === restrictionType.ban
+    ? new ApiError(403, 'ACCOUNT_BANNED', memberMessages.accountBanned, undefined, details)
+    : new ApiError(403, 'ACCOUNT_SUSPENDED', memberMessages.accountSuspended, undefined, details);
 }
 
 /** 로그인 응답의 user (프론트 `LoggedInUser`, docs/API_SPEC.md 2절) */
@@ -89,6 +103,26 @@ function createMemberService({ memberRepository, tokenProvider, bcryptRounds, no
       expiresAt: refreshToken.expiresAt,
     });
     return { accessToken: tokenProvider.createAccessToken(memberId), refreshToken: refreshToken.token };
+  }
+
+  /**
+   * 로그인 화면 안내 모달에 보여줄 제재 내용 (docs/API_SPEC.md 로그인 에러 코드).
+   * 해제 예정 시각은 member.suspended_until 을 따르고, 사유·정지 일수는 그 제재(sanction) 행에서 가져옵니다.
+   * 제재 행을 찾지 못하면 사유·일수는 null 입니다.
+   */
+  async function describeRestriction(member, type) {
+    const sanction = await memberRepository.findActiveRestriction({ memberId: member.id, type });
+    const days =
+      type === restrictionType.suspend && sanction?.endsAt
+        ? Math.round((sanction.endsAt.getTime() - sanction.startsAt.getTime()) / DAY_MS)
+        : null;
+    const endsAt = type === restrictionType.suspend ? (member.suspendedUntil ?? sanction?.endsAt ?? null) : null;
+    return {
+      nickname: member.nickname,
+      reason: sanction?.reason ?? null,
+      days,
+      endsAt: endsAt && endsAt.toISOString(),
+    };
   }
 
   /** GET /api/auth/check */
@@ -158,7 +192,8 @@ function createMemberService({ memberRepository, tokenProvider, bcryptRounds, no
       throw member.loginFailCount + 1 >= MAX_LOGIN_FAILURES ? accountLocked() : invalidCredentials();
     }
 
-    assertNotSanctioned(member, current);
+    const restriction = restrictionOf(member, current);
+    if (restriction) throw restrictionError(restriction, await describeRestriction(member, restriction));
 
     await memberRepository.recordLoginSuccess({ memberId: member.id, now: current });
     const refreshToken = tokenProvider.createRefreshToken({
@@ -195,7 +230,8 @@ function createMemberService({ memberRepository, tokenProvider, bcryptRounds, no
 
     const member = await memberRepository.findAuthMemberById(stored.memberId);
     if (!member || member.status === memberStatus.withdrawn) throw invalidRefreshToken();
-    assertNotSanctioned(member, current);
+    const restriction = restrictionOf(member, current);
+    if (restriction) throw restrictionError(restriction);
 
     const next = tokenProvider.createRefreshToken({ memberId: member.id, now: current, expiresAt: stored.expiresAt });
     return issueTokens(member.id, next);

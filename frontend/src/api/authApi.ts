@@ -1,4 +1,4 @@
-import { ACCESS_TOKEN_KEY, AUTH_CHANGE_EVENT, REFRESH_TOKEN_KEY, USER_KEY, request } from './http';
+import { ACCESS_TOKEN_KEY, AUTH_CHANGE_EVENT, ApiRequestError, REFRESH_TOKEN_KEY, USER_KEY, request } from './http';
 
 /** POST /api/auth/login 응답의 user (docs/API_SPEC.md 2절) */
 export interface LoginUser {
@@ -57,6 +57,30 @@ export async function login(userId: string, password: string, rememberMe: boolea
   const result = await request<LoginResult>('POST', '/api/auth/login', { userId, password, rememberMe });
   saveSession(result.accessToken, result.refreshToken, result.user);
   return result.user;
+}
+
+/**
+ * 정지 회원이 로그인하면 403 `ACCOUNT_SUSPENDED` / `ACCOUNT_BANNED` 의 error.sanction 으로 오는 제재 내용 (docs/API_SPEC.md 2절).
+ * reason·days 는 제재 기록을 찾지 못하면 null, 영구 정지(BAN)는 days·endsAt 이 null 입니다.
+ */
+export interface LoginSanction {
+  readonly type: 'SUSPEND' | 'BAN';
+  readonly nickname: string;
+  readonly reason: string | null;
+  readonly days: number | null;
+  /** 해제 예정 시각 (ISO-8601) */
+  readonly endsAt: string | null;
+}
+
+const SANCTION_ERROR_CODES: readonly string[] = ['ACCOUNT_SUSPENDED', 'ACCOUNT_BANNED'];
+
+/** 로그인 에러가 정지 회원 응답이면 제재 내용을, 아니면 null 을 돌려줍니다. */
+export function loginSanctionOf(err: unknown): LoginSanction | null {
+  if (!(err instanceof ApiRequestError) || !SANCTION_ERROR_CODES.includes(err.code)) return null;
+  const sanction = err.details.sanction;
+  if (typeof sanction !== 'object' || sanction === null) return null;
+  const { type, nickname } = sanction as Partial<LoginSanction>;
+  return (type === 'SUSPEND' || type === 'BAN') && typeof nickname === 'string' ? (sanction as LoginSanction) : null;
 }
 
 /** 서버 로그아웃은 실패해도(토큰 만료 등) 이 브라우저의 로그인 정보는 지웁니다. */
