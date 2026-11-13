@@ -5,6 +5,11 @@ const {
   DEFAULT_PAGE_SIZE,
   MAX_PAGE_SIZE,
   SEARCH_MAX_LENGTH,
+  DATE_PATTERN,
+  sortOrders,
+  BOOLEAN_VALUES,
+  KST_OFFSET_MS,
+  DAY_MS,
   REASON_MAX_LENGTH,
   LONG_TEXT_MAX_LENGTH,
   SUSPEND_MAX_DAYS,
@@ -26,6 +31,9 @@ const {
 
 const asTrimmedString = (value) => (typeof value === 'string' ? value.trim() : '');
 const asObject = (value) => (value && typeof value === 'object' && !Array.isArray(value) ? value : {});
+/** game.code (VARCHAR(30)) */
+const GAME_CODE_MAX_LENGTH = 30;
+
 /** 이모지처럼 서로게이트 쌍인 문자도 1자로 셉니다 (MySQL VARCHAR 글자 수 기준). */
 const charLength = (value) => Array.from(value).length;
 
@@ -90,28 +98,72 @@ function readSearch(errors, query) {
   return q || null;
 }
 
+/** 한국 시간 날짜(YYYY-MM-DD) 0시를 UTC Date 로. 형식이 틀리거나 없는 날짜면 null */
+function kstDayStart(text) {
+  if (!DATE_PATTERN.test(text)) return null;
+  const [year, month, day] = text.split('-').map(Number);
+  const utc = Date.UTC(year, month - 1, day);
+  const date = new Date(utc);
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return null;
+  return new Date(utc - KST_OFFSET_MS);
+}
+
 /**
- * 목록 조회 쿼리를 검증합니다. filters 는 { 쿼리 키: 허용 값 목록 } 입니다.
- * @returns {{ page: number, size: number, offset: number, q?: string | null } & Record<string, string | null>}
+ * 기간 필터 from · to (한국 시간 날짜, 둘 다 포함) → [createdFrom, createdBefore) UTC 범위
+ * @returns {{ createdFrom: Date | null, createdBefore: Date | null }}
  */
-function validateListQuery(rawQuery, { filters = {}, search = false } = {}) {
+function readDateRange(errors, query) {
+  const range = { createdFrom: null, createdBefore: null };
+  for (const key of ['from', 'to']) {
+    const text = asTrimmedString(query[key]);
+    if (!text) continue;
+    const start = kstDayStart(text);
+    if (!start) errors.add(key, adminMessages.dateInvalid);
+    else if (key === 'from') range.createdFrom = start;
+    else range.createdBefore = new Date(start.getTime() + DAY_MS);
+  }
+  if (range.createdFrom && range.createdBefore && range.createdFrom >= range.createdBefore) {
+    errors.add('to', adminMessages.dateRangeInvalid);
+  }
+  return range;
+}
+
+/**
+ * 목록 조회 쿼리를 검증합니다. 모든 목록이 page · size · sort(desc|asc) · from · to 를 받습니다.
+ * - filters: { 쿼리 키: 허용 값 목록 } — 값이 없으면 null
+ * - flags: 'true' | 'false' 로 받는 쿼리 키 목록 — boolean 또는 null
+ * - search: q(검색어) 사용 여부, game: 게임 코드 필터 사용 여부
+ */
+function validateListQuery(rawQuery, { filters = {}, flags = [], search = false, game = false } = {}) {
   const query = asObject(rawQuery);
   const errors = createErrors();
-  const result = readPaging(errors, query);
+  const result = { ...readPaging(errors, query), ...readDateRange(errors, query) };
+  result.sort = sortOrders[optionalEnum(errors, 'sort', query.sort, Object.keys(sortOrders)) ?? 'desc'];
   for (const [key, allowed] of Object.entries(filters)) result[key] = optionalEnum(errors, key, query[key], allowed);
+  for (const key of flags) {
+    const value = optionalEnum(errors, key, query[key], BOOLEAN_VALUES);
+    result[key] = value === null ? null : value === 'true';
+  }
   if (search) result.q = readSearch(errors, query);
+  if (game) {
+    const code = asTrimmedString(query.game);
+    if (charLength(code) > GAME_CODE_MAX_LENGTH) errors.add('game', adminMessages.gameInvalid);
+    result.game = code || null;
+  }
   errors.throwIfAny();
   return result;
 }
 
 const validateReportListQuery = (query) =>
-  validateListQuery(query, { filters: { status: reportStatuses, type: reportTargetTypes } });
-const validatePostListQuery = (query) => validateListQuery(query, { filters: { status: postStatuses }, search: true });
+  validateListQuery(query, { filters: { status: reportStatuses, type: reportTargetTypes }, search: true });
+const validatePostListQuery = (query) =>
+  validateListQuery(query, { filters: { status: postStatuses }, flags: ['reported'], search: true, game: true });
 const validateMemberListQuery = (query) =>
-  validateListQuery(query, { filters: { status: memberStatuses }, search: true });
+  validateListQuery(query, { filters: { status: memberStatuses }, flags: ['reported'], search: true });
 const validateCommentListQuery = (query) =>
-  validateListQuery(query, { filters: { status: commentFilterStatuses }, search: true });
-const validateHistoryQuery = (query) => validateListQuery(query, { filters: { kind: Object.keys(historyKinds) } });
+  validateListQuery(query, { filters: { status: commentFilterStatuses }, flags: ['secret'], search: true });
+const validateHistoryQuery = (query) =>
+  validateListQuery(query, { filters: { kind: Object.keys(historyKinds) }, search: true });
 
 /** 관리자 로그인 `{ userId, password }` */
 function validateAdminLogin(body) {

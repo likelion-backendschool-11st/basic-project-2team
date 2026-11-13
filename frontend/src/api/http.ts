@@ -23,9 +23,9 @@ export class ApiRequestError extends Error {
   }
 }
 
-const readToken = () => {
+const readToken = (key: string) => {
   try {
-    return localStorage.getItem(ACCESS_TOKEN_KEY);
+    return localStorage.getItem(key);
   } catch {
     return null;
   }
@@ -37,9 +37,14 @@ interface ApiEnvelope<T> {
   readonly error?: { readonly code: string; readonly message: string; readonly fields?: readonly FieldError[] };
 }
 
-/** JSON 요청을 보내고 `data` 를 돌려줍니다. 실패하면 ApiRequestError 를 던집니다. */
-export async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
-  const token = readToken();
+export interface RequestOptions {
+  /** Authorization 헤더에 실을 토큰의 localStorage 키 (관리자 API 는 ADMIN_ACCESS_TOKEN_KEY) */
+  readonly tokenKey?: string;
+}
+
+/** JSON 요청을 보내고 `data` 를 돌려줍니다. 실패하면 ApiRequestError 를 던집니다. 204 응답이면 undefined 입니다. */
+export async function request<T>(method: string, path: string, body?: unknown, { tokenKey = ACCESS_TOKEN_KEY }: RequestOptions = {}): Promise<T> {
+  const token = readToken(tokenKey);
   let res: Response;
   try {
     res = await fetch(`${API_BASE_URL}${path}`, {
@@ -50,6 +55,7 @@ export async function request<T>(method: string, path: string, body?: unknown): 
   } catch {
     throw new ApiRequestError(0, 'NETWORK_ERROR', '서버에 연결할 수 없습니다. 잠시 후 다시 시도해주세요.');
   }
+  if (res.status === 204) return undefined as T;
   const json = (await res.json().catch(() => null)) as ApiEnvelope<T> | null;
   if (!res.ok || !json?.success) {
     const error = json?.error;

@@ -100,6 +100,7 @@ const toPostItem = (row) => ({
   createdAt: row.createdAt,
   category: row.category,
   game: row.gameName,
+  gameCode: row.gameCode,
   partyType: row.partyType,
   content: row.contentName,
   title: row.title,
@@ -384,15 +385,23 @@ function createAdminService({ adminRepository, tokenProvider, bcryptRounds, now 
   async function getPost(postId) {
     const row = await adminRepository.findPostById(postId);
     if (!row) throw notFound('POST_NOT_FOUND', adminMessages.postNotFound);
-    const logs = await adminRepository.listActionLogsByTarget({
-      targetType: logTargetType.post,
-      targetId: postId,
-      limit: DETAIL_LOG_LIMIT,
-    });
+    const [logs, reports] = await Promise.all([
+      adminRepository.listActionLogsByTarget({
+        targetType: logTargetType.post,
+        targetId: postId,
+        limit: DETAIL_LOG_LIMIT,
+      }),
+      adminRepository.listReportsByPost(postId),
+    ]);
     const item = toPostItem(row);
     return {
       ...item,
-      author: { ...item.author, userId: row.authorLoginId, mannerTemp: toNumber(row.authorMannerTemp) },
+      author: {
+        ...item.author,
+        userId: row.authorLoginId,
+        mannerTemp: toNumber(row.authorMannerTemp),
+        sanctionCount: Number(row.authorSanctionCount),
+      },
       body: row.body,
       partyName: row.partyName,
       playStyle: row.playStyle,
@@ -406,6 +415,13 @@ function createAdminService({ adminRepository, tokenProvider, bcryptRounds, now 
       deleteReason: row.deleteReason,
       deletedBy: row.deletedByName,
       logs: logs.map(toLog),
+      reports: reports.map((report) => ({
+        id: report.id,
+        createdAt: report.createdAt,
+        reason: report.reasonCode,
+        status: report.status,
+        reporter: report.reporterNickname,
+      })),
     };
   }
 
@@ -579,10 +595,11 @@ function createAdminService({ adminRepository, tokenProvider, bcryptRounds, now 
   /** GET /api/admin/history */
   async function listHistory(query) {
     const input = validateHistoryQuery(query);
+    const { kind, size, ...filters } = input;
     const result = await adminRepository.listActionLogs({
-      actionTypes: input.kind ? historyKinds[input.kind] : null,
-      offset: input.offset,
-      limit: input.size,
+      ...filters,
+      actionTypes: kind ? historyKinds[kind] : null,
+      limit: size,
     });
     return toPage(result, input, (row) => ({
       ...toLog(row),

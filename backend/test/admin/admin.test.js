@@ -109,12 +109,18 @@ function createFakeRepository() {
     async updateReport({ id, status, action, memo, handledAt }) {
       Object.assign(byId(state.reports, id), { status, action, adminMemo: memo, handledAt });
     },
-    async listPosts({ status, q, offset, limit }) {
+    async listPosts({ status, q, offset, limit, ...rest }) {
+      state.lastPostQuery = { status, q, ...rest };
       const rows = state.posts.filter((p) => (!status || p.status === status) && (!q || p.title.includes(q)));
       return pageOf(rows, { offset, limit });
     },
     async findPostById(id) {
       return snapshot(byId(state.posts, id));
+    },
+    async listReportsByPost(postId) {
+      return state.reports
+        .filter((r) => r.targetType === 'POST' && r.targetId === postId)
+        .map((r) => ({ ...r, reporterNickname: nickname(r.reporterId) }));
     },
     async lockPost(id) {
       return snapshot(byId(state.posts, id));
@@ -387,6 +393,31 @@ describe('admin API', () => {
       const detail = await json(await request('GET', '/posts/100'));
       assert.equal(detail.body.data.title, '광고 공고');
       assert.deepEqual(detail.body.data.logs, []);
+      assert.deepEqual(
+        detail.body.data.reports.map((r) => [r.id, r.reporter]),
+        [[2, '신고자']],
+      );
+    });
+
+    it('기간(한국 시간)·정렬·게임·신고 여부 필터를 repository 로 넘기고, 형식이 틀리면 400', async () => {
+      await request('GET', '/posts?from=2026-11-01&to=2026-11-13&sort=asc&game=lol&reported=true');
+      assert.deepEqual(repo.state.lastPostQuery, {
+        page: 1,
+        size: 10,
+        status: null,
+        q: null,
+        createdFrom: new Date('2026-10-31T15:00:00Z'),
+        createdBefore: new Date('2026-11-13T15:00:00Z'),
+        sort: 'ASC',
+        reported: true,
+        game: 'lol',
+      });
+
+      const bad = await json(await request('GET', '/posts?from=2026-02-30&to=2026-01-01&sort=old&reported=yes'));
+      assert.equal(bad.status, 400);
+      assert.deepEqual(bad.body.error.fields.map((f) => f.field).sort(), ['from', 'reported', 'sort']);
+      const reversed = await json(await request('GET', '/posts?from=2026-11-13&to=2026-11-01'));
+      assert.deepEqual(reversed.body.error.fields.map((f) => f.field), ['to']);
     });
   });
 

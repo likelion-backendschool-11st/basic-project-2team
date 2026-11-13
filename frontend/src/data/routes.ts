@@ -17,6 +17,7 @@ export const ROUTES = {
   findId: '/find-id',
   findPassword: '/find-password',
   admin: '/admin',
+  adminLogin: '/admin/login',
   adminReports: '/admin/reports',
   adminReportDetail: '/admin/reports/:reportId',
   adminPosts: '/admin/posts',

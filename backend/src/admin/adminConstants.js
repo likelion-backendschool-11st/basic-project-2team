@@ -4,6 +4,11 @@
 const DEFAULT_PAGE_SIZE = 10;
 const MAX_PAGE_SIZE = 100;
 const SEARCH_MAX_LENGTH = 50;
+/** 기간 필터 from · to (YYYY-MM-DD, 한국 시간 날짜) */
+const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+/** 목록 정렬 (작성·접수·처리 일시 기준) */
+const sortOrders = Object.freeze({ desc: 'DESC', asc: 'ASC' });
+const BOOLEAN_VALUES = Object.freeze(['true', 'false']);
 
 /** post.delete_reason · 댓글 처리 사유 (VARCHAR(200)) */
 const REASON_MAX_LENGTH = 200;
@@ -159,6 +164,9 @@ const adminMessages = Object.freeze({
   pageInvalid: 'page 는 1 이상의 정수여야 합니다.',
   sizeInvalid: `size 는 1~${MAX_PAGE_SIZE} 사이의 정수여야 합니다.`,
   qInvalid: `검색어는 ${SEARCH_MAX_LENGTH}자 이하로 입력해주세요.`,
+  dateInvalid: '날짜는 YYYY-MM-DD 형식으로 입력해주세요.',
+  dateRangeInvalid: '시작일은 종료일보다 늦을 수 없습니다.',
+  gameInvalid: '게임 코드를 확인해주세요.',
   oneOf: (values) => `${values.join(', ')} 중 하나여야 합니다.`,
   reasonRequired: '사유를 입력해주세요.',
   reasonTooLong: (max) => `사유는 ${max}자 이하로 입력해주세요.`,
@@ -189,6 +197,9 @@ module.exports = {
   DEFAULT_PAGE_SIZE,
   MAX_PAGE_SIZE,
   SEARCH_MAX_LENGTH,
+  DATE_PATTERN,
+  sortOrders,
+  BOOLEAN_VALUES,
   REASON_MAX_LENGTH,
   LONG_TEXT_MAX_LENGTH,
   SUSPEND_MAX_DAYS,

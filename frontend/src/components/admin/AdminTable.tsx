@@ -36,7 +36,7 @@ export function AdminTable<T extends { readonly id: number }>({ title, list, col
           {actions}
         </div>
       </div>
-      <div className="overflow-x-auto rounded-2xl border border-night-borderLight">
+      <div aria-busy={list.loading} className={`overflow-x-auto rounded-2xl border border-night-borderLight transition-opacity ${list.loading && list.visible.length > 0 ? 'opacity-60' : ''}`}>
         <table className="w-full text-sm">
           <thead className="bg-night-base/70 text-xs text-fog-muted">
             <tr>
@@ -45,8 +45,15 @@ export function AdminTable<T extends { readonly id: number }>({ title, list, col
             </tr>
           </thead>
           <tbody className="divide-y divide-night-borderLight">
-            {list.visible.length === 0 && <tr><td colSpan={columns.length + 1} className="py-12 text-center text-fog-muted">{adminText.empty}</td></tr>}
-            {list.visible.map((r) => (
+            {list.error ? (
+              <tr><td colSpan={columns.length + 1} className="py-12 text-center text-rose-300">
+                {list.error}
+                <button type="button" onClick={list.reload} className="ml-3 text-xs underline text-fog-sub hover:text-white">{adminText.retry}</button>
+              </td></tr>
+            ) : list.visible.length === 0 && (
+              <tr><td colSpan={columns.length + 1} className="py-12 text-center text-fog-muted">{list.loading ? adminText.loading : adminText.empty}</td></tr>
+            )}
+            {!list.error && list.visible.map((r) => (
               <tr key={r.id} className={`hover:bg-white/[0.03] ${rowClass?.(r) ?? ''}`}>
                 {selection && <td className="px-3 py-3"><input type="checkbox" aria-label={`${r.id}번 선택`} checked={selection.selected.has(r.id)} onChange={() => selection.toggle(r.id)} className="rounded border-night-borderLight bg-night-card text-mercury" /></td>}
                 {columns.map((c) => <td key={c.header} className={`px-3 py-3 ${c.className ?? ''}`}>{c.cell(r)}</td>)}
