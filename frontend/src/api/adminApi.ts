@@ -44,7 +44,7 @@ export type MemberStatus = 'ACTIVE' | 'WARNED' | 'SUSPENDED' | 'BANNED' | 'WITHD
 export type SanctionType = 'WARNING' | 'SUSPEND' | 'BAN';
 export type CommentStatus = 'VISIBLE' | 'REPORTED' | 'HIDDEN' | 'DELETED';
 export type CommentUpdateStatus = Exclude<CommentStatus, 'REPORTED'>;
-export type HistoryKind = 'REPORT' | 'POST_DELETE' | 'COMMENT' | 'SANCTION' | 'MEMBER_VIEW' | 'LOGIN';
+export type HistoryKind = 'REPORT' | 'POST_DELETE' | 'COMMENT' | 'SANCTION' | 'LOGIN';
 export type AdminActionType =
   | 'ADMIN_LOGIN'
   | 'REPORT_PROCESS'

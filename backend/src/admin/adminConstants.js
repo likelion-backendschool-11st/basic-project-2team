@@ -127,15 +127,19 @@ const commentActionTypes = Object.freeze({
   [commentStatus.deleted]: actionType.commentDelete,
 });
 
-/** GET /api/admin/history 의 kind → action_type 목록 (화면의 처리 이력 탭) */
+/**
+ * GET /api/admin/history 의 kind → action_type 목록 (화면의 처리 이력 탭).
+ * 회원 상세 조회(MEMBER_VIEW)는 접근 기록으로 남기기만 하고 처리 이력 목록에는 보여 주지 않습니다.
+ */
 const historyKinds = Object.freeze({
   REPORT: [actionType.reportProcess],
   POST_DELETE: [actionType.postDelete],
   COMMENT: [actionType.commentHide, actionType.commentRestore, actionType.commentDelete],
   SANCTION: [actionType.memberSanction],
-  MEMBER_VIEW: [actionType.memberView],
   LOGIN: [actionType.login],
 });
+/** 처리 이력 목록에 보여 줄 action_type 전체 (kind 미지정 시) */
+const historyActionTypes = Object.freeze(Object.values(historyKinds).flat());
 const actionTypeKinds = Object.freeze(
   Object.fromEntries(
     Object.entries(historyKinds).flatMap(([kind, types]) => types.map((type) => [type, kind])),
@@ -233,6 +237,7 @@ module.exports = {
   actionType,
   commentActionTypes,
   historyKinds,
+  historyActionTypes,
   actionTypeKinds,
   logTargetType,
   notificationType,

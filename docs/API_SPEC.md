@@ -775,7 +775,7 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 | 회원 `status` | `ACTIVE`(정상) · `WARNED`(경고) · `SUSPENDED`(이용 정지) · `BANNED`(영구 정지) · `WITHDRAWN`(탈퇴) |
 | 제재 `type` | `WARNING`(경고) · `SUSPEND`(기간 정지) · `BAN`(영구 정지) |
 | 댓글 `status` | `VISIBLE`(정상) · `REPORTED`(신고됨 — 목록 전용, VISIBLE 이면서 신고 1건 이상) · `HIDDEN`(가림) · `DELETED`(삭제) |
-| 이력 `kind` | `REPORT`(신고 처리) · `POST_DELETE`(공고 삭제) · `COMMENT`(댓글 가림·복구·삭제) · `SANCTION`(회원 제재) · `MEMBER_VIEW`(회원 정보 조회) · `LOGIN`(관리자 로그인) |
+| 이력 `kind` | `REPORT`(신고 처리) · `POST_DELETE`(공고 삭제) · `COMMENT`(댓글 가림·복구·삭제) · `SANCTION`(회원 제재) · `LOGIN`(관리자 로그인) — 회원 상세 조회(`MEMBER_VIEW`)는 접근 기록으로 저장만 하고 목록에는 나오지 않음 |
 
 **관리자 로그인 응답** `200 OK`
 
