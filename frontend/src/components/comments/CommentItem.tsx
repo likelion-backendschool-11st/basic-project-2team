@@ -48,7 +48,7 @@ export const CommentItem: React.FC<CommentItemProps> = (p) => {
         <span className="text-fog-muted">{ago(c.ageMin)}</span>
         {c.secret && <i className="fa-solid fa-lock text-[10px] text-amberAccent" />}
       </div>
-      {p.popoverOpen && <UserPopover name={c.author} profile={p.profile} onAction={p.onPopoverAction} onClose={p.onTogglePopover} />}
+      {p.popoverOpen && <UserPopover profile={p.profile} onAction={p.onPopoverAction} onClose={p.onTogglePopover} />}
       {p.isEditing ? (
         <div className="mt-2">
           <textarea value={draft} onChange={(e) => setDraft(e.target.value)} rows={2} className="w-full resize-none rounded-lg bg-night-surface border-0 p-3 text-sm text-fog-headline focus:ring-1 focus:ring-mercury" />

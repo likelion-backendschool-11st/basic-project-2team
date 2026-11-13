@@ -48,5 +48,5 @@ export const updateComment = (commentId: number, text: string) =>
 export const deleteComment = (commentId: number) => request<void>('DELETE', `/api/comments/${commentId}`);
 
 /** POST /api/reports — 현재 서버는 COMMENT 신고만 받습니다 (docs/API_SPEC.md 6절). */
-export const reportComment = (commentId: number, reason: string) =>
-  request<{ readonly id: number }>('POST', '/api/reports', { targetType: 'COMMENT', targetId: commentId, reason });
+export const reportComment = (commentId: number, reason: string, detail?: string) =>
+  request<{ readonly id: number }>('POST', '/api/reports', { targetType: 'COMMENT', targetId: commentId, reason, ...(detail ? { detail } : {}) });

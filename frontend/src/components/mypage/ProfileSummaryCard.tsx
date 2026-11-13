@@ -4,12 +4,14 @@ import ProfileStatsPanel from './ProfileStatsPanel';
 
 interface ProfileSummaryCardProps {
   readonly profile: ProfileSummary;
+  /** false 면 바깥 카드(배경·테두리·여백) 없이 내용만 그립니다 — 댓글 프로필 팝오버용 */
+  readonly framed?: boolean;
 }
 
 /** MyPage top card: avatar + level, profile fields, activity stats. */
-export const ProfileSummaryCard: React.FC<ProfileSummaryCardProps> = ({ profile }) => (
-  <div className="bg-night-surface border border-night-borderLight rounded-2xl p-6 shadow-sm relative overflow-hidden">
-    <div className="absolute -right-20 -top-20 w-64 h-64 bg-mercury/10 rounded-full blur-3xl pointer-events-none" />
+export const ProfileSummaryCard: React.FC<ProfileSummaryCardProps> = ({ profile, framed = true }) => (
+  <div className={framed ? 'bg-night-surface border border-night-borderLight rounded-2xl p-6 shadow-sm relative overflow-hidden' : 'relative'}>
+    {framed && <div className="absolute -right-20 -top-20 w-64 h-64 bg-mercury/10 rounded-full blur-3xl pointer-events-none" />}
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
       <div className="lg:col-span-3 flex flex-col items-center sm:items-start lg:items-center">
         <div className="relative group">
