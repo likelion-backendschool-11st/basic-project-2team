@@ -386,7 +386,7 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 
 **참가 신청 (`POST /api/posts/{postId}/applications`)** — 본문 `{ "role": "서포터", "message": "잘 부탁드려요" }` (둘 다 선택, `role` 30자·`message` 200자 이하) → `201` `{ "id": 3, "status": "PENDING" }`
 
-- 취소(`CANCELED`)했던 신청은 같은 행을 `PENDING` 으로 되살립니다. 거절(`REJECTED`)·노쇼(`NO_SHOW`)된 신청은 다시 할 수 없습니다.
+- 취소(`CANCELED`)했던 신청은 같은 행을 `PENDING` 으로 되살립니다. 이때 `late_cancel` · `canceled_at` 취소 기록은 지우지 않습니다. 거절(`REJECTED`)·노쇼(`NO_SHOW`)된 신청은 다시 할 수 없습니다.
 - 오류: 400 `INVALID_INPUT`(필드별), 401 `UNAUTHORIZED`, 403 `CANNOT_APPLY_OWN_POST` · `REAPPLY_NOT_ALLOWED` · `ACCOUNT_BANNED` · `ACCOUNT_SUSPENDED`, 404 `POST_NOT_FOUND`, 409 `POST_CLOSED`(`OPEN` 이 아님) · `PARTY_FULL`(정원이 참) · `ALREADY_APPLIED`(대기 중·수락됨).
 
 **신청 취소 (`DELETE /api/posts/{postId}/applications/me`)** → `204`

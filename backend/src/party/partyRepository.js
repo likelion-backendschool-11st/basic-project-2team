@@ -52,10 +52,13 @@ function createPartyRepository(pool) {
     }
   }
 
-  /** 취소했던 신청을 같은 행에서 다시 PENDING 으로 되돌립니다. 그 사이 상태가 바뀌었으면 false */
+  /**
+   * 취소했던 신청을 같은 행에서 다시 PENDING 으로 되돌립니다. 그 사이 상태가 바뀌었으면 false.
+   * 취소 기록(late_cancel · canceled_at)은 지우지 않습니다. 직전 취소 이력을 재신청으로 지울 수 없게 하기 위해서입니다.
+   */
   async function reapply({ id, role, message }) {
     const [result] = await pool.query(
-      `UPDATE post_application SET status = '${S.pending}', role = ?, message = ?, canceled_at = NULL, decided_at = NULL, late_cancel = FALSE
+      `UPDATE post_application SET status = '${S.pending}', role = ?, message = ?, decided_at = NULL
         WHERE id = ? AND status = '${S.canceled}'`,
       [role, message, id],
     );
@@ -95,7 +98,7 @@ function createPartyRepository(pool) {
 
       const wasAccepted = application.status === S.accepted;
       await connection.query(
-        `UPDATE post_application SET status = '${S.canceled}', canceled_at = ?, late_cancel = ? WHERE id = ?`,
+        `UPDATE post_application SET status = '${S.canceled}', canceled_at = ?, late_cancel = (late_cancel OR ?) WHERE id = ?`,
         [canceledAt, wasAccepted && lateCancel, application.id],
       );
       if (wasAccepted) {

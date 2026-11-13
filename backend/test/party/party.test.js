@@ -39,7 +39,7 @@ function createFakeRepository() {
     async reapply({ id, role, message }) {
       const a = state.applications.find((x) => x.id === id);
       if (a.status !== 'CANCELED') return false;
-      Object.assign(a, { status: 'PENDING', role, message, lateCancel: false });
+      Object.assign(a, { status: 'PENDING', role, message });
       return true;
     },
     async cancelApplication({ postId, applicantId, lateCancel }) {
@@ -47,7 +47,7 @@ function createFakeRepository() {
       if (!a || !['PENDING', 'ACCEPTED'].includes(a.status)) return false;
       if (a.status === 'ACCEPTED') {
         state.posts.get(postId).currentCount -= 1;
-        a.lateCancel = lateCancel;
+        a.lateCancel = a.lateCancel || lateCancel;
       }
       a.status = 'CANCELED';
       return true;
@@ -195,6 +195,19 @@ describe('party application API', () => {
         [repo.state.applications[0].status, repo.state.applications[0].lateCancel, repo.state.posts.get(1).currentCount],
         ['CANCELED', true, 1],
       );
+    });
+
+    it('late_cancel 기록은 재신청해도, 이후 여유 있게 취소해도 지워지지 않는다', async () => {
+      await apply(A);
+      await decide(1, 'ACCEPTED');
+      repo.state.posts.get(1).scheduleAt = new Date('2026-11-14T02:00:00Z');
+      await call('DELETE', '/1/applications/me', undefined, A);
+      await apply(A);
+      assert.equal(repo.state.applications[0].lateCancel, true);
+      await decide(1, 'ACCEPTED');
+      repo.state.posts.get(1).scheduleAt = new Date('2026-11-20T00:00:00Z');
+      await call('DELETE', '/1/applications/me', undefined, A);
+      assert.equal(repo.state.applications[0].lateCancel, true);
     });
 
     it('출발까지 여유가 있으면 late_cancel 이 아니다', async () => {
