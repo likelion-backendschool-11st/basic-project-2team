@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { HEADCOUNT_MAX, initialDraft, toolbarActions, typeLabels, writeText, type SelectOption, type ToolbarAction } from '../data/writeData';
 import { paths, ROUTES } from '../data/routes';
 import { getGames, type Game } from '../api/gameApi';
-import { createPost, getLatestDraft, saveDraft as saveDraftApi } from '../api/postApi';
+import { createPost, getLatestDraft, saveDraft as saveDraftApi, updatePost } from '../api/postApi';
+import { getPostDetail } from '../api/postDetailApi';
 import { ApiRequestError } from '../api/http';
 import { useModal } from './useModal';
 import { useToast } from './useToast';
@@ -30,7 +31,13 @@ function normalizeDraft(draft: WriteDraft, games: readonly Game[]): WriteDraft {
 const clock = (date = new Date()) => date.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
 const labelOf = (list: readonly { value: string; label: string }[], value: string) => list.find((o) => o.value === value)?.label ?? '';
 
-export function useWriteForm() {
+const pad = (n: number) => String(n).padStart(2, '0');
+
+/** `postId` 를 주면 수정 모드: 기존 공고를 불러와 채우고 PUT 으로 저장합니다. */
+export function useWriteForm(postId?: string) {
+  const editing = postId !== undefined;
+  /** 수정 모드에서 불러온 값: 일정(바꾸지 않으면 지난 일정도 허용)과 태그(PUT 이 교체하므로 그대로 다시 보냄) */
+  const original = useRef<{ schedule: string | null; tags: readonly string[] }>({ schedule: null, tags: [] });
   const navigate = useNavigate();
   const [draft, setDraft] = useState<WriteDraft>(initialDraft);
   const [savedAt, setSavedAt] = useState<string | null>(null);
@@ -48,21 +55,45 @@ export function useWriteForm() {
    */
   useEffect(() => {
     let cancelled = false;
-    Promise.all([getGames(), getLatestDraft().catch(() => null)])
+    Promise.all([getGames(), editing ? getPostDetail(postId) : getLatestDraft().catch(() => null)])
       .then(([list, saved]) => {
         if (cancelled) return;
         setGames(list);
-        if (saved) {
+        if (saved && 'host' in saved) {
+          if (!saved.viewer?.isOwner) return navigate(paths.postDetail(postId!), { replace: true });
+          const at = saved.schedule ? new Date(saved.schedule) : null;
+          original.current = { schedule: saved.schedule, tags: saved.tags };
+          setDraft(
+            normalizeDraft(
+              {
+                ...initialDraft,
+                title: saved.title,
+                body: saved.body,
+                partyName: saved.partyName ?? '',
+                game: saved.game,
+                type: saved.type,
+                detail: saved.detail ?? '',
+                headcount: saved.headcount,
+                style: saved.style ?? initialDraft.style,
+                tbd: saved.scheduleTbd,
+                date: at ? `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}` : '',
+                time: at ? `${pad(at.getHours())}:${pad(at.getMinutes())}` : '',
+                voice: saved.voiceRequired,
+              },
+              list,
+            ),
+          );
+        } else if (saved && 'savedAt' in saved) {
           setDraft(normalizeDraft({ ...initialDraft, ...saved.draft }, list));
           setSavedAt(clock(new Date(saved.savedAt)));
           toast.show(writeText.draftLoaded);
         }
       })
-      .catch(() => !cancelled && setError(writeText.optionsLoadFailed));
+      .catch(() => !cancelled && setError(editing ? writeText.editLoadFailed : writeText.optionsLoadFailed));
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- toast.show 는 안정적이라 한 번만 실행
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- toast.show 는 안정적이라 한 번만 실행(postId 는 라우트로 고정)
   }, []);
 
   const set = useCallback(
@@ -114,13 +145,15 @@ export function useWriteForm() {
     // 날짜·시간은 브라우저 로컬 시간. 비어 있거나 지금 이전이면 서버에 보내기 전에 막습니다.
     const scheduleAt = draft.tbd ? null : new Date(`${draft.date}T${draft.time}`);
     if (scheduleAt && (!draft.date || !draft.time || Number.isNaN(scheduleAt.getTime()))) return setError(writeText.scheduleRequired);
-    if (scheduleAt && scheduleAt.getTime() <= Date.now()) return setError(writeText.schedulePast);
+    // 수정 때 일정을 그대로 두면 이미 지난 일정이어도 서버가 허용합니다.
+    const scheduleUnchanged = editing && scheduleAt !== null && scheduleAt.getTime() === new Date(original.current.schedule ?? NaN).getTime();
+    if (scheduleAt && !scheduleUnchanged && scheduleAt.getTime() <= Date.now()) return setError(writeText.schedulePast);
     if (!draft.game) return setError(writeText.placeholders.game);
     if (!draft.type) return setError(writeText.placeholders.type);
     if (options.detail.length > 0 && !draft.detail) return setError(writeText.placeholders.detail);
     setSubmitting(true);
     try {
-      const { id } = await createPost({
+      const body = {
         title: draft.title,
         body: draft.body,
         partyName: draft.partyName,
@@ -133,11 +166,12 @@ export function useWriteForm() {
         // 날짜·시간은 브라우저 로컬 시간 → 시간대가 포함된 ISO 문자열
         schedule: scheduleAt?.toISOString(),
         voiceRequired: draft.voice,
-      });
+      };
+      const { id } = editing ? await updatePost(postId, { ...body, tags: original.current.tags }) : await createPost(body);
       navigate(paths.postDetail(String(id)));
     } catch (err) {
       // 필드별 오류가 있으면 첫 번째 메시지를, 없으면 서버 메시지를 보여줍니다.
-      setError(err instanceof ApiRequestError ? (err.fields[0]?.message ?? err.message) : writeText.submitFailed);
+      setError(err instanceof ApiRequestError ? (err.fields[0]?.message ?? err.message) : editing ? writeText.updateFailed : writeText.submitFailed);
     } finally {
       setSubmitting(false);
     }
@@ -163,6 +197,6 @@ export function useWriteForm() {
   return {
     draft, set, options, savedAt, previewing, submitting, togglePreview: () => setPreviewing((v) => !v), error, bodyRef,
     toolbarActions, maxHeadcount, applyToolbar, saveDraft, submit, summary, chars, gameLabel, typeLabel,
-    leave, confirmLeave: () => navigate(ROUTES.board), toast,
+    editing, leave, confirmLeave: () => navigate(editing ? paths.postDetail(postId) : ROUTES.board), toast,
   };
 }

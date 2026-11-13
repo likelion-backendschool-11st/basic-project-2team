@@ -6,6 +6,7 @@ import OptionPanel from '../components/write/OptionPanel';
 import WriteTopBar from '../components/write/WriteTopBar';
 import { inputBaseClass } from '../components/signup/fieldStyles';
 import { writeText } from '../data/writeData';
+import { useParams } from 'react-router-dom';
 import { useWriteForm } from '../hooks/useWriteForm';
 
 interface PostWritePageProps {
@@ -14,10 +15,11 @@ interface PostWritePageProps {
 
 /** Stitch screen: "OurParty 공고글 작성하기" (262fbf52487f4fddb91379d500854527) */
 export const PostWritePage: React.FC<PostWritePageProps> = () => {
-  const f = useWriteForm();
+  const { postId } = useParams();
+  const f = useWriteForm(postId);
   return (
     <div className="min-h-screen flex flex-col bg-night-base">
-      <WriteTopBar savedAt={f.savedAt} onDraft={f.saveDraft} onLeave={f.leave.open} />
+      <WriteTopBar savedAt={f.savedAt} onDraft={f.editing ? undefined : f.saveDraft} editing={f.editing} onLeave={f.leave.open} />
       <main className="flex-1 max-w-[1520px] w-full mx-auto p-4 lg:p-6 grid grid-cols-1 xl:grid-cols-[1fr_420px] gap-6 items-start">
         <div className="flex flex-col gap-5">
           <section className="rounded-2xl border border-night-borderLight bg-night-surface p-5">
@@ -31,7 +33,7 @@ export const PostWritePage: React.FC<PostWritePageProps> = () => {
             </button>
             <p className="flex-1 min-w-48 text-xs text-fog-muted">{f.error ? <span className="text-rose-300">{f.error}</span> : writeText.syncNote}</p>
             <button type="button" onClick={f.submit} disabled={f.submitting} className="disabled:opacity-60 h-12 px-8 rounded-xl bg-mercury hover:bg-mercury-light text-sm font-bold text-white shadow-lg shadow-mercury/30 flex items-center gap-2">
-              <i className="fa-solid fa-triangle-exclamation" />{writeText.submit}
+              <i className="fa-solid fa-triangle-exclamation" />{f.editing ? writeText.submitEdit : writeText.submit}
             </button>
           </section>
         </div>

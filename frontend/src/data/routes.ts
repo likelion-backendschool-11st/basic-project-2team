@@ -4,6 +4,7 @@ export const ROUTES = {
   board: '/board',
   postWrite: '/board/write',
   postDetail: '/board/:postId',
+  postEdit: '/board/:postId/edit',
   search: '/search',
   notifications: '/notifications',
   myPage: '/mypage',
@@ -31,6 +32,7 @@ export const ROUTES = {
 /** Concrete URLs for the parameterised routes above. */
 export const paths = {
   postDetail: (postId: string) => `/board/${postId}`,
+  postEdit: (postId: string) => `/board/${postId}/edit`,
   adminReportDetail: (reportId: string) => `/admin/reports/${reportId}`,
   adminPostDetail: (postId: string) => `/admin/posts/${postId}`,
   adminMemberDetail: (memberId: string) => `/admin/members/${memberId}`,

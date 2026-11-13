@@ -10,6 +10,7 @@ import ReviewPage from '../pages/ReviewPage';
 export const boardRoutes: RouteObject[] = [
   { path: ROUTES.board, element: <BoardPage /> },
   { path: ROUTES.postWrite, element: <RequireLogin><PostWritePage /></RequireLogin> },
+  { path: ROUTES.postEdit, element: <RequireLogin message="공고 수정은 로그인 후 사용할 수 있습니다."><PostWritePage /></RequireLogin> },
   { path: ROUTES.postDetail, element: <PostDetailPage /> },
   { path: ROUTES.review, element: <ReviewPage /> },
 ];

@@ -26,6 +26,10 @@ export const saveDraft = (draft: object) => request<DraftResponse>('POST', '/api
 /** 내 임시저장. 저장한 적이 없으면 null */
 export const getLatestDraft = () => request<DraftResponse | null>('GET', '/api/posts/drafts/latest');
 
+/** PUT /api/posts/{postId} — 작성과 같은 본문을 통째로 다시 보냅니다(tags 는 보낸 것으로 교체). */
+export const updatePost = (postId: string, body: CreatePostRequest & { readonly tags: readonly string[] }) =>
+  request<{ readonly id: number }>('PUT', `/api/posts/${encodeURIComponent(postId)}`, body);
+
 export const createPost = (body: CreatePostRequest) => request<{ readonly id: number }>('POST', '/api/posts', body);
 
 /** PATCH /api/posts/{postId}/status — COMPLETED 는 마이페이지 「활동 완료」에서만 쓰고 되돌릴 수 없습니다. */
