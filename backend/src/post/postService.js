@@ -70,7 +70,21 @@ function createPostService({ postRepository, now = () => new Date() }) {
     return row ? toDraftResponse(row) : null;
   }
 
-  return { createPost, saveDraft, getLatestDraft };
+  /**
+   * DELETE /api/posts/:postId — 작성자만 지울 수 있고, 소프트 삭제입니다.
+   * postId 가 1 이상의 정수가 아니어도 404 입니다(공고 상세와 같은 규칙).
+   */
+  async function deletePost(postId, memberId) {
+    const notFound = () => new ApiError(404, 'POST_NOT_FOUND', postMessages.postNotFound);
+    if (!/^[1-9]\d*$/.test(postId) || !Number.isSafeInteger(Number(postId))) throw notFound();
+
+    const post = await postRepository.findPostAuthor(Number(postId));
+    if (!post) throw notFound();
+    if (post.authorId !== memberId) throw new ApiError(403, 'NOT_POST_AUTHOR', postMessages.notPostAuthor);
+    if (!(await postRepository.softDeletePost(Number(postId), now()))) throw notFound();
+  }
+
+  return { createPost, saveDraft, getLatestDraft, deletePost };
 }
 
 module.exports = { createPostService };

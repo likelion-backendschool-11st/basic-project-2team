@@ -4,6 +4,8 @@
  * post · post_tag · tag · game · game_content 테이블 접근.
  * @param {import('mysql2/promise').Pool} pool
  */
+const { POST_STATUS_DELETED } = require('./postConstants');
+
 function createPostRepository(pool) {
   /** 게임 코드 → { id, categoryCode }. 없거나 비활성이면 null */
   async function findGameByCode(code) {
@@ -86,7 +88,40 @@ function createPostRepository(pool) {
     return rows[0] ?? null;
   }
 
-  return { findGameByCode, findGameContent, createPost, saveDraft, findDraft };
+  /** 삭제되지 않은 공고의 작성자 → { authorId }. 없거나 삭제됐으면 null */
+  async function findPostAuthor(postId) {
+    const [rows] = await pool.query(
+      `SELECT author_id AS authorId FROM post WHERE id = ? AND deleted_at IS NULL AND status <> '${POST_STATUS_DELETED}' LIMIT 1`,
+      [postId],
+    );
+    return rows[0] ?? null;
+  }
+
+  /**
+   * 공고를 소프트 삭제(status = DELETED, deleted_at)하고 스크랩을 정리합니다. 신청·댓글·리뷰는 그대로 둡니다.
+   * @returns {Promise<boolean>} 삭제했으면 true, 그 사이 이미 삭제됐으면 false
+   */
+  async function softDeletePost(postId, deletedAt) {
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+      const [result] = await connection.query(
+        `UPDATE post SET status = '${POST_STATUS_DELETED}', deleted_at = ?
+          WHERE id = ? AND deleted_at IS NULL AND status <> '${POST_STATUS_DELETED}'`,
+        [deletedAt, postId],
+      );
+      if (result.affectedRows > 0) await connection.query('DELETE FROM post_scrap WHERE post_id = ?', [postId]);
+      await connection.commit();
+      return result.affectedRows > 0;
+    } catch (err) {
+      await connection.rollback();
+      throw err;
+    } finally {
+      connection.release();
+    }
+  }
+
+  return { findGameByCode, findGameContent, createPost, saveDraft, findDraft, findPostAuthor, softDeletePost };
 }
 
 module.exports = { createPostRepository };
