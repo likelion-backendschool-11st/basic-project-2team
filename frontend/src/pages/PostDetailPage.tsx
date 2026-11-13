@@ -62,7 +62,7 @@ const PostDetailView: React.FC<{ readonly postId: string }> = ({ postId }) => {
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_380px] gap-6 items-start">
         <div className="flex flex-col gap-5 min-w-0">
           <PostHeader detail={detail} filled={post.filled} state={post.state} scrapped={post.scrapped} onScrap={post.toggleScrap} onShare={post.copyLink} onEdit={() => navigate(paths.postEdit(String(detail.id)))} onRemove={post.remove.open} />
-          {detail.isOwner && <ApplicantBanner count={post.applicants.length} onManage={post.applicantsDialog.open} />}
+          {detail.isOwner && <ApplicantBanner count={post.applicants.length} names={post.applicants.map((a) => a.name)} onManage={post.applicantsDialog.open} />}
           <PostTiles tiles={detail.tiles} />
           <PostDescription detail={detail} />
           <CommentSection thread={thread} ownerView={detail.isOwner} title={detail.isOwner ? '댓글 및 공대 문의' : commentText.title} />

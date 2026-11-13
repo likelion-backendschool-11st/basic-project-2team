@@ -33,6 +33,7 @@ export interface PostDetail {
   readonly participants: readonly Participant[];
   readonly status: PostStatus;
   readonly commentCount: number;
+  readonly scrapCount: number;
   /** 로그인한 사용자 기준 (비로그인이면 false / null) */
   readonly scrapped: boolean;
   readonly applicationStatus: ApplicationStatus | null;
@@ -122,7 +123,11 @@ export const postText = {
   remove: '삭제',
   waiting: (n: number) => `대기 중인 참여 신청 ${n}건`,
   waitingTag: '실시간 필수',
-  waitingNote: '홀리한빛(1625 홀나), 붓끝의마법(1621 도화가)님이 승인 대기 중입니다.',
+  /** 대기 중인 신청자 닉네임을 최대 3명까지 보여주고 나머지는 「외 N명」 */
+  waitingNote: (names: readonly string[]) =>
+    names.length === 0
+      ? '대기 중인 신청자가 없습니다.'
+      : `${names.slice(0, 3).join(', ')}${names.length > 3 ? ` 외 ${names.length - 3}명` : ''}님이 승인 대기 중입니다.`,
   manageApplicants: '신청자 목록 관리 / 승인',
   participantsTitle: '파티 참가자 명단',
   conditionsTitle: '파티 모집 상세 조건',
