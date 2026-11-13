@@ -21,8 +21,16 @@ const MAX_SEARCH_LENGTH = 50;
 /** category 코드 형식 (category.code). 목록에 없는 코드는 빈 결과로 응답합니다. */
 const CATEGORY_PATTERN = /^[a-z0-9_-]{1,20}$/;
 
+/** GET /api/posts/popular · urgent (메인 화면, docs/API_SPEC.md 3절). 메인 카드 수(frontend homeData)에 맞춘 기본값 */
+const DEFAULT_FEATURED_LIMIT = 4;
+const MAX_FEATURED_LIMIT = 20;
+/** 마감 임박 기준: 남은 자리가 이 수 이하이거나 출발이 이 시간 안으로 다가온 모집 중 공고 */
+const URGENT_REMAINING_SEATS = 2;
+const URGENT_WITHIN_HOURS = 24;
+
 const boardMessages = Object.freeze({
   invalidInput: '입력값을 확인해주세요.',
+  limitInvalid: `limit 는 1~${MAX_FEATURED_LIMIT} 사이의 정수여야 합니다.`,
   categoryInvalid: 'category 형식이 올바르지 않습니다.',
   sortInvalid: `sort 는 ${POST_SORTS.join(', ')} 중 하나여야 합니다.`,
   searchInvalid: `q 는 ${MAX_SEARCH_LENGTH}자 이하여야 합니다.`,
@@ -35,6 +43,10 @@ const boardMessages = Object.freeze({
 });
 
 module.exports = {
+  DEFAULT_FEATURED_LIMIT,
+  MAX_FEATURED_LIMIT,
+  URGENT_REMAINING_SEATS,
+  URGENT_WITHIN_HOURS,
   POST_STATUS,
   POST_ID_PATTERN,
   POST_SORTS,

@@ -10,6 +10,8 @@ const {
   MAX_FILTER_TAGS,
   MAX_SEARCH_LENGTH,
   CATEGORY_PATTERN,
+  DEFAULT_FEATURED_LIMIT,
+  MAX_FEATURED_LIMIT,
   boardMessages: m,
 } = require('./boardConstants');
 
@@ -47,6 +49,17 @@ function parseTags(raw) {
   return tags.length <= MAX_FILTER_TAGS ? tags : null;
 }
 
+/** 인기·마감 임박 쿼리(category, limit)를 검증·정규화합니다. */
+function parseFeaturedQuery(query) {
+  const fields = [];
+  const category = query.category === undefined ? null : asString(query.category);
+  if (category !== null && !CATEGORY_PATTERN.test(category)) fields.push({ field: 'category', message: m.categoryInvalid });
+  const limit = parseInteger(query.limit, DEFAULT_FEATURED_LIMIT);
+  if (limit === null || limit < 1 || limit > MAX_FEATURED_LIMIT) fields.push({ field: 'limit', message: m.limitInvalid });
+  if (fields.length > 0) throw new ApiError(400, 'INVALID_INPUT', m.invalidInput, fields);
+  return { category, limit };
+}
+
 /**
  * 공고 목록 쿼리(category, q, sort, tags, page, size, excludeClosed)를 검증·정규화합니다.
  * @returns {{ category: string | null, q: string, sort: string, tags: string[], page: number, size: number, excludeClosed: boolean }}
@@ -80,4 +93,4 @@ function parseListQuery(query) {
   return { category, q, sort, tags, page, size, excludeClosed: excludeClosedRaw === 'true' };
 }
 
-module.exports = { parsePostId, parseListQuery };
+module.exports = { parsePostId, parseListQuery, parseFeaturedQuery };

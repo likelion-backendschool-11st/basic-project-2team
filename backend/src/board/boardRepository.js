@@ -1,6 +1,6 @@
 'use strict';
 
-const { POST_STATUS } = require('./boardConstants');
+const { POST_STATUS, URGENT_REMAINING_SEATS, URGENT_WITHIN_HOURS } = require('./boardConstants');
 
 /** 삭제되지 않은 공고만 대상으로 하는 조건 (소프트 삭제: deleted_at / status = DELETED) */
 const ALIVE_POST = `p.deleted_at IS NULL AND p.status <> '${POST_STATUS.deleted}'`;
@@ -11,6 +11,16 @@ const LIST_ORDER = Object.freeze({
   views: 'p.view_count DESC, p.id DESC',
   urgent: '(p.schedule_at IS NULL), p.schedule_at ASC, (p.headcount - p.current_count) ASC, p.id DESC',
 });
+
+/** 목록·인기·마감 임박이 같은 모양의 행을 돌려주도록 공유하는 SELECT 열과 JOIN */
+const LIST_COLUMNS = `p.id, p.category_code AS categoryCode, g.code AS gameCode, g.name AS gameName,
+              p.party_type AS partyType, p.title, p.headcount, p.current_count AS currentCount,
+              p.schedule_at AS scheduleAt, p.voice_required AS voiceRequired, p.status,
+              p.view_count AS viewCount, p.comment_count AS commentCount, p.created_at AS createdAt,
+              m.nickname AS authorNickname, m.status AS authorStatus`;
+const LIST_JOINS = `FROM post p
+         JOIN game g ON g.id = p.game_id
+         JOIN member m ON m.id = p.author_id`;
 
 /**
  * 공고 목록·상세 조회용 테이블 접근: post · category · game · game_content · member · post_tag · tag · post_scrap · post_application
@@ -103,20 +113,44 @@ function createBoardRepository(pool) {
 
     const [[{ totalCount }]] = await pool.query(`SELECT COUNT(*) AS totalCount FROM post p JOIN game g ON g.id = p.game_id WHERE ${condition}`, params);
     const [rows] = await pool.query(
-      `SELECT p.id, p.category_code AS categoryCode, g.code AS gameCode, g.name AS gameName,
-              p.party_type AS partyType, p.title, p.headcount, p.current_count AS currentCount,
-              p.schedule_at AS scheduleAt, p.voice_required AS voiceRequired, p.status,
-              p.view_count AS viewCount, p.comment_count AS commentCount, p.created_at AS createdAt,
-              m.nickname AS authorNickname, m.status AS authorStatus
-         FROM post p
-         JOIN game g ON g.id = p.game_id
-         JOIN member m ON m.id = p.author_id
+      `SELECT ${LIST_COLUMNS}
+         ${LIST_JOINS}
         WHERE ${condition}
         ORDER BY ${LIST_ORDER[sort]}
         LIMIT ? OFFSET ?`,
       [...params, limit, offset],
     );
     return { rows, totalCount };
+  }
+
+  /**
+   * 메인 화면용 인기·마감 임박 공고. 모집 중이고 아직 출발하지 않은(일정 미정 포함) 공고만 대상입니다.
+   * - popular: 조회수 → 댓글 수 순
+   * - urgent: 남은 자리가 적거나 출발이 곧인 공고를, 출발이 가까운 순(미정은 뒤) → 남은 자리가 적은 순
+   * @param {{ kind: 'popular' | 'urgent', category: string | null, limit: number, now: Date }} filter
+   */
+  async function findFeaturedPosts({ kind, category, limit, now }) {
+    const where = [ALIVE_POST, `p.status = '${POST_STATUS.open}'`, '(p.schedule_at IS NULL OR p.schedule_at > ?)'];
+    const params = [now];
+    if (category) {
+      where.push('p.category_code = ?');
+      params.push(category);
+    }
+    let order = 'p.view_count DESC, p.comment_count DESC, p.id DESC';
+    if (kind === 'urgent') {
+      where.push(`((p.headcount - p.current_count) <= ${URGENT_REMAINING_SEATS} OR p.schedule_at <= ?)`);
+      params.push(new Date(now.getTime() + URGENT_WITHIN_HOURS * 3_600_000));
+      order = LIST_ORDER.urgent;
+    }
+    const [rows] = await pool.query(
+      `SELECT ${LIST_COLUMNS}
+         ${LIST_JOINS}
+        WHERE ${where.join(' AND ')}
+        ORDER BY ${order}
+        LIMIT ?`,
+      [...params, limit],
+    );
+    return rows;
   }
 
   /** 여러 공고의 태그를 한 번에: { postId → 태그 이름[] } */
@@ -135,7 +169,7 @@ function createBoardRepository(pool) {
     return byPost;
   }
 
-  return { increaseViewCount, findPostDetail, findTagNames, findViewerState, findPostPage, findTagNamesByPostIds };
+  return { increaseViewCount, findPostDetail, findTagNames, findViewerState, findPostPage, findFeaturedPosts, findTagNamesByPostIds };
 }
 
 module.exports = { createBoardRepository };
