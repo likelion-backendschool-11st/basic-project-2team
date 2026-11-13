@@ -14,7 +14,6 @@ interface FindPasswordFormProps {
 export const FindPasswordForm: React.FC<FindPasswordFormProps> = ({ className = '' }) => {
   const form = useFindPasswordForm();
   const { userId, email, newPassword, confirmPassword } = findPasswordText.fields;
-  const errorMessage = form.error ? findPasswordText[form.error] : null;
 
   return (
     <form className={`space-y-4 ${className}`} noValidate onSubmit={form.onSubmit}>
@@ -32,7 +31,7 @@ export const FindPasswordForm: React.FC<FindPasswordFormProps> = ({ className = 
           <AuthTextField
             autoComplete={email.autoComplete}
             id={email.id}
-            invalid={form.error === 'invalidEmail'}
+            invalid={form.invalidEmail}
             label={email.label}
             onChange={form.onEmailChange}
             placeholder={email.placeholder}
@@ -50,6 +49,7 @@ export const FindPasswordForm: React.FC<FindPasswordFormProps> = ({ className = 
         <AuthTextField
           autoComplete={newPassword.autoComplete}
           id={newPassword.id}
+          invalid={form.invalidPassword}
           label={newPassword.label}
           onChange={form.onNewPasswordChange}
           placeholder={newPassword.placeholder}
@@ -59,7 +59,7 @@ export const FindPasswordForm: React.FC<FindPasswordFormProps> = ({ className = 
         <AuthTextField
           autoComplete={confirmPassword.autoComplete}
           id={confirmPassword.id}
-          invalid={form.error === 'mismatch'}
+          invalid={form.mismatch}
           label={confirmPassword.label}
           onChange={form.onConfirmPasswordChange}
           placeholder={confirmPassword.placeholder}
@@ -68,7 +68,7 @@ export const FindPasswordForm: React.FC<FindPasswordFormProps> = ({ className = 
         />
       </fieldset>
 
-      {errorMessage && <FormAlert message={errorMessage} />}
+      {form.errorMessage && <FormAlert message={form.errorMessage} />}
       {form.success && (
         <FormAlert
           message={
@@ -84,7 +84,7 @@ export const FindPasswordForm: React.FC<FindPasswordFormProps> = ({ className = 
       )}
 
       <div className="pt-4">
-        <PrimaryButton label={findPasswordText.submit} />
+        <PrimaryButton disabled={form.submitting} label={findPasswordText.submit} />
       </div>
     </form>
   );

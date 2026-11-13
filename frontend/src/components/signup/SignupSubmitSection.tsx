@@ -8,9 +8,17 @@ interface SignupSubmitSectionProps {
   readonly loginLabel: string;
   readonly loginTo: string;
   readonly error?: string | null;
+  readonly submitting?: boolean;
 }
 
-export const SignupSubmitSection: React.FC<SignupSubmitSectionProps> = ({ submitLabel, haveAccountLabel, loginLabel, loginTo, error }) => (
+export const SignupSubmitSection: React.FC<SignupSubmitSectionProps> = ({
+  submitLabel,
+  haveAccountLabel,
+  loginLabel,
+  loginTo,
+  error,
+  submitting = false,
+}) => (
   <div className="flex flex-col gap-4 pt-1">
     {error && (
       <div className="flex justify-center">
@@ -18,8 +26,9 @@ export const SignupSubmitSection: React.FC<SignupSubmitSectionProps> = ({ submit
       </div>
     )}
     <button
-      className="w-full h-14 rounded-full bg-mercury text-white text-base font-semibold shadow-lg shadow-mercury/25 hover:shadow-mercury/40 hover:brightness-105 active:scale-[0.99] transition-all flex items-center justify-center gap-2 group"
+      className="w-full h-14 rounded-full bg-mercury text-white text-base font-semibold shadow-lg shadow-mercury/25 hover:shadow-mercury/40 hover:brightness-105 active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 group"
       type="submit"
+      disabled={submitting}
     >
       <span>{submitLabel}</span>
       <i className="fa-solid fa-arrow-right text-[16px] group-hover:translate-x-1 transition-transform" />

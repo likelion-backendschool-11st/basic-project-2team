@@ -30,6 +30,9 @@ export const recoveryTabs: readonly RecoveryTab[] = [
 /** 아이디·비밀번호 찾기 이메일 형식 검사 (백엔드 memberConstants.EMAIL_PATTERN 과 동일) */
 export const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+/** 영문·숫자·특수문자(!@#)를 모두 포함한 8~12자 (백엔드 memberConstants.PASSWORD_PATTERN 과 동일) */
+export const PASSWORD_PATTERN = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[!@#])[A-Za-z\d!@#]{8,12}$/;
+
 export const passwordToggleLabels = {
   show: '비밀번호 보기 토글',
 } as const;
@@ -59,7 +62,9 @@ export const loginText = {
       autoComplete: 'current-password',
     },
   } satisfies Record<string, AuthFieldCopy>,
-  errorMessage: '아이디 또는 비밀번호가 일치하지 않습니다.',
+  /** 아이디·비밀번호를 비워 두고 제출했을 때 (그 밖의 실패는 서버 메시지를 그대로 보여줍니다) */
+  requiredMessage: '아이디와 비밀번호를 입력해주세요.',
+  failedMessage: '로그인에 실패했습니다. 잠시 후 다시 시도해주세요.',
   rememberMe: '로그인 상태 유지',
   submit: '로그인',
   submitIcon: 'fa-solid fa-arrow-right',
@@ -75,7 +80,6 @@ export const loginText = {
     onlineCount: '9,420명',
     onlineSuffix: '동시 접속 중',
   },
-  minPasswordLength: 8,
   successRedirect: ROUTES.homeLoggedIn,
 } as const;
 
@@ -108,7 +112,7 @@ export const findIdText = {
   invalidEmail: '올바른 이메일 주소를 입력해주세요.',
   resultPrefix: '회원님의 아이디는',
   resultSuffix: '입니다.',
-  mockFoundId: 'gamer_pro77',
+  failed: '아이디를 찾지 못했습니다. 잠시 후 다시 시도해주세요.',
   backToLogin: { label: '로그인으로 돌아가기', to: ROUTES.login } satisfies AuthLinkItem,
   altLink: { label: '비밀번호를 잊으셨나요?', to: ROUTES.findPassword } satisfies AuthLinkItem,
   supportPrompt: '가입한 이메일을 분실하셨나요?',
@@ -155,6 +159,8 @@ export const findPasswordText = {
   required: '모든 항목을 입력해주세요.',
   invalidEmail: '올바른 이메일 주소를 입력해주세요.',
   mismatch: '새 비밀번호가 일치하지 않습니다.',
+  invalidPassword: '비밀번호는 영문, 숫자, 특수문자(!, @, #)를 모두 포함한 8~12자로 입력해주세요.',
+  failed: '비밀번호를 재설정하지 못했습니다. 잠시 후 다시 시도해주세요.',
   success: '비밀번호가 재설정되었습니다. 새 비밀번호로 로그인해주세요.',
   backToLogin: { label: '로그인으로 돌아가기', to: ROUTES.login } satisfies AuthLinkItem,
   altLink: { label: '아이디를 잊으셨나요?', to: ROUTES.findId } satisfies AuthLinkItem,
