@@ -481,13 +481,55 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 | POST | `/api/posts/{postId}/reviews` | 파티원 평가 제출 | 🔒 파티원 |
 | GET | `/api/review-tags` | 평가 태그 목록 | |
 
+- **파티원**은 파티장(공고 작성자)과 신청이 `ACCEPTED` 인 회원입니다. 탈퇴한 회원은 파티원에서 빠집니다.
+- 평가는 공고가 `COMPLETED`(작성자가 활동 완료 처리)일 때만 할 수 있습니다. 완료 처리는 `PATCH /api/posts/{postId}/status` (3절)로 합니다.
+- 두 🔒 API 모두 확인 순서는 공고 존재(404) → 요청자가 파티원인지(403) → 공고 상태(409) 입니다.
+
+**평가 태그 목록 (`GET /api/review-tags`)**
+
+- 로그인 없이 조회할 수 있습니다. `review_tag` 중 `is_active = true` 인 태그를 `sort_order` 순으로 돌려줍니다. 평가 제출 시 `tags` 에는 `code` 를 보냅니다.
+
+```json
+[
+  { "code": "on-time", "label": "#시간엄수" },
+  { "code": "kind", "label": "#친절함" }
+]
+```
+
+**평가 대상 파티원 (`GET /api/posts/{postId}/reviews/targets`)** 🔒 파티원
+
+- 본인을 뺀 파티원 목록입니다. 파티장이 먼저, 그다음 승인 순입니다.
+- `reviewed`: 내가 이 공고에서 이미 평가한 파티원이면 `true` (다시 평가할 수 없음).
+- `characterName` 은 그 파티원의 이 게임 프로필(`member_game_profile.character_name`), `role` 은 신청 시 포지션이며 없으면 `null` 입니다 (파티장은 항상 `null`).
+- 오류: 401 `UNAUTHORIZED`, 403 `NOT_PARTY_MEMBER`, 404 `POST_NOT_FOUND`(없음, 삭제됨, `postId` 가 1 이상의 정수가 아님), 409 `POST_NOT_COMPLETED`.
+
+```json
+[
+  { "id": 3, "nickname": "빛나는오더", "avatarUrl": null, "level": 52, "game": "로스트아크", "characterName": null, "role": null, "isHost": true, "reviewed": true },
+  { "id": 9, "nickname": "홀리한빛", "avatarUrl": null, "level": 40, "game": "로스트아크", "characterName": "홀리한빛", "role": "서포터", "isHost": false, "reviewed": false }
+]
+```
+
+**파티원 평가 제출 (`POST /api/posts/{postId}/reviews`)** 🔒 파티원
+
 ```json
 {
   "reviews": [
-    { "targetMemberId": "m1", "rating": 5, "tags": ["on-time", "kind"], "comment": "덕분에 한 번에 클리어했어요!" }
+    { "targetMemberId": 9, "rating": 5, "tags": ["on-time", "kind"], "comment": "덕분에 한 번에 클리어했어요!" }
   ]
 }
 ```
+
+- 여러 파티원을 한 번에 평가합니다. 하나라도 실패하면 아무것도 저장하지 않습니다 (`review` + `review_tag_map` 를 한 트랜잭션으로 저장).
+- `reviews` 1~15개. `targetMemberId` 1 이상의 정수(본인 불가, 한 요청 안에서 중복 불가), `rating` 1~5 정수, `tags` 선택(활성 태그 `code` 배열, 최대 10개, 중복은 하나로 합침), `comment` 선택(앞뒤 공백 제거 후 500자 이하, 빈 문자열은 `null`).
+- 응답 `201 { "reviewIds": [41, 42] }` (요청 순서와 같음).
+- 등록한 평가는 수정·삭제할 수 없습니다.
+- 같은 트랜잭션에서 함께 반영합니다 ([DB 설계 결정 사항](./03-db-design.md#6-결정-사항) 2, 8-1, 8-3):
+  - 대상 회원 `mannerTemp`: 리뷰 1건마다 5점 +0.5 / 4점 +0.2 / 3점 0 / 2점 −0.5 / 1점 −1.0, 한 건마다 0.0~99.9 로 보정. `reviewCount` +1.
+  - 평가자 활동 점수: 리뷰 1건마다 `REVIEW_WRITE` +5 (`activity_point_log`), 누적 점수로 `level` 재계산 (지급으로 레벨이 내려가지는 않음).
+  - 그 결과는 마이페이지 프로필(`mannerTemp` · `reviewCount` · `averageRating` · `topTags`), 공고 상세 `host`, 매너 랭킹에 바로 보입니다.
+- 데이터 보정: `backend/` 에서 `npm run recalc:manner` (전체) 또는 `npm run recalc:manner -- 3 9` (회원 id) 로 리뷰 행만으로 매너 온도·받은 평가 수를 다시 계산합니다.
+- 오류: 400 `INVALID_INPUT`(필드별, 예: `reviews[0].rating` — 없거나 비활성인 태그 포함), 401 `UNAUTHORIZED`, 403 `NOT_PARTY_MEMBER`(평가자) · `REVIEW_TARGET_NOT_PARTY_MEMBER`(대상), 404 `POST_NOT_FOUND`, 409 `POST_NOT_COMPLETED` · `ALREADY_REVIEWED`(이 공고에서 이미 평가한 파티원이 포함됨).
 
 ## 8. 마이페이지 · 랭킹
 
@@ -500,9 +542,22 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 | GET | `/api/members/me/favorites` | 즐겨찾는 유저 목록 | 🔒 |
 | POST / DELETE | `/api/members/me/favorites/{memberId}` | 즐겨찾기 추가 / 해제 → `204` | 🔒 |
 | GET | `/api/members/{memberId}` | 회원 프로필 (로그인하면 `viewer` 포함) | |
-| GET | `/api/rankings/manner` | 매너 랭킹 (메인 명예의 전당) | |
+| GET | `/api/rankings/manner?limit=` | 매너 랭킹 (메인 명예의 전당) | |
 
-구현: `backend/src/mypage/` (`/api/members` 에 마운트)
+구현: `backend/src/mypage/` (`/api/members` 에 마운트), 랭킹은 `backend/src/ranking/`
+
+**매너 랭킹 (`GET /api/rankings/manner`)**
+
+- 로그인 없이 조회합니다. `limit` 기본 10, 최대 50 (틀리면 400 `INVALID_INPUT`).
+- 정상(`ACTIVE`) 회원 중 평가를 1건 이상 받은 회원을 매너 온도 높은 순 → 받은 평가 수 많은 순 → id 순으로 정렬합니다.
+- `mainGame`: 대표 게임(없으면 `null`), `topTag`: 가장 많이 받은 평가 태그(없으면 `null`).
+
+```json
+[
+  { "rank": 1, "id": 5, "nickname": "갓공대장", "avatarUrl": null, "level": 30, "mannerTemp": 99.0, "reviewCount": 142,
+    "mainGame": { "code": "lostark", "name": "로스트아크" }, "topTag": { "code": "order", "label": "#오더장인" } }
+]
+```
 
 **프로필 (`GET /api/members/me/summary`, `GET /api/members/{memberId}`)**
 
