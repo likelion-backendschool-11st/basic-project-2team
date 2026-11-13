@@ -4,14 +4,21 @@ import Modal from '../ui/Modal';
 
 interface ReportDialogProps {
   readonly isOpen: boolean;
-  readonly onConfirm: (reason: string) => void;
+  /** 선택한 사유와 상세 내용(선택, 비어 있을 수 있음) */
+  readonly onConfirm: (reason: string, detail: string) => void;
   readonly onClose: () => void;
 }
 
 export const ReportDialog: React.FC<ReportDialogProps> = ({ isOpen, onConfirm, onClose }) => {
   const [reason, setReason] = useState<string | null>(null);
+  const [detail, setDetail] = useState('');
   const d = commentText.reportDialog;
-  const close = () => { setReason(null); onClose(); };
+  const reset = () => { setReason(null); setDetail(''); };
+  const close = () => { reset(); onClose(); };
+  const submit = () => {
+    if (reason) onConfirm(reason, detail);
+    reset();
+  };
   return (
     <Modal isOpen={isOpen} onClose={close} ariaLabel={d.title}>
       <h2 className="text-lg font-bold text-white flex items-center gap-2"><i className="fa-solid fa-flag text-roseAccent" />{d.title}</h2>
@@ -24,9 +31,21 @@ export const ReportDialog: React.FC<ReportDialogProps> = ({ isOpen, onConfirm, o
           </label>
         ))}
       </div>
-      <div className="mt-6 grid grid-cols-2 gap-3">
+      <label className="mt-4 block">
+        <span className="text-xs font-semibold text-fog-sub">{d.detailLabel}</span>
+        <textarea
+          value={detail}
+          maxLength={d.detailMax}
+          rows={3}
+          placeholder={d.detailPlaceholder}
+          onChange={(e) => setDetail(e.target.value)}
+          className="mt-2 w-full resize-none rounded-xl border border-night-borderLight bg-night-surface p-3 text-sm text-fog-headline placeholder:text-fog-muted focus:border-roseAccent/60 focus:ring-0"
+        />
+        <span className="block text-right text-[11px] font-mono text-fog-muted">{detail.length}/{d.detailMax}</span>
+      </label>
+      <div className="mt-4 grid grid-cols-2 gap-3">
         <button type="button" onClick={close} className="h-12 rounded-xl border border-night-borderLight text-sm font-semibold text-fog-sub hover:text-white">{d.cancel}</button>
-        <button type="button" disabled={!reason} onClick={() => { if (reason) onConfirm(reason); setReason(null); }} className="h-12 rounded-xl bg-roseAccent text-sm font-bold text-white disabled:opacity-40 disabled:pointer-events-none">{d.confirm}</button>
+        <button type="button" disabled={!reason} onClick={submit} className="h-12 rounded-xl bg-roseAccent text-sm font-bold text-white disabled:opacity-40 disabled:pointer-events-none">{d.confirm}</button>
       </div>
     </Modal>
   );

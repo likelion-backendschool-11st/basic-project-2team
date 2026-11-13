@@ -1,40 +1,46 @@
-import React from 'react';
+import React, { useMemo } from 'react';
+import { toProfileSummary } from '../../api/mypageApi';
 import { commentText } from '../../data/commentData';
 import type { CommentAuthorProfile } from '../../hooks/useComments';
+import ProfileSummaryCard from '../mypage/ProfileSummaryCard';
 
 interface UserPopoverProps {
-  readonly name: string;
   /** GET /api/members/{memberId} 결과. 불러오는 중이면 'loading', 실패하면 'error' */
   readonly profile: CommentAuthorProfile;
   readonly onAction: (message: string) => void;
   readonly onClose: () => void;
 }
 
-/** 댓글 작성자 프로필 팝오버: 레벨·매너 온도·대표 게임 + 빠른 동작 */
-export const UserPopover: React.FC<UserPopoverProps> = ({ name, profile, onAction, onClose }) => {
-  const loaded = typeof profile === 'object' ? profile : null;
-  const mainGame = loaded?.games.find((g) => g.isMain) ?? loaded?.games[0];
+/** 댓글 작성자 프로필 카드: 마이페이지 프로필 카드와 같은 구성 + 파티 초대하기 */
+export const UserPopover: React.FC<UserPopoverProps> = ({ profile, onAction, onClose }) => {
+  const t = commentText.popover;
+  const summary = useMemo(() => (typeof profile === 'object' ? toProfileSummary(profile) : null), [profile]);
   return (
-    <div className="my-2 rounded-xl border border-mercury/30 bg-night-card p-4 shadow-2xl">
-      <div className="flex items-center justify-between mb-3">
+    <div className="my-2 rounded-xl border border-mercury/30 bg-night-card p-5 shadow-2xl">
+      <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2 text-sm font-bold text-white">
-          <span className="w-8 h-8 rounded-full bg-mercury/30 flex items-center justify-center">{Array.from(name)[0]}</span>
-          {name}
-          {loaded && (
-            <>
-              <span className="text-[10px] px-1.5 rounded bg-mercury/20 text-mercury-light font-normal">{commentText.popover.level(loaded.level)}</span>
-              <span className="text-[10px] font-normal text-emerald-300">{commentText.popover.manner(`${loaded.mannerTemp.toFixed(1)}℃`)}</span>
-            </>
-          )}
-          {profile === 'loading' && <span className="text-[10px] font-normal text-fog-muted">{commentText.popover.loading}</span>}
+          {t.title}
+          <span className="text-[10px] px-1.5 py-0.5 rounded bg-mercury/20 text-mercury-light font-semibold">{t.badge}</span>
         </div>
         <button type="button" aria-label="닫기" onClick={onClose} className="text-fog-sub hover:text-white"><i className="fa-solid fa-xmark" /></button>
       </div>
-      {mainGame && <p className="mb-3 text-[11px] text-fog-muted"><i className="fa-solid fa-gamepad mr-1.5 text-mercury-light" />{mainGame.name}</p>}
-      <div className="grid grid-cols-1 gap-1.5 text-xs">
-        {([['fa-arrow-up-right-from-square', commentText.popover.battle, commentText.popover.battle], ['fa-comment', commentText.popover.dm, commentText.popover.dmSent], ['fa-user-plus', commentText.popover.invite, commentText.popover.invited]] as const).map(([icon, label, message]) => (
-          <button key={label} type="button" onClick={() => { onAction(message); onClose(); }} className="flex items-center gap-2 rounded-lg bg-night-base/60 px-3 py-2 text-left text-fog-headline hover:bg-mercury/20"><i className={`fa-solid ${icon} w-4 text-mercury-light`} />{label}</button>
-        ))}
+      {summary ? (
+        <ProfileSummaryCard profile={summary} framed={false} />
+      ) : (
+        <p className={`py-6 text-center text-sm ${profile === 'error' ? 'text-rose-300' : 'text-fog-muted'}`}>
+          {profile === 'error' ? t.loadFailed : t.loading}
+        </p>
+      )}
+      <div className="mt-4 flex justify-end">
+        {/* 초대 API 가 아직 없어 안내 토스트만 띄웁니다. */}
+        <button
+          type="button"
+          disabled={!summary}
+          onClick={() => { onAction(t.invited); onClose(); }}
+          className="flex items-center gap-2 rounded-lg bg-mercury px-4 py-2 text-xs font-bold text-white hover:bg-mercury-light disabled:opacity-40 disabled:pointer-events-none"
+        >
+          <i className="fa-solid fa-user-plus" />{t.invite}
+        </button>
       </div>
     </div>
   );

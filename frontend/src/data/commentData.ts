@@ -57,8 +57,8 @@ export const commentText = {
   deleted: '댓글이 삭제되었습니다.',
   reportedToast: '신고가 접수되었습니다. 운영팀이 검토 후 조치합니다.',
   deleteDialog: { title: '댓글 삭제', description: '작성하신 댓글을 삭제하시겠습니까? 삭제된 댓글은 복구할 수 없으며, 답글이 있는 경우에도 작성자 정보와 내용이 영구 삭제 처리됩니다.', confirm: '삭제하기', cancel: '취소' },
-  reportDialog: { title: '댓글 신고', description: '신고 사유를 선택해 주세요. 허위 신고는 제재될 수 있습니다.', confirm: '신고 접수하기', cancel: '취소' },
-  popover: { loading: '프로필을 불러오는 중...', manner: (temp: string) => `매너 ${temp}`, level: (level: number) => `Lv.${level}`, battle: '전투정보실 바로가기', dm: '1:1 디스코드 쪽지', invite: '파티 초대하기', invited: '파티 초대를 보냈습니다.', dmSent: '쪽지 창을 열었습니다.' },
+  reportDialog: { title: '댓글 신고', description: '신고 사유를 선택해 주세요. 허위 신고는 제재될 수 있습니다.', detailLabel: '상세 내용 (선택)', detailPlaceholder: '신고 사유를 자세히 적어 주시면 검토에 도움이 됩니다.', detailMax: 500, confirm: '신고 접수하기', cancel: '취소' },
+  popover: { title: '유저 프로필 카드', badge: '상세 정보', loading: '프로필을 불러오는 중...', loadFailed: '프로필을 불러오지 못했습니다.', invite: '파티 초대하기', invited: '파티 초대를 보냈습니다.' },
 };
 
 export const reportReasons: readonly string[] = ['욕설 및 비하 발언', '스팸 / 도배', '부적절한 광고', '개인정보 노출', '기타'];

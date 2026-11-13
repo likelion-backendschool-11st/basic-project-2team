@@ -8,7 +8,7 @@ import {
   type CommentResponse,
 } from '../api/commentApi';
 import { ApiRequestError } from '../api/http';
-import { getMemberProfile, type MemberProfileResponse } from '../api/memberApi';
+import { getMemberProfile, type MemberProfileResponse } from '../api/mypageApi';
 import { COMMENT_PAGE_SIZE, commentText, type CommentSort, type PostComment } from '../data/commentData';
 import { useModal } from './useModal';
 import { usePagination } from './usePagination';
@@ -167,13 +167,14 @@ export function useComments(postId: string, initialTotal: number) {
 
   const markReported = (id: string) => setComments((prev) => prev.map((c) => (c.id === id ? { ...c, reported: true } : c)));
   const askReport = (id: string) => { setReportId(id); reportDialog.open(); };
-  const confirmReport = async (reason: string) => {
+  /** 신고 접수. detail 은 선택 입력(빈 문자열이면 보내지 않음) */
+  const confirmReport = async (reason: string, detail = '') => {
     const id = reportId;
     reportDialog.close();
     setReportId(null);
     if (!id) return;
     try {
-      await reportComment(Number(id), reason);
+      await reportComment(Number(id), reason, detail.trim() || undefined);
       markReported(id);
       toast.show(commentText.reportedToast);
     } catch (err) {
