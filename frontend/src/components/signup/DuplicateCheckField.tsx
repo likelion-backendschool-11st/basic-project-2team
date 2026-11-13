@@ -18,7 +18,10 @@ interface DuplicateCheckFieldProps {
 const statusTone: Readonly<Record<CheckStatus, FieldStatusTone>> = {
   idle: 'hint',
   empty: 'error',
+  checking: 'hint',
   available: 'success',
+  taken: 'error',
+  invalid: 'error',
 };
 
 export const DuplicateCheckField: React.FC<DuplicateCheckFieldProps> = ({
@@ -48,8 +51,9 @@ export const DuplicateCheckField: React.FC<DuplicateCheckFieldProps> = ({
         />
       </div>
       <button
-        className="h-12 px-6 rounded-full bg-mercury text-white text-sm font-medium hover:brightness-110 active:scale-95 transition-all flex items-center justify-center shrink-0 shadow-sm"
+        className="h-12 px-6 rounded-full bg-mercury text-white text-sm font-medium hover:brightness-110 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed transition-all flex items-center justify-center shrink-0 shadow-sm"
         type="button"
+        disabled={status === 'checking'}
         onClick={onCheck}
       >
         {buttonLabel}

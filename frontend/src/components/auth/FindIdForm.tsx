@@ -28,7 +28,7 @@ export const FindIdForm: React.FC<FindIdFormProps> = ({ className = '' }) => {
           autoComplete={email.autoComplete}
           icon={email.icon}
           id={email.id}
-          invalid={form.error === 'invalidEmail'}
+          invalid={form.invalidEmail}
           label={email.label}
           onChange={form.onEmailChange}
           placeholder={email.placeholder}
@@ -37,7 +37,7 @@ export const FindIdForm: React.FC<FindIdFormProps> = ({ className = '' }) => {
         />
         <HelperNotice>{findIdText.helper}</HelperNotice>
       </div>
-      {form.error && <FormAlert message={findIdText[form.error]} />}
+      {form.errorMessage && <FormAlert message={form.errorMessage} />}
       {form.foundId && (
         <FormAlert
           message={
@@ -49,7 +49,7 @@ export const FindIdForm: React.FC<FindIdFormProps> = ({ className = '' }) => {
         />
       )}
       <div className="pt-3">
-        <PrimaryButton icon={findIdText.submitIcon} label={findIdText.submit} />
+        <PrimaryButton disabled={form.submitting} icon={findIdText.submitIcon} label={findIdText.submit} />
       </div>
     </form>
   );

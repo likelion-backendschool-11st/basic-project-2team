@@ -20,7 +20,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ className = '' }) => {
         hint={username.hint}
         icon={username.icon}
         id={username.id}
-        invalid={form.error}
+        invalid={form.error !== null}
         label={username.label}
         onChange={form.onUsernameChange}
         placeholder={username.placeholder}
@@ -32,7 +32,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ className = '' }) => {
         hint={password.hint}
         icon={password.icon}
         id={password.id}
-        invalid={form.error}
+        invalid={form.error !== null}
         label={password.label}
         onChange={form.onPasswordChange}
         placeholder={password.placeholder}
@@ -40,11 +40,17 @@ export const LoginForm: React.FC<LoginFormProps> = ({ className = '' }) => {
         type="password"
         value={form.password}
       />
-      {form.error && <FormAlert message={loginText.errorMessage} />}
+      {form.error && <FormAlert message={form.error} />}
       <div className="flex items-center justify-between pt-1">
         <RememberMeCheckbox checked={form.rememberMe} label={loginText.rememberMe} onChange={form.onRememberMeChange} />
       </div>
-      <PrimaryButton icon={loginText.submitIcon} iconPosition="trailing" label={loginText.submit} shape="pill" />
+      <PrimaryButton
+        disabled={form.submitting}
+        icon={loginText.submitIcon}
+        iconPosition="trailing"
+        label={loginText.submit}
+        shape="pill"
+      />
     </form>
   );
 };

@@ -73,3 +73,45 @@ export async function logout() {
     saveSession(null, null, null);
   }
 }
+
+/* ------------------------------------------------------------------ */
+/* 회원가입 · 아이디/비밀번호 찾기 (docs/API_SPEC.md 2절)               */
+/* ------------------------------------------------------------------ */
+
+export type AvailabilityType = 'userId' | 'nickname' | 'email';
+
+/** GET /api/auth/check — 형식이 틀린 값이면 400 INVALID_INPUT (fields[0].message 에 이유) */
+export const checkAvailability = (type: AvailabilityType, value: string) =>
+  request<{ readonly available: boolean }>('GET', `/api/auth/check?${new URLSearchParams({ type, value })}`);
+
+export interface SignupRequest {
+  readonly name: string;
+  readonly phone: string;
+  readonly address: string;
+  readonly userId: string;
+  readonly nickname: string;
+  readonly password: string;
+  readonly email: string;
+  readonly agreements: { readonly terms: boolean; readonly privacy: boolean; readonly marketing: boolean };
+}
+
+export interface SignupResult {
+  readonly id: number;
+  readonly userId: string;
+  readonly nickname: string;
+}
+
+export const signup = (body: SignupRequest) => request<SignupResult>('POST', '/api/auth/signup', body);
+
+export const findId = (nickname: string, email: string) =>
+  request<{ readonly userId: string }>('POST', '/api/auth/find-id', { nickname, email });
+
+/** 아이디·이메일 일치 확인 → 재설정 토큰(15분) 발급 → 새 비밀번호로 재설정. 성공하면 다른 기기 로그인도 끊깁니다. */
+export async function findAndResetPassword(userId: string, email: string, newPassword: string) {
+  const { resetToken } = await request<{ readonly resetToken: string; readonly expiresAt: string }>(
+    'POST',
+    '/api/auth/find-password',
+    { userId, email },
+  );
+  await request<void>('POST', '/api/auth/reset-password', { resetToken, newPassword });
+}

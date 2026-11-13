@@ -1,5 +1,5 @@
 import React from 'react';
-import { checkMessages, signupFields as f, signupText as t, termItems } from '../../data/signupData';
+import { signupFields as f, signupText as t, termItems } from '../../data/signupData';
 import { useSignupForm } from '../../hooks/useSignupForm';
 import SectionHeading from './SectionHeading';
 import TextField from './TextField';
@@ -16,7 +16,7 @@ interface SignupFormCardProps {
 
 export const SignupFormCard: React.FC<SignupFormCardProps> = ({ className = '' }) => {
   const form = useSignupForm();
-  const { values, checks, onFieldChange, runDuplicateCheck } = form;
+  const { values, checks, checkMessageOf, onFieldChange, runDuplicateCheck } = form;
 
   return (
     <form
@@ -42,7 +42,7 @@ export const SignupFormCard: React.FC<SignupFormCardProps> = ({ className = '' }
           field={f.userId}
           value={values.userId}
           status={checks.userId}
-          statusMessage={checkMessages.userId[checks.userId]}
+          statusMessage={checkMessageOf('userId')}
           buttonLabel={t.checkButton}
           onChange={onFieldChange('userId')}
           onCheck={() => runDuplicateCheck('userId')}
@@ -51,7 +51,7 @@ export const SignupFormCard: React.FC<SignupFormCardProps> = ({ className = '' }
           field={f.nickname}
           value={values.nickname}
           status={checks.nickname}
-          statusMessage={checkMessages.nickname[checks.nickname]}
+          statusMessage={checkMessageOf('nickname')}
           buttonLabel={t.checkButton}
           onChange={onFieldChange('nickname')}
           onCheck={() => runDuplicateCheck('nickname')}
@@ -80,7 +80,7 @@ export const SignupFormCard: React.FC<SignupFormCardProps> = ({ className = '' }
           field={f.email}
           value={values.email}
           status={checks.email}
-          statusMessage={checkMessages.email[checks.email]}
+          statusMessage={checkMessageOf('email')}
           buttonLabel={t.checkButton}
           onChange={onFieldChange('email')}
           onCheck={() => runDuplicateCheck('email')}
@@ -107,6 +107,7 @@ export const SignupFormCard: React.FC<SignupFormCardProps> = ({ className = '' }
         loginLabel={t.loginLink}
         loginTo={t.loginTo}
         error={form.submitError}
+        submitting={form.submitting}
       />
     </form>
   );

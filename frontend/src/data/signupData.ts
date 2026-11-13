@@ -12,7 +12,8 @@ export type SignupFieldKey =
 
 export type DuplicateCheckKey = 'userId' | 'nickname' | 'email';
 
-export type CheckStatus = 'idle' | 'empty' | 'available';
+/** checking: 서버 확인 중 · taken: 이미 사용 중 · invalid: 형식 오류 (문구는 서버 메시지를 우선) */
+export type CheckStatus = 'idle' | 'empty' | 'checking' | 'available' | 'taken' | 'invalid';
 
 export interface SignupFieldConfig {
   readonly key: SignupFieldKey;
@@ -52,7 +53,7 @@ export const signupText = {
   basicSectionTitle: '기본 정보',
   basicSectionHint: '실제 본인 정보를 입력해주세요',
   checkButton: '중복 확인',
-  passwordGuide: '8자 이상, 영문 대소문자, 숫자, 특수문자를 혼용하여 구성해 주세요.',
+  passwordGuide: '영문, 숫자, 특수문자(!, @, #)를 모두 포함한 8~12자로 입력해주세요.',
   passwordMismatch: '비밀번호가 일치하지 않습니다',
   passwordMatch: '비밀번호가 일치합니다',
   emailNote: '인증 불필요 · 계정 복구 용도로만 등록됩니다',
@@ -69,25 +70,57 @@ export const signupText = {
   loginTo: ROUTES.login,
   errorRequiredTerms: '필수 약관에 모두 동의해주셔야 가입이 진행됩니다.',
   errorPasswordMismatch: '비밀번호와 비밀번호 확인이 일치하지 않습니다.',
+  errorFailed: '회원가입에 실패했습니다. 잠시 후 다시 시도해주세요.',
+  checkFailed: '중복 확인에 실패했습니다. 잠시 후 다시 시도해주세요.',
 } as const;
 
 export const checkMessages: Readonly<Record<DuplicateCheckKey, Readonly<Record<CheckStatus, string>>>> = {
   userId: {
     idle: '중복 확인을 눌러주세요',
     empty: '내용을 입력하신 후 확인해주세요',
+    checking: '확인 중입니다…',
     available: '사용 가능한 아이디입니다',
+    taken: '이미 사용 중인 아이디입니다',
+    invalid: '아이디는 영문 소문자와 숫자 4~20자로 입력해주세요.',
   },
   nickname: {
     idle: '중복 확인을 눌러주세요',
     empty: '내용을 입력하신 후 확인해주세요',
+    checking: '확인 중입니다…',
     available: '사용 가능한 닉네임입니다',
+    taken: '이미 사용 중인 닉네임입니다',
+    invalid: '닉네임은 공백 없이 2~10자로 입력해주세요.',
   },
   email: {
     idle: '중복 확인을 눌러주세요',
     empty: '내용을 입력하신 후 확인해주세요',
+    checking: '확인 중입니다…',
     available: '사용 가능한 이메일입니다',
+    taken: '이미 가입된 이메일입니다',
+    invalid: '올바른 이메일 형식이 아닙니다.',
   },
 };
+
+/** 회원가입 전에 중복 확인을 마치지 않았을 때 */
+export const checkRequiredMessages: Readonly<Record<DuplicateCheckKey, string>> = {
+  userId: '아이디 중복 확인을 해주세요.',
+  nickname: '닉네임 중복 확인을 해주세요.',
+  email: '이메일 중복 확인을 해주세요.',
+};
+
+/** 409 DUPLICATE_* 응답 code → 다시 확인해야 하는 필드 (휴대폰은 중복 확인 버튼이 없어 메시지만 표시) */
+export const duplicateErrorFields: Readonly<Record<string, DuplicateCheckKey>> = {
+  DUPLICATE_LOGIN_ID: 'userId',
+  DUPLICATE_NICKNAME: 'nickname',
+  DUPLICATE_EMAIL: 'email',
+};
+
+/** 화면의 약관 항목 id → API agreements 키. 만 14세 확인(age)은 서버에 보내지 않고 화면에서만 필수로 확인합니다. */
+export const agreementTermIds = {
+  terms: 'service',
+  privacy: 'privacy',
+  marketing: 'push',
+} as const;
 
 export const signupFields: Readonly<Record<SignupFieldKey, SignupFieldConfig>> = {
   name: { key: 'name', id: 'user-name', label: '이름', placeholder: '이름을 입력하세요', type: 'text', autoComplete: 'name' },

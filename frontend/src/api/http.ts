@@ -23,6 +23,10 @@ export class ApiRequestError extends Error {
   }
 }
 
+/** 화면에 보여줄 에러 문구. 입력 오류(INVALID_INPUT)면 첫 번째 필드 메시지가 더 구체적이라 그것을 씁니다. */
+export const errorMessageOf = (err: unknown, fallback: string) =>
+  err instanceof ApiRequestError ? (err.fields[0]?.message ?? err.message) : fallback;
+
 const readToken = (key: string) => {
   try {
     return localStorage.getItem(key);
