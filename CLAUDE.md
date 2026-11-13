@@ -16,7 +16,7 @@
 
 | 영역 | 기능 |
 | --- | --- |
-| 인증/계정 | 회원가입(아이디·닉네임·이메일 중복확인, 이메일 인증, 약관동의), 로그인/로그아웃, 아이디 찾기, 비밀번호 찾기, 프로필 수정, 비밀번호 변경, 회원 탈퇴 |
+| 인증/계정 | 회원가입(아이디·닉네임·이메일 중복확인, 약관동의 — 이메일은 인증 없이 입력만), 아이디 찾기(닉네임+이메일 일치), 비밀번호 찾기(아이디+이메일 일치), 로그인/로그아웃, 프로필 수정, 비밀번호 변경, 회원 탈퇴 |
 | 메인 | 카테고리, 인기 공고, 마감 임박 공고, 매너 랭킹(명예의 전당), 빠른 검색 필터 |
 | 게시판(공고) | 카테고리별 목록(`mmorpg`/`fps`/`aos`/`steam`/`etc`), 정렬(최신·조회수·마감임박), 태그 필터, 페이지네이션, 검색, 공고 작성(마크다운·임시저장), 공고 상세 |
 | 파티 | 참가 신청/취소, (작성자) 신청자 승인·거절, 모집 마감, 스크랩, 링크 복사 |
@@ -65,7 +65,7 @@ npm run lint      # ESLint 검사
 ### 백엔드
 
 - 스택(JavaScript + Node.js + express + MySQL )
-  - Express 5 (CommonJS), mysql2 (promise pool, UTC), bcryptjs, jsonwebtoken, nodemailer, cors, 테스트는 Node 내장 `node:test`
+  - Express 5 (CommonJS), mysql2 (promise pool, UTC), bcryptjs, jsonwebtoken, cors, 테스트는 Node 내장 `node:test`
 - `backend/.env.example` 을 `.env` 로 복사해 DB 접속 정보를 넣습니다 (`.env` 는 커밋 금지).
 
 ```bash
@@ -102,7 +102,7 @@ backend/
 │   ├── app.js              # Express 앱 조립 (cors, json, 라우터, 에러 핸들러)
 │   ├── config/             # env.js (환경 변수), db.js (mysql2 pool)
 │   ├── common/             # ApiError, 응답 헬퍼, 에러 핸들러, JWT(tokenProvider), 인증 미들웨어(requireAuth, requireAdmin)
-│   ├── member/             # 회원가입·중복 확인·로그인·토큰 재발급·로그아웃 (Routes / Controller / Service / Repository / Validator / Constants)
+│   ├── member/             # 회원가입·중복 확인·로그인·토큰 재발급·로그아웃·아이디/비밀번호 찾기 (Routes / Controller / Service / Repository / Validator / Constants)
 │   └── admin/              # 관리자 로그인·대시보드·신고/공고/회원/댓글 관리·처리 이력 (같은 구조)
 └── test/                   # node:test 테스트
 ```

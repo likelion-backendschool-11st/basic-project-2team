@@ -118,7 +118,7 @@ export const passwordText = {
   strengthLabel: '보안도:',
   strength: ['미입력', '취약', '보통', '안전'] as readonly string[],
   forgot: '현재 비밀번호를 잊으셨나요?',
-  forgotNote: '안전한 로그아웃 후 이메일 인증 가능',
+  forgotNote: '로그아웃 후 비밀번호 찾기에서 재설정 가능',
   submit: '비밀번호 변경',
   done: '비밀번호가 변경되었습니다.',
   showLabel: '비밀번호 보기',

@@ -25,16 +25,6 @@ const env = Object.freeze({
     /** Refresh Token 유효 기간(일) — 로그인 상태 유지 선택 */
     rememberMeTtlDays: Number(process.env.REMEMBER_ME_TTL_DAYS ?? 14),
   }),
-  /** SMTP_HOST 가 비어 있으면 메일을 보내지 않고 서버 콘솔에 출력합니다 (로컬 개발용). */
-  mail: Object.freeze({
-    host: process.env.SMTP_HOST ?? '',
-    port: Number(process.env.SMTP_PORT ?? 587),
-    /** 465 포트(SSL)면 true, 587(STARTTLS)이면 false */
-    secure: process.env.SMTP_SECURE === 'true',
-    user: process.env.SMTP_USER ?? '',
-    password: process.env.SMTP_PASSWORD ?? '',
-    from: process.env.MAIL_FROM ?? 'OurParty <no-reply@ourparty.local>',
-  }),
 });
 
 if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET) {

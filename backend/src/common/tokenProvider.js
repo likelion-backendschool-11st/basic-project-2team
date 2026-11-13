@@ -5,8 +5,6 @@ const jwt = require('jsonwebtoken');
 
 const ALGORITHM = 'HS256';
 const DAY_MS = 24 * 60 * 60 * 1000;
-/** 이메일 인증 완료 토큰 유효 시간: 인증 후 이 시간 안에 아이디 찾기·비밀번호 찾기를 마쳐야 합니다. */
-const EMAIL_VERIFICATION_TOKEN_TTL_SECONDS = 15 * 60;
 /** 비밀번호 재설정 토큰 유효 시간 (REQ-LOGIN-007) */
 const PASSWORD_RESET_TOKEN_TTL_SECONDS = 15 * 60;
 
@@ -14,7 +12,6 @@ const PASSWORD_RESET_TOKEN_TTL_SECONDS = 15 * 60;
 const tokenTypes = Object.freeze({
   access: 'access',
   refresh: 'refresh',
-  emailVerification: 'email_verification',
   passwordReset: 'password_reset',
   /** 관리자 계정(admin_account)은 회원과 id 가 겹치므로 admin 타입으로 따로 발급합니다. */
   admin: 'admin',
@@ -35,7 +32,6 @@ function toId(sub) {
 /**
  * 인증에 쓰는 JWT(HS256) 를 만들고 검증합니다.
  * - access / refresh: 로그인 (refresh 는 폐기를 위해 DB 에 해시 저장)
- * - email_verification: 이메일 인증 완료 증명 (sub = 이메일)
  * - password_reset: 비밀번호 재설정 (한 번만 쓰도록 DB 에 해시 저장)
  * - admin: 관리자 Access Token (Refresh Token 없이 만료되면 다시 로그인)
  * @param {{ jwtSecret: string, accessTokenTtlSeconds: number, refreshTokenTtlDays: number, rememberMeTtlDays: number }} authConfig
@@ -118,14 +114,6 @@ function createTokenProvider({ jwtSecret, accessTokenTtlSeconds, refreshTokenTtl
     }).token;
   }
 
-  /** 이메일 인증을 마쳤다는 증명. 아이디 찾기·비밀번호 찾기 요청에 함께 보냅니다. */
-  function createEmailVerificationToken({ email, now }) {
-    return sign(tokenTypes.emailVerification, email, {
-      now,
-      expiresAt: new Date(now.getTime() + EMAIL_VERIFICATION_TOKEN_TTL_SECONDS * 1000),
-    });
-  }
-
   function createPasswordResetToken({ memberId, now }) {
     return withHash(
       sign(tokenTypes.passwordReset, memberId, {
@@ -142,9 +130,6 @@ function createTokenProvider({ jwtSecret, accessTokenTtlSeconds, refreshTokenTtl
     verifyRefreshToken: (token, now) => ({ memberId: verifyIdToken(tokenTypes.refresh, token, now) }),
     createAdminAccessToken,
     verifyAdminAccessToken: (token) => ({ adminId: verifyIdToken(tokenTypes.admin, token) }),
-    createEmailVerificationToken,
-    /** @returns {{ email: string }} */
-    verifyEmailVerificationToken: (token, now) => ({ email: verify(tokenTypes.emailVerification, token, now) }),
     createPasswordResetToken,
     verifyPasswordResetToken: (token, now) => ({ memberId: verifyIdToken(tokenTypes.passwordReset, token, now) }),
     hashToken,
