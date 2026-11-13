@@ -1,0 +1,48 @@
+'use strict';
+
+const { ApiError } = require('../common/ApiError');
+const { postMessages } = require('./postConstants');
+const { validateCreatePost } = require('./postValidator');
+
+/**
+ * 공고 작성 비즈니스 로직.
+ * @param {{ postRepository: ReturnType<typeof import('./postRepository').createPostRepository>, now?: () => Date }} deps
+ */
+function createPostService({ postRepository, now = () => new Date() }) {
+  /** POST /api/posts */
+  async function createPost(authorId, body) {
+    const input = validateCreatePost(body, now());
+
+    const game = await postRepository.findGameByCode(input.game);
+    if (!game) throw new ApiError(404, 'GAME_NOT_FOUND', postMessages.gameNotFound);
+
+    let gameContentId = null;
+    if (input.detail) {
+      gameContentId = await postRepository.findGameContentId(game.id, input.detail);
+      if (gameContentId === null) throw new ApiError(404, 'GAME_CONTENT_NOT_FOUND', postMessages.detailNotFound);
+    }
+
+    const id = await postRepository.createPost({
+      post: {
+        authorId,
+        categoryCode: game.categoryCode,
+        gameId: game.id,
+        gameContentId,
+        partyType: input.type,
+        title: input.title,
+        body: input.body,
+        partyName: input.partyName,
+        playStyle: input.style,
+        headcount: input.headcount,
+        scheduleAt: input.scheduleAt,
+        voiceRequired: input.voiceRequired,
+      },
+      tags: input.tags,
+    });
+    return { id };
+  }
+
+  return { createPost };
+}
+
+module.exports = { createPostService };
