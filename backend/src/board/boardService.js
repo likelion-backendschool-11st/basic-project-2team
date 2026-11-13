@@ -2,7 +2,7 @@
 
 const { ApiError } = require('../common/ApiError');
 const { boardMessages } = require('./boardConstants');
-const { parseListQuery } = require('./boardValidator');
+const { parseListQuery, parseFeaturedQuery } = require('./boardValidator');
 
 const toIso = (value) => (value ? new Date(value).toISOString() : null);
 
@@ -74,7 +74,7 @@ function toPostListItem(row, tags) {
  * 공고 목록·상세 조회 비즈니스 로직.
  * @param {{ boardRepository: ReturnType<typeof import('./boardRepository').createBoardRepository> }} deps
  */
-function createBoardService({ boardRepository }) {
+function createBoardService({ boardRepository, now = () => new Date() }) {
   /**
    * GET /api/posts/{postId} — 조회수를 1 올리고 상세를 돌려줍니다.
    * @param {number} postId
@@ -120,7 +120,15 @@ function createBoardService({ boardRepository }) {
     };
   }
 
-  return { getPostDetail, listPosts };
+  /** GET /api/posts/popular · urgent — 메인 화면용 공고 목록(배열, 목록 아이템과 같은 모양) */
+  async function listFeatured(kind, query) {
+    const { category, limit } = parseFeaturedQuery(query);
+    const rows = await boardRepository.findFeaturedPosts({ kind, category, limit, now: now() });
+    const tagsByPost = await boardRepository.findTagNamesByPostIds(rows.map((row) => row.id));
+    return rows.map((row) => toPostListItem(row, tagsByPost.get(row.id) ?? []));
+  }
+
+  return { getPostDetail, listPosts, listFeatured };
 }
 
 module.exports = { createBoardService };

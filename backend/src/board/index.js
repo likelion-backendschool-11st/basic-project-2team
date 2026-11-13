@@ -23,7 +23,7 @@ function createBoardModule({
   optionalAuth,
   now,
 }) {
-  const boardController = createBoardController(createBoardService({ boardRepository }));
+  const boardController = createBoardController(createBoardService({ boardRepository, now }));
   const commentController = createCommentController(createCommentService({ commentRepository, now }));
 
   const postCommentRouter = createCommentRouter(commentController, { requireAuth, optionalAuth });

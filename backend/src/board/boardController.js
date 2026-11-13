@@ -20,7 +20,9 @@ function createBoardController(boardService) {
     return sendSuccess(res, 200, data);
   }
 
-  return { getDetail, list };
+  const featured = (kind) => async (req, res) => sendSuccess(res, 200, await boardService.listFeatured(kind, req.query));
+
+  return { getDetail, list, popular: featured('popular'), urgent: featured('urgent') };
 }
 
 module.exports = { createBoardController };

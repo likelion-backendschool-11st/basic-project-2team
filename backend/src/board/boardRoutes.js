@@ -9,6 +9,9 @@ const { Router } = require('express');
 function createBoardRouter(boardController, { optionalAuth, commentRouter }) {
   const router = Router();
   router.get('/', boardController.list);
+  // 고정 경로는 /:postId 보다 먼저 둡니다 (아니면 postId 로 해석돼 404 가 됩니다).
+  router.get('/popular', boardController.popular);
+  router.get('/urgent', boardController.urgent);
   router.use('/:postId/comments', commentRouter);
   router.get('/:postId', optionalAuth, boardController.getDetail);
   return router;

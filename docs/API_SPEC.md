@@ -272,8 +272,8 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 | --- | --- | --- | --- |
 | GET | `/api/posts?category=&sort=&tags=&page=&size=` | 공고 목록 | |
 | GET | `/api/posts/search?q=&tags=&page=&size=` | 공고 검색 | |
-| GET | `/api/posts/popular` | 인기 공고 (메인) | |
-| GET | `/api/posts/urgent` | 마감 임박 공고 (메인) | |
+| GET | `/api/posts/popular?category=&limit=` | 인기 공고 (메인) | |
+| GET | `/api/posts/urgent?category=&limit=` | 마감 임박 공고 (메인) | |
 | GET | `/api/posts/{postId}` | 공고 상세 (조회수 +1) | |
 | GET | `/api/posts/{postId}/related` | 관련 공고 | |
 | POST | `/api/posts` | 공고 작성 | 🔒 |
@@ -292,6 +292,9 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 - `tags`: 쉼표로 구분한 태그(최대 5개, `#` 는 있어도 됨). 지정한 태그를 **모두** 가진 공고만 조회합니다.
 - `page`(기본 1) · `size`(기본 8, 최대 50), `excludeClosed=true` 이면 모집 중(`OPEN`) 공고만 조회합니다 (기본 `false`).
 - `urgent`: 출발 시간이 가까운 순(일정 미정은 뒤), 남은 자리가 적은 순입니다. `recent` 는 최신순, `views` 는 조회수순입니다.
+- **인기·마감 임박** (`GET /api/posts/popular`, `GET /api/posts/urgent`): 응답은 목록 아이템(위 `GET /api/posts` 의 `items[]`)과 같은 모양의 **배열**입니다. `category`(생략 시 전체), `limit`(기본 4, 1~20, 그 밖은 400 `INVALID_INPUT`). 둘 다 **모집 중(`OPEN`)이고 아직 출발하지 않은**(일정 미정 포함) 공고만 대상입니다.
+  - `popular`: 조회수 → 댓글 수 순
+  - `urgent`: 남은 자리가 2 이하이거나 출발이 24시간 이내인 공고를 출발이 가까운 순(일정 미정은 뒤) → 남은 자리가 적은 순으로 정렬 (기준은 `boardConstants.js` 의 `URGENT_*`)
 - **공고 삭제** (`DELETE /api/posts/{postId}`) 🔒 작성자: 응답 `204`. 소프트 삭제(`status = DELETED`, `deleted_at`)라 신청·댓글·리뷰는 보존하고, 그 공고의 스크랩은 삭제합니다. 삭제된 공고는 목록·상세·카테고리 공고 수에서 빠집니다. 오류: 401 `UNAUTHORIZED`, 403 `NOT_POST_AUTHOR`, 404 `POST_NOT_FOUND`(없음, 이미 삭제됨, `postId` 가 1 이상의 정수가 아님). 활동 점수 회수(`POST_REVOKE`)는 점수 지급이 구현될 때 함께 합니다.
 - **임시저장** (`POST /api/posts/drafts`, `GET /api/posts/drafts/latest`): 회원당 1개이며 새로 저장하면 덮어씁니다. 요청 본문은 작성 폼 값 `{ title, body, partyName, game, type, detail, headcount, style, tbd, date, time, voice }` 중 보낸 것만 저장하고(미완성·빈 값 허용, 알 수 없는 필드는 버림), 타입이 틀리거나 너무 긴 값은 400 `INVALID_INPUT`(필드별) 입니다. 두 API 모두 `{ draft, savedAt }` 를 돌려주며, 저장한 적이 없으면 `GET` 은 `data: null` 입니다. 공고를 등록하면 그 회원의 임시저장은 삭제됩니다.
 - `GET /api/categories` 는 `[{ code, name, postCount }]` 를 `sort_order` 순으로 돌려줍니다. `postCount` 는 삭제되지 않은 공고 수(마감 포함)입니다.
