@@ -112,7 +112,7 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 | 항목 | 내용 |
 | --- | --- |
 | 공통 | 둘 다 JWT(HS256), 서명 키 `JWT_SECRET`. `sub` = 회원 id, `typ` = `access` / `refresh` 로 종류를 구분해 서로의 자리에 쓸 수 없음 |
-| Access Token | 유효 시간 30분 (`ACCESS_TOKEN_TTL_SECONDS`). DB 에 저장하지 않음 |
+| Access Token | 유효 시간 2시간 (`ACCESS_TOKEN_TTL_SECONDS`, 7200초). DB 에 저장하지 않음. 만료되어 401 `TOKEN_EXPIRED` 를 받으면 프론트(`frontend/src/api/http.ts`)가 Refresh Token 으로 재발급받아 원래 요청을 한 번 다시 보냄 |
 | Refresh Token | `jti`(UUID) 포함. 폐기 처리를 위해 DB `refresh_token` 에 토큰의 SHA-256 해시를 저장하고, 재발급 시 JWT 검증과 DB 확인(폐기·만료)을 모두 통과해야 함. 유효 기간: `rememberMe=false` 1일 (`REFRESH_TOKEN_TTL_DAYS`), `true` 14일 (`REMEMBER_ME_TTL_DAYS`) |
 | 재발급 | 사용한 Refresh Token 은 폐기하고 새로 발급(rotation). 만료 시각은 처음 로그인 때 값을 유지 |
 | 로그아웃 | 해당 회원의 Refresh Token 을 모두 폐기 (`revoked_at` 기록) |
