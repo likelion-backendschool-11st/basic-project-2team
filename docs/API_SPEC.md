@@ -425,7 +425,17 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
  { "id": 2, "nickname": "달빛힐러", "avatarUrl": null, "level": 3, "mannerTemp": 36.5, "reviewCount": 0, "role": "서포터", "isHost": false }]
 ```
 
-⚠️ 알림 발송(지원 결과·신청 알림)은 별도 이슈(#38)라 이번 범위에 없습니다.
+**알림 전송** — 아래 파티 이벤트가 일어나면 같은 트랜잭션 안에서 `notification` 에 한 건씩 저장합니다(이벤트가 실패해 롤백되면 알림도 남지 않음). 문구는 `partyConstants.js` 의 `partyMessages.notice`, 공고 제목은 40자에서 줄임표로 자릅니다.
+
+| 이벤트 | 받는 사람 | `type` |
+| --- | --- | --- |
+| 참가 신청 · 재신청 | 파티장 | `APPLICATION_RECEIVED` |
+| 신청 승인/거절 | 신청자 | `APPLICATION_RESULT` |
+| 수락된 파티원의 신청 취소 (대기 중 취소는 알리지 않음) | 파티장 | `APPLICATION_CANCELED` |
+| 승인으로 정원이 차서 자동 마감 | 아직 대기 중인 신청자 | `POST_UPDATED` |
+| 작성자가 마감(`CLOSED`)·완료(`COMPLETED`) 처리 (재개는 알리지 않음) | 대기 중·수락된 신청자 | `POST_UPDATED` |
+
+⚠️ 알림함 조회·읽음 처리 API 는 아직 없습니다(실시간 푸시 없이 폴링으로 조회할 예정). 지금은 저장까지만 합니다.
 
 ## 5. 댓글 (Comment)
 
