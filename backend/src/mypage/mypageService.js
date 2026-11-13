@@ -46,13 +46,16 @@ const toPostSummary = (row) => ({
   status: row.postStatus,
 });
 
-const toMyPost = (row) => ({
+/** 출발 시간이 지났거나(일정 미정 포함) 완료 처리할 수 있는 시점인지 */
+const hasStarted = (row, now) => !row.scheduleAt || new Date(row.scheduleAt) <= now;
+
+const toMyPost = (now) => (row) => ({
   ...toPostSummary(row),
   views: row.viewCount,
   commentCount: row.commentCount,
   createdAt: toIso(row.createdAt),
-  // 「활동 완료」 버튼: 아직 완료 전이고 승인된 파티원이 있을 때 (PATCH /api/posts/{postId}/status)
-  canComplete: COMPLETABLE_POST_STATUSES.includes(row.postStatus) && Number(row.reviewTargetCount) > 0,
+  // 「활동 완료」 버튼: 아직 완료 전이고 승인된 파티원이 있으며 출발 시간이 지났을 때 (PATCH /api/posts/{postId}/status 의 완료 조건과 같음)
+  canComplete: COMPLETABLE_POST_STATUSES.includes(row.postStatus) && Number(row.reviewTargetCount) > 0 && hasStarted(row, now),
   review: toReviewProgress(row, row.postStatus === POST_STATUS_COMPLETED),
 });
 
@@ -106,7 +109,7 @@ const toTopTags = (tags, ratingCount) =>
  * 마이페이지 조회·즐겨찾기 비즈니스 로직.
  * @param {{ mypageRepository: ReturnType<typeof import('./mypageRepository').createMypageRepository> }} deps
  */
-function createMypageService({ mypageRepository }) {
+function createMypageService({ mypageRepository, now = () => new Date() }) {
   /** 프로필 공통 응답. includePrivate 이면 비공개 항목(나이대)도 그대로 담습니다. */
   async function buildProfile(member, { includePrivate }) {
     const [games, stats, tags] = await Promise.all([
@@ -176,7 +179,7 @@ function createMypageService({ mypageRepository }) {
       limit: paging.size,
       offset: (paging.page - 1) * paging.size,
     });
-    return toPage(result, paging, toMyPost);
+    return toPage(result, paging, toMyPost(now()));
   }
 
   /** GET /api/members/me/applications — 내가 신청한 공고 (신청 상태 포함) */

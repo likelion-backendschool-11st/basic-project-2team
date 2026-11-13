@@ -29,27 +29,11 @@ const DRAFT_STRING_FIELDS = Object.freeze({
 const DRAFT_BOOLEAN_FIELDS = Object.freeze(['tbd', 'voice']);
 
 const POST_STATUS_DELETED = 'DELETED';
-const POST_STATUS_COMPLETED = 'COMPLETED';
-/** PATCH /api/posts/{postId}/status 로 바꿀 수 있는 상태. COMPLETED(활동 완료)는 되돌릴 수 없습니다. */
-const CHANGEABLE_POST_STATUSES = Object.freeze(['OPEN', 'CLOSED', POST_STATUS_COMPLETED]);
-
-/** postRepository.changePostStatus 결과 */
-const STATUS_CHANGE_RESULT = Object.freeze({
-  changed: 'CHANGED',
-  unchanged: 'UNCHANGED',
-  notFound: 'NOT_FOUND',
-  alreadyCompleted: 'ALREADY_COMPLETED',
-  noPartyMembers: 'NO_PARTY_MEMBERS',
-});
 
 const postMessages = Object.freeze({
   invalidInput: '입력값을 확인해주세요.',
   postNotFound: '존재하지 않는 공고입니다.',
   notPostAuthor: '공고 작성자만 삭제할 수 있습니다.',
-  notPostAuthorForStatus: '공고 작성자만 모집 상태를 바꿀 수 있습니다.',
-  statusInvalid: `status 는 ${CHANGEABLE_POST_STATUSES.join(', ')} 중 하나여야 합니다.`,
-  alreadyCompleted: '활동 완료 처리된 공고는 상태를 바꿀 수 없습니다.',
-  noPartyMembers: '승인된 파티원이 있어야 활동 완료 처리할 수 있습니다.',
   draftInvalid: '임시저장할 내용이 올바르지 않습니다.',
   titleInvalid: `제목은 ${TITLE_MIN_LENGTH}~${TITLE_MAX_LENGTH}자로 입력해주세요.`,
   bodyRequired: '본문을 입력해주세요.',
@@ -86,8 +70,5 @@ module.exports = {
   DRAFT_STRING_FIELDS,
   DRAFT_BOOLEAN_FIELDS,
   POST_STATUS_DELETED,
-  POST_STATUS_COMPLETED,
-  CHANGEABLE_POST_STATUSES,
-  STATUS_CHANGE_RESULT,
   postMessages,
 };

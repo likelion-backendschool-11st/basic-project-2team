@@ -105,7 +105,7 @@ function createApp({
   // GET /api/members/:memberId(mypage)가 /me 를 잡지 않도록 account 를 먼저 마운트합니다.
   const account = createAccountModule({ pool, accountRepository, requireAuth, bcryptRounds, now });
   app.use('/api/members', account.router);
-  const mypage = createMypageModule({ pool, mypageRepository, requireAuth, optionalAuth });
+  const mypage = createMypageModule({ pool, mypageRepository, requireAuth, optionalAuth, now });
   app.use('/api/members', mypage.router);
 
   app.use(notFoundHandler);
