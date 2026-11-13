@@ -28,8 +28,12 @@ const DRAFT_STRING_FIELDS = Object.freeze({
 });
 const DRAFT_BOOLEAN_FIELDS = Object.freeze(['tbd', 'voice']);
 
+const POST_STATUS_DELETED = 'DELETED';
+
 const postMessages = Object.freeze({
   invalidInput: '입력값을 확인해주세요.',
+  postNotFound: '존재하지 않는 공고입니다.',
+  notPostAuthor: '공고 작성자만 삭제할 수 있습니다.',
   draftInvalid: '임시저장할 내용이 올바르지 않습니다.',
   titleInvalid: `제목은 ${TITLE_MIN_LENGTH}~${TITLE_MAX_LENGTH}자로 입력해주세요.`,
   bodyRequired: '본문을 입력해주세요.',
@@ -65,5 +69,6 @@ module.exports = {
   PLAY_STYLES,
   DRAFT_STRING_FIELDS,
   DRAFT_BOOLEAN_FIELDS,
+  POST_STATUS_DELETED,
   postMessages,
 };
