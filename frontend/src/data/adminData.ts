@@ -166,8 +166,8 @@ export const reportDetailText = {
 
 // ───────── 공고
 
-export const postStatusLabel: Record<PostStatus, string> = { OPEN: '모집 중', CLOSED: '마감', COMPLETED: '종료', DELETED: '삭제됨' };
-export const postStatusTone: Record<PostStatus, Tone> = { OPEN: 'indigo', CLOSED: 'amber', COMPLETED: 'slate', DELETED: 'rose' };
+export const postStatusLabel: Record<PostStatus, string> = { OPEN: '모집 중', PAUSED: '모집 중단', CLOSED: '마감', COMPLETED: '종료', DELETED: '삭제됨' };
+export const postStatusTone: Record<PostStatus, Tone> = { OPEN: 'indigo', PAUSED: 'amber', CLOSED: 'amber', COMPLETED: 'slate', DELETED: 'rose' };
 export const postStatusOptions = toOptions(postStatusLabel);
 
 export const postText = {

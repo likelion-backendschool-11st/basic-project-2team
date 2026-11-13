@@ -18,7 +18,7 @@ export interface PostListItem {
   readonly voiceRequired: boolean;
   readonly views: number;
   readonly commentCount: number;
-  readonly status: 'OPEN' | 'CLOSED' | 'COMPLETED';
+  readonly status: 'OPEN' | 'PAUSED' | 'CLOSED' | 'COMPLETED';
   readonly createdAt: string;
 }
 
@@ -66,6 +66,7 @@ export const getCategories = () => request<readonly CategorySummary[]>('GET', '/
 const membersToneOf = (remaining: number): MembersTone => (remaining <= 1 ? 'urgent' : remaining <= 2 ? 'few' : 'open');
 
 function badgeOf(item: PostListItem, remaining: number): PostBadge | undefined {
+  if (item.status === 'PAUSED') return { label: boardText.badgePaused, tone: 'neutral' };
   if (item.status === 'CLOSED') return { label: boardText.badgeClosed, tone: 'neutral' };
   if (item.status === 'COMPLETED') return { label: boardText.badgeCompleted, tone: 'neutral' };
   if (remaining <= 1) return { label: boardText.badgeUrgent, tone: 'urgent' };

@@ -103,6 +103,7 @@ export const boardText = {
   empty: '조건에 맞는 게시글이 없습니다.',
   loadFailed: '게시글 목록을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.',
   badgeClosed: '모집마감',
+  badgePaused: '모집중단',
   badgeCompleted: '종료',
   badgeUrgent: '마감임박',
   badgeVoice: '음성필수',

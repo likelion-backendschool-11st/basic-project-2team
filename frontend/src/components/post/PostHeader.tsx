@@ -38,6 +38,7 @@ export const PostHeader: React.FC<PostHeaderProps> = ({ detail, filled, state, s
       <span className={`${chip} bg-indigo-500/15 text-indigo-300 border-indigo-500/30`}>{detail.game}</span>
       <span className={`${chip} bg-rose-500/15 text-rose-300 border-rose-500/30`}>{detail.raid}</span>
       {state === 'open' && <span className={`${chip} bg-emerald-500/10 text-emerald-300 border-emerald-500/20`}>● {postText.recruiting(filled, detail.max)}</span>}
+      {state === 'paused' && <span className={`${chip} bg-amber-500/10 text-amber-300 border-amber-500/20`}>{postText.pausedBadge}</span>}
       {state === 'closed' && <span className={`${chip} bg-slate-500/20 text-slate-300 border-slate-500/30`}>{postText.closedBadge}</span>}
       {state === 'open' && filled === detail.max - 1 && <span className={`${chip} bg-rose-500/10 text-rose-300 border-rose-500/20`}>⏰ {postText.almostFull}</span>}
     </div>

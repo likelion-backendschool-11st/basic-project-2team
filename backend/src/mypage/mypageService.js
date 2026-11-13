@@ -6,7 +6,7 @@ const { parsePageQuery, parseApplicationQuery } = require('./mypageValidator');
 
 const WITHDRAWN = 'WITHDRAWN';
 const POST_STATUS_COMPLETED = 'COMPLETED';
-const COMPLETABLE_POST_STATUSES = Object.freeze(['OPEN', 'CLOSED']);
+const COMPLETABLE_POST_STATUSES = Object.freeze(['OPEN', 'PAUSED', 'CLOSED']);
 const APPLICATION_ACCEPTED = 'ACCEPTED';
 
 /**

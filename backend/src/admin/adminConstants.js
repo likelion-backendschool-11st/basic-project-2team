@@ -95,7 +95,7 @@ const memberStatusSeverity = Object.freeze({
 });
 
 /** post.status — 화면의 모집 중 · 마감 · 종료 · 삭제됨 */
-const postStatus = Object.freeze({ open: 'OPEN', closed: 'CLOSED', completed: 'COMPLETED', deleted: 'DELETED' });
+const postStatus = Object.freeze({ open: 'OPEN', paused: 'PAUSED', closed: 'CLOSED', completed: 'COMPLETED', deleted: 'DELETED' });
 const postStatuses = Object.freeze(Object.values(postStatus));
 
 /** comment.status */

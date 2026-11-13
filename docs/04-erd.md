@@ -243,7 +243,7 @@ erDiagram
         tinyint current_count "파티장 포함, 기본 1"
         datetime schedule_at "NULL이면 시간 미정"
         boolean voice_required "기본 FALSE"
-        varchar(20) status "OPEN / CLOSED / COMPLETED / DELETED"
+        varchar(20) status "OPEN / PAUSED / CLOSED / COMPLETED / DELETED"
         int view_count "기본 0"
         int comment_count "기본 0"
         datetime deleted_at

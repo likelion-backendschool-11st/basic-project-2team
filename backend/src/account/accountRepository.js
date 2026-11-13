@@ -9,7 +9,7 @@ const PROFILE_COLUMNS = Object.freeze({
 });
 
 /** 탈퇴를 막는 「진행 중인 파티」: 모집 중이거나 마감됐지만 아직 완료되지 않은 공고 */
-const ACTIVE_POST = "p.deleted_at IS NULL AND p.status IN ('OPEN', 'CLOSED')";
+const ACTIVE_POST = "p.deleted_at IS NULL AND p.status IN ('OPEN', 'PAUSED', 'CLOSED')";
 
 /** 트랜잭션 하나로 fn 을 실행합니다. fn 이 false 를 돌려주면 롤백합니다. */
 async function inTransaction(pool, fn) {
