@@ -45,6 +45,7 @@ function createBoardRepository(pool) {
               p.required_spec AS requiredSpec, p.headcount, p.current_count AS currentCount,
               p.schedule_at AS scheduleAt, p.voice_required AS voiceRequired, p.status,
               p.view_count AS viewCount, p.comment_count AS commentCount,
+              (SELECT COUNT(*) FROM post_scrap s WHERE s.post_id = p.id) AS scrapCount,
               p.created_at AS createdAt, p.updated_at AS updatedAt,
               m.id AS hostId, m.nickname AS hostNickname, m.avatar_url AS hostAvatarUrl, m.level AS hostLevel,
               m.manner_temp AS hostMannerTemp, m.review_count AS hostReviewCount, m.status AS hostStatus

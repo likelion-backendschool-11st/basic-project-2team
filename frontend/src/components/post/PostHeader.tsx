@@ -30,7 +30,7 @@ export const PostHeader: React.FC<PostHeaderProps> = ({ detail, filled, state, s
       ) : (
         <div className="flex items-center gap-2 text-xs">
           <button type="button" onClick={onShare} className="px-3 py-2 rounded-lg border border-night-borderLight text-fog-headline hover:bg-white/5 flex items-center gap-1.5"><i className="fa-solid fa-share-nodes" />{postText.share}</button>
-          <button type="button" aria-pressed={scrapped} onClick={onScrap} className={`px-3 py-2 rounded-lg border flex items-center gap-1.5 ${scrapped ? 'border-mercury bg-mercury/20 text-white' : 'border-night-borderLight text-fog-headline hover:bg-white/5'}`}><i className="fa-solid fa-bookmark" />{scrapped ? 48 : 47}</button>
+          <button type="button" aria-pressed={scrapped} onClick={onScrap} className={`px-3 py-2 rounded-lg border flex items-center gap-1.5 ${scrapped ? 'border-mercury bg-mercury/20 text-white' : 'border-night-borderLight text-fog-headline hover:bg-white/5'}`}><i className="fa-solid fa-bookmark" />{detail.scrapCount}</button>
         </div>
       )}
     </div>

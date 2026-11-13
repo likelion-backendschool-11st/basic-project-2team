@@ -32,6 +32,7 @@ function toPostDetail(row, tags, viewer) {
     status: row.status,
     views: row.viewCount,
     commentCount: row.commentCount,
+    scrapCount: Number(row.scrapCount ?? 0),
     tags,
     host: {
       id: row.hostId,

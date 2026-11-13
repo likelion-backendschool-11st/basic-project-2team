@@ -351,7 +351,7 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
   "schedule": "2026-11-15T12:00:00.000Z", "scheduleTbd": false,
   "voiceRequired": true,
   "status": "OPEN",
-  "views": 129, "commentCount": 3,
+  "views": 129, "commentCount": 3, "scrapCount": 5,
   "tags": ["숙련", "디코필수"],
   "host": { "id": 3, "nickname": "빛나는오더", "avatarUrl": null, "level": 52, "mannerTemp": 99.8, "reviewCount": 184 },
   "viewer": { "isOwner": false, "scrapped": true, "applicationStatus": "PENDING" },
@@ -361,6 +361,7 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 ```
 
 - `detail`·`detailName`·`detailType`·`partyName`·`style`·`requiredSpec` 은 없으면 `null`. 일정 미정이면 `schedule: null`, `scheduleTbd: true`.
+- `scrapCount`: 이 공고를 스크랩한 회원 수(`post_scrap` 행 수).
 - `viewer` 는 비로그인이면 `null`. `applicationStatus` 는 신청한 적이 없으면 `null`, 아니면 `PENDING`·`ACCEPTED`·`REJECTED`·`CANCELED`·`NO_SHOW`.
 - 탈퇴한 작성자는 `host.nickname` 이 `"탈퇴한 회원"`, `avatarUrl` 이 `null` 입니다.
 

@@ -26,6 +26,7 @@ export interface PostDetailResponse {
   readonly status: PostStatus;
   readonly views: number;
   readonly commentCount: number;
+  readonly scrapCount: number;
   readonly tags: readonly string[];
   readonly host: {
     readonly id: number;
@@ -134,6 +135,7 @@ export function toPostDetail(res: PostDetailResponse): PostDetail {
     participants: [{ name: res.host.nickname, role: t.leaderRole, leader: true, online: true }],
     status: res.status,
     commentCount: res.commentCount,
+    scrapCount: res.scrapCount,
     scrapped: res.viewer?.scrapped ?? false,
     applicationStatus: res.viewer?.applicationStatus ?? null,
   };
