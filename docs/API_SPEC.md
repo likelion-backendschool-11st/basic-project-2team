@@ -382,6 +382,41 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 | PATCH | `/api/posts/{postId}/applications/{applicationId}` | 승인/거절 `{ status: "ACCEPTED" \| "REJECTED" }` | 🔒 작성자 |
 | GET | `/api/posts/{postId}/participants` | 확정 파티원 목록 (`Participant[]`) | |
 
+구현: `backend/src/party/` (`/api/posts` 에 마운트). 모두 🔒 이며 `participants` 만 비로그인도 조회할 수 있습니다. `postId`·`applicationId` 가 1 이상의 정수가 아니거나 삭제된 공고면 404 입니다.
+
+**참가 신청 (`POST /api/posts/{postId}/applications`)** — 본문 `{ "role": "서포터", "message": "잘 부탁드려요" }` (둘 다 선택, `role` 30자·`message` 200자 이하) → `201` `{ "id": 3, "status": "PENDING" }`
+
+- 취소(`CANCELED`)했던 신청은 같은 행을 `PENDING` 으로 되살립니다. 거절(`REJECTED`)·노쇼(`NO_SHOW`)된 신청은 다시 할 수 없습니다.
+- 오류: 400 `INVALID_INPUT`(필드별), 401 `UNAUTHORIZED`, 403 `CANNOT_APPLY_OWN_POST` · `REAPPLY_NOT_ALLOWED` · `ACCOUNT_BANNED` · `ACCOUNT_SUSPENDED`, 404 `POST_NOT_FOUND`, 409 `POST_CLOSED`(`OPEN` 이 아님) · `PARTY_FULL`(정원이 참) · `ALREADY_APPLIED`(대기 중·수락됨).
+
+**신청 취소 (`DELETE /api/posts/{postId}/applications/me`)** → `204`
+
+- 대기 중(`PENDING`)·수락(`ACCEPTED`)된 내 신청만 취소할 수 있습니다. 수락된 신청이면 공고의 `current` 가 1 줄고, 출발 3시간 이내(이미 지난 경우 포함)면 `late_cancel` 로 기록해 노쇼와 구분합니다.
+- 오류: 404 `POST_NOT_FOUND` · `APPLICATION_NOT_FOUND`(취소할 신청이 없음), 409 `POST_COMPLETED`.
+
+**신청자 목록 (`GET /api/posts/{postId}/applications?status=`)** 🔒 작성자 — 취소·노쇼는 제외하고 오래된 순입니다. `status` 는 `PENDING` · `ACCEPTED` · `REJECTED`.
+
+```json
+[{ "id": 3, "status": "PENDING", "role": "서포터", "message": "잘 부탁드려요", "appliedAt": "2026-11-12T00:00:00.000Z",
+   "applicant": { "id": 2, "nickname": "빛나는오더", "avatarUrl": null, "level": 52, "mannerTemp": 99.8, "reviewCount": 184 } }]
+```
+
+- 탈퇴한 신청자의 `nickname` 은 `"탈퇴한 회원"` 입니다. 오류: 400 `INVALID_INPUT`, 403 `NOT_POST_AUTHOR`.
+
+**승인/거절 (`PATCH /api/posts/{postId}/applications/{applicationId}`)** 🔒 작성자 — 본문 `{ "status": "ACCEPTED" | "REJECTED" }` → `200` `{ "id": 3, "status": "ACCEPTED", "current": 2, "max": 8 }`
+
+- 대기 중 신청만 처리합니다. 승인하면 `current` 가 1 늘고(정원을 넘지 않게 공고 행을 잠금), 거절은 인원을 바꾸지 않습니다. 정원이 차도 공고 `status` 는 자동으로 바뀌지 않습니다(상태 변경은 별도 API).
+- 오류: 400 `INVALID_INPUT`, 403 `NOT_POST_AUTHOR`, 404 `APPLICATION_NOT_FOUND`, 409 `ALREADY_DECIDED` · `POST_CLOSED`(승인만) · `PARTY_FULL`(승인만).
+
+**확정 파티원 (`GET /api/posts/{postId}/participants`)** — 파티장이 먼저, 이어서 수락된 순입니다.
+
+```json
+[{ "id": 1, "nickname": "빛나는오더", "avatarUrl": null, "level": 52, "mannerTemp": 99.8, "reviewCount": 184, "role": null, "isHost": true },
+ { "id": 2, "nickname": "달빛힐러", "avatarUrl": null, "level": 3, "mannerTemp": 36.5, "reviewCount": 0, "role": "서포터", "isHost": false }]
+```
+
+⚠️ 알림 발송(지원 결과·신청 알림)은 별도 이슈(#38)라 이번 범위에 없습니다.
+
 ## 5. 댓글 (Comment)
 
 | Method | URI | 설명 | 인증 |

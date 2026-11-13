@@ -1,0 +1,300 @@
+'use strict';
+
+const { describe, it, before, after, beforeEach } = require('node:test');
+const assert = require('node:assert/strict');
+const { createApp } = require('../../src/app');
+const { createTokenProvider } = require('../../src/common/tokenProvider');
+
+const AUTH = Object.freeze({ jwtSecret: 'test-secret', accessTokenTtlSeconds: 1800, refreshTokenTtlDays: 1, rememberMeTtlDays: 14 });
+const NOW = new Date('2026-11-14T00:00:00Z');
+const HOST = 1;
+const A = 2;
+const B = 3;
+const C = 4;
+
+/** DB 대신 메모리에 저장하는 가짜 repository. 승인·취소의 인원 계산은 실제 repository 와 같은 규칙입니다. */
+function createFakeRepository() {
+  const state = { posts: new Map(), members: new Map(), applications: [], nextId: 1 };
+  const find = (postId, memberId) => state.applications.find((a) => a.postId === postId && a.applicantId === memberId);
+  const memberRow = (id) => ({ memberId: id, nickname: `회원${id}`, avatarUrl: null, level: 1, mannerTemp: '36.5', reviewCount: 0, memberStatus: state.members.get(id)?.status ?? 'ACTIVE' });
+  return {
+    state,
+    async findPost(postId) {
+      const p = state.posts.get(postId);
+      return p && p.status !== 'DELETED' ? { id: postId, ...p } : null;
+    },
+    async findMemberStatus(memberId) {
+      return state.members.get(memberId) ?? { status: 'ACTIVE', suspendedUntil: null };
+    },
+    async findMyApplication(postId, memberId) {
+      const a = find(postId, memberId);
+      return a ? { id: a.id, status: a.status } : null;
+    },
+    async createApplication({ postId, applicantId, role, message }) {
+      if (find(postId, applicantId)) return null;
+      const a = { id: state.nextId++, postId, applicantId, role, message, status: 'PENDING', lateCancel: false };
+      state.applications.push(a);
+      return a.id;
+    },
+    async reapply({ id, role, message }) {
+      const a = state.applications.find((x) => x.id === id);
+      if (a.status !== 'CANCELED') return false;
+      Object.assign(a, { status: 'PENDING', role, message, lateCancel: false });
+      return true;
+    },
+    async cancelApplication({ postId, applicantId, lateCancel }) {
+      const a = find(postId, applicantId);
+      if (!a || !['PENDING', 'ACCEPTED'].includes(a.status)) return false;
+      if (a.status === 'ACCEPTED') {
+        state.posts.get(postId).currentCount -= 1;
+        a.lateCancel = lateCancel;
+      }
+      a.status = 'CANCELED';
+      return true;
+    },
+    async findApplications(postId, status) {
+      return state.applications
+        .filter((a) => a.postId === postId && ['PENDING', 'ACCEPTED', 'REJECTED'].includes(a.status) && (!status || a.status === status))
+        .map((a) => ({ ...a, appliedAt: NOW, ...memberRow(a.applicantId) }));
+    },
+    async decideApplication({ postId, applicationId, status }) {
+      const post = state.posts.get(postId);
+      const a = state.applications.find((x) => x.id === applicationId && x.postId === postId);
+      if (!a) return { result: 'NOT_FOUND' };
+      if (a.status !== 'PENDING') return { result: 'ALREADY_DECIDED' };
+      if (status === 'ACCEPTED') {
+        if (post.status !== 'OPEN') return { result: 'POST_CLOSED' };
+        if (post.currentCount >= post.headcount) return { result: 'FULL' };
+        post.currentCount += 1;
+      }
+      a.status = status;
+      return { result: 'OK', current: post.currentCount, max: post.headcount };
+    },
+    async findParticipants(postId) {
+      const post = state.posts.get(postId);
+      const accepted = state.applications.filter((a) => a.postId === postId && a.status === 'ACCEPTED');
+      return [
+        { ...memberRow(post.authorId), role: null, isHost: 1 },
+        ...accepted.map((a) => ({ ...memberRow(a.applicantId), role: a.role, isHost: 0 })),
+      ];
+    },
+  };
+}
+
+describe('party application API', () => {
+  let server;
+  let baseUrl;
+  const repo = createFakeRepository();
+  const tokens = createTokenProvider(AUTH);
+
+  before(async () => {
+    const app = createApp({ partyRepository: repo, corsOrigins: [], bcryptRounds: 4, auth: AUTH, now: () => NOW });
+    await new Promise((resolve) => {
+      server = app.listen(0, resolve);
+    });
+    baseUrl = `http://localhost:${server.address().port}`;
+  });
+  after(() => server.close());
+  beforeEach(() => {
+    Object.assign(repo.state, { applications: [], nextId: 1 });
+    repo.state.members.clear();
+    repo.state.posts.clear();
+    repo.state.posts.set(1, { authorId: HOST, status: 'OPEN', headcount: 3, currentCount: 1, scheduleAt: new Date('2026-11-14T12:00:00Z') });
+  });
+
+  const call = (method, path, body, memberId) =>
+    fetch(`${baseUrl}/api/posts${path}`, {
+      method,
+      headers: { 'Content-Type': 'application/json', ...(memberId ? { Authorization: `Bearer ${tokens.createAccessToken(memberId)}` } : {}) },
+      body: body && JSON.stringify(body),
+    });
+  const json = async (res) => (await res.json());
+  const apply = (memberId, body = {}) => call('POST', '/1/applications', body, memberId);
+  const decide = (id, status, memberId = HOST) => call('PATCH', `/1/applications/${id}`, { status }, memberId);
+
+  describe('POST /:postId/applications', () => {
+    it('신청하면 201 PENDING 이고 포지션·메시지는 다듬어 저장한다', async () => {
+      const res = await apply(A, { role: ' 서포터 ', message: '' });
+      assert.equal(res.status, 201);
+      assert.deepEqual((await json(res)).data, { id: 1, status: 'PENDING' });
+      assert.deepEqual([repo.state.applications[0].role, repo.state.applications[0].message], ['서포터', null]);
+    });
+
+    it('본문 없이도 신청할 수 있다', async () => {
+      assert.equal((await call('POST', '/1/applications', undefined, A)).status, 201);
+    });
+
+    it('중복 신청은 409 ALREADY_APPLIED', async () => {
+      await apply(A);
+      const res = await apply(A);
+      assert.equal(res.status, 409);
+      assert.equal((await json(res)).error.code, 'ALREADY_APPLIED');
+    });
+
+    it('본인 공고는 403 CANNOT_APPLY_OWN_POST', async () => {
+      const res = await apply(HOST);
+      assert.equal(res.status, 403);
+      assert.equal((await json(res)).error.code, 'CANNOT_APPLY_OWN_POST');
+    });
+
+    it('마감·완료 공고는 409 POST_CLOSED, 정원이 찬 공고는 409 PARTY_FULL', async () => {
+      repo.state.posts.get(1).status = 'CLOSED';
+      assert.equal((await json(await apply(A))).error.code, 'POST_CLOSED');
+      repo.state.posts.get(1).status = 'OPEN';
+      repo.state.posts.get(1).currentCount = 3;
+      assert.equal((await json(await apply(A))).error.code, 'PARTY_FULL');
+    });
+
+    it('취소한 신청은 같은 행으로 다시 신청할 수 있고, 거절·노쇼는 403 REAPPLY_NOT_ALLOWED', async () => {
+      await apply(A);
+      await call('DELETE', '/1/applications/me', undefined, A);
+      const res = await apply(A, { role: '딜러' });
+      assert.equal(res.status, 201);
+      assert.deepEqual([repo.state.applications.length, repo.state.applications[0].status, repo.state.applications[0].role], [1, 'PENDING', '딜러']);
+
+      for (const status of ['REJECTED', 'NO_SHOW']) {
+        repo.state.applications[0].status = status;
+        const again = await apply(A);
+        assert.equal(again.status, 403, status);
+        assert.equal((await json(again)).error.code, 'REAPPLY_NOT_ALLOWED');
+      }
+    });
+
+    it('영구 정지·정지 중인 회원은 403, 기간이 끝난 정지는 허용', async () => {
+      repo.state.members.set(A, { status: 'BANNED' });
+      assert.equal((await json(await apply(A))).error.code, 'ACCOUNT_BANNED');
+      repo.state.members.set(A, { status: 'SUSPENDED', suspendedUntil: new Date('2026-12-01T00:00:00Z') });
+      assert.equal((await json(await apply(A))).error.code, 'ACCOUNT_SUSPENDED');
+      repo.state.members.set(A, { status: 'SUSPENDED', suspendedUntil: new Date('2026-11-01T00:00:00Z') });
+      assert.equal((await apply(A)).status, 201);
+    });
+
+    it('길이를 넘는 값은 필드별 400, 없는·삭제된·형식 틀린 공고는 404, 비로그인은 401', async () => {
+      const bad = await apply(A, { role: 'a'.repeat(31), message: 'b'.repeat(201) });
+      assert.equal(bad.status, 400);
+      assert.deepEqual((await json(bad)).error.fields.map((f) => f.field), ['role', 'message']);
+      repo.state.posts.get(1).status = 'DELETED';
+      for (const id of ['1', '999', 'abc', '0']) assert.equal((await call('POST', `/${id}/applications`, {}, A)).status, 404, id);
+      assert.equal((await call('POST', '/1/applications', {})).status, 401);
+    });
+  });
+
+  describe('DELETE /:postId/applications/me', () => {
+    it('대기 중 신청을 취소하면 204 이고 인원은 그대로다', async () => {
+      await apply(A);
+      assert.equal((await call('DELETE', '/1/applications/me', undefined, A)).status, 204);
+      assert.deepEqual([repo.state.applications[0].status, repo.state.posts.get(1).currentCount], ['CANCELED', 1]);
+    });
+
+    it('수락된 신청을 취소하면 인원이 줄고, 출발 3시간 이내면 late_cancel 로 기록한다', async () => {
+      await apply(A);
+      await decide(1, 'ACCEPTED');
+      repo.state.posts.get(1).scheduleAt = new Date('2026-11-14T02:00:00Z'); // NOW 로부터 2시간 뒤
+      await call('DELETE', '/1/applications/me', undefined, A);
+      assert.deepEqual(
+        [repo.state.applications[0].status, repo.state.applications[0].lateCancel, repo.state.posts.get(1).currentCount],
+        ['CANCELED', true, 1],
+      );
+    });
+
+    it('출발까지 여유가 있으면 late_cancel 이 아니다', async () => {
+      await apply(A);
+      await decide(1, 'ACCEPTED');
+      await call('DELETE', '/1/applications/me', undefined, A);
+      assert.equal(repo.state.applications[0].lateCancel, false);
+    });
+
+    it('신청한 적 없거나 이미 취소·거절된 경우 404 APPLICATION_NOT_FOUND, 완료된 파티는 409', async () => {
+      assert.equal((await json(await call('DELETE', '/1/applications/me', undefined, A))).error.code, 'APPLICATION_NOT_FOUND');
+      await apply(B);
+      await decide(1, 'REJECTED');
+      assert.equal((await call('DELETE', '/1/applications/me', undefined, B)).status, 404);
+      repo.state.posts.get(1).status = 'COMPLETED';
+      assert.equal((await json(await call('DELETE', '/1/applications/me', undefined, B))).error.code, 'POST_COMPLETED');
+    });
+  });
+
+  describe('GET /:postId/applications', () => {
+    it('작성자는 취소를 뺀 신청자 목록을 받고 status 로 거를 수 있다', async () => {
+      await apply(A, { role: '서포터', message: '잘 부탁드려요' });
+      await apply(B);
+      await apply(C);
+      await call('DELETE', '/1/applications/me', undefined, C);
+      await decide(1, 'ACCEPTED');
+
+      const { data } = await json(await call('GET', '/1/applications', undefined, HOST));
+      assert.deepEqual(data.map((a) => [a.id, a.status]), [[1, 'ACCEPTED'], [2, 'PENDING']]);
+      assert.deepEqual(data[0].applicant, { id: A, nickname: '회원2', avatarUrl: null, level: 1, mannerTemp: 36.5, reviewCount: 0 });
+      assert.equal(data[0].role, '서포터');
+
+      const pending = await json(await call('GET', '/1/applications?status=PENDING', undefined, HOST));
+      assert.deepEqual(pending.data.map((a) => a.id), [2]);
+    });
+
+    it('작성자가 아니면 403, 잘못된 status 는 400, 탈퇴한 신청자는 닉네임을 가린다', async () => {
+      assert.equal((await json(await call('GET', '/1/applications', undefined, A))).error.code, 'NOT_POST_AUTHOR');
+      assert.equal((await call('GET', '/1/applications?status=CANCELED', undefined, HOST)).status, 400);
+      await apply(A);
+      repo.state.members.set(A, { status: 'WITHDRAWN' });
+      // 탈퇴 회원은 신청 자체가 막히므로 신청 후 상태만 바꿔 확인
+      const { data } = await json(await call('GET', '/1/applications', undefined, HOST));
+      assert.equal(data[0].applicant.nickname, '탈퇴한 회원');
+    });
+  });
+
+  describe('PATCH /:postId/applications/:applicationId', () => {
+    it('승인하면 확정 인원이 늘고 현재/정원을 돌려준다', async () => {
+      await apply(A);
+      const res = await decide(1, 'ACCEPTED');
+      assert.equal(res.status, 200);
+      assert.deepEqual((await json(res)).data, { id: 1, status: 'ACCEPTED', current: 2, max: 3 });
+    });
+
+    it('거절은 인원을 바꾸지 않는다', async () => {
+      await apply(A);
+      assert.deepEqual((await json(await decide(1, 'REJECTED'))).data, { id: 1, status: 'REJECTED', current: 1, max: 3 });
+    });
+
+    it('정원이 차면 승인은 409 PARTY_FULL, 거절은 가능하다', async () => {
+      for (const id of [A, B, C]) await apply(id);
+      await decide(1, 'ACCEPTED');
+      await decide(2, 'ACCEPTED');
+      assert.equal(repo.state.posts.get(1).currentCount, 3);
+      assert.equal((await json(await decide(3, 'ACCEPTED'))).error.code, 'PARTY_FULL');
+      assert.equal((await decide(3, 'REJECTED')).status, 200);
+    });
+
+    it('이미 처리된 신청은 409 ALREADY_DECIDED, 마감된 공고의 승인은 409 POST_CLOSED', async () => {
+      await apply(A);
+      await apply(B);
+      await decide(1, 'ACCEPTED');
+      assert.equal((await json(await decide(1, 'REJECTED'))).error.code, 'ALREADY_DECIDED');
+      repo.state.posts.get(1).status = 'CLOSED';
+      assert.equal((await json(await decide(2, 'ACCEPTED'))).error.code, 'POST_CLOSED');
+    });
+
+    it('작성자가 아니면 403, 없는·형식 틀린 신청은 404, status 가 틀리면 400', async () => {
+      await apply(A);
+      assert.equal((await json(await decide(1, 'ACCEPTED', B))).error.code, 'NOT_POST_AUTHOR');
+      for (const id of ['99', 'abc', '0']) assert.equal((await decide(id, 'ACCEPTED')).status, 404, id);
+      assert.equal((await decide(1, 'PENDING')).status, 400);
+      assert.equal(repo.state.applications[0].status, 'PENDING');
+    });
+  });
+
+  describe('GET /:postId/participants', () => {
+    it('비로그인도 볼 수 있고 파티장이 먼저, 이어서 수락된 파티원이 나온다', async () => {
+      await apply(A, { role: '딜러' });
+      await apply(B);
+      await decide(1, 'ACCEPTED');
+      const res = await call('GET', '/1/participants');
+      assert.equal(res.status, 200);
+      const { data } = await json(res);
+      assert.deepEqual(data.map((p) => [p.id, p.isHost, p.role]), [[HOST, true, null], [A, false, '딜러']]);
+    });
+
+    it('없는 공고는 404', async () => {
+      assert.equal((await call('GET', '/999/participants')).status, 404);
+    });
+  });
+});
