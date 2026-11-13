@@ -165,9 +165,11 @@ export function usePostDetail(postId: string) {
   };
 
   const apply = () => run(() => applyToPost(postId), postText.applySuccess);
+  // 수락(ACCEPTED)된 뒤에는 「파티 탈퇴」, 아직 대기(PENDING) 중이면 「신청 취소」로 구분합니다.
+  const accepted = detail?.applicationStatus === 'ACCEPTED';
   const confirmLeave = async () => {
     leave.close();
-    await run(() => cancelApplication(postId), postText.applyCanceled);
+    await run(() => cancelApplication(postId), accepted ? postText.leftParty : postText.applyCanceled);
   };
 
   const leaveToBoard = async (done: string) => {
@@ -207,7 +209,7 @@ export function usePostDetail(postId: string) {
   const state: PartyState = detail ? toPartyState(detail.status) : 'open';
   return {
     detail, loading, error, related,
-    applied: detail?.applicationStatus === 'PENDING' || detail?.applicationStatus === 'ACCEPTED',
+    applied: accepted || detail?.applicationStatus === 'PENDING', accepted,
     apply, scrapped, toggleScrap, copyLink,
     following, toggleFollow, state, togglePause: () => setStatus(state === 'open' ? 'PAUSED' : 'OPEN'),
     applicants, resolveApplicant, applicantsDialog, participants,
