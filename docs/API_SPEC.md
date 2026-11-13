@@ -344,21 +344,148 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 
 ## 9. 관리자 (Admin) 🛡️
 
-| Method | URI | 설명 |
+구현: `backend/src/admin/` (Routes / Controller / Service / Repository / Validator / Constants)
+
+- 관리자 계정은 회원과 분리된 `admin_account` 테이블을 씁니다 (REQ-ADMIN-001). 회원가입 API는 없고 DB에 직접 등록합니다.
+- 🛡️ 표시 API는 `Authorization: Bearer {관리자 accessToken}` 이 필요합니다. 관리자 토큰은 JWT `typ: "admin"` 이라 **회원 토큰으로는 401** 입니다.
+  관리자 토큰은 Refresh Token 없이 Access Token 하나만 발급하며, 만료되면 다시 로그인합니다 (유효 시간 `ACCESS_TOKEN_TTL_SECONDS`).
+- 상태 값은 화면에는 한글로 표시하지만, API에서는 아래 영문 enum으로 주고받고 프론트에서 매핑합니다.
+- 목록 API는 공통 페이지네이션 `?page=1&size=10` (size 1~100, 기본 10) 을 따르고 `{ items, page, size, totalCount, totalPages }` 로 응답합니다. 최신순 정렬입니다.
+- 처리 API(신고 처리·공고 삭제·제재·댓글 처리)와 로그인, 회원 상세 조회는 `admin_action_log` 에 처리자·IP와 함께 기록됩니다 (REQ-ADMIN-007).
+- 시간은 UTC ISO-8601 (`2026-11-13T01:52:10.000Z`) 로 응답합니다.
+
+| Method | URI | 설명 | 인증 |
+| --- | --- | --- | --- |
+| POST | `/api/admin/auth/login` | 관리자 로그인 `{ userId, password }` → `{ accessToken, admin }` | |
+| GET | `/api/admin/me` | 로그인한 관리자 정보 `{ id, userId, name, role }` | 🛡️ |
+| GET | `/api/admin/dashboard` | 대시보드 통계 | 🛡️ |
+| GET | `/api/admin/reports?status=&type=&page=&size=` | 신고 목록 | 🛡️ |
+| GET | `/api/admin/reports/{reportId}` | 신고 상세 (피신고 회원의 제재 이력 포함) | 🛡️ |
+| PATCH | `/api/admin/reports/{reportId}` | 신고 처리 `{ status, action?, days?, memo? }` | 🛡️ |
+| GET | `/api/admin/posts?status=&q=&page=&size=` | 공고 목록 (`q`: 제목·작성자 닉네임) | 🛡️ |
+| GET | `/api/admin/posts/{postId}` | 공고 상세 (이 공고의 관리자 처리 이력 포함) | 🛡️ |
+| DELETE | `/api/admin/posts/{postId}` | 공고 삭제 `{ reason }` → `204` | 🛡️ |
+| GET | `/api/admin/members?status=&q=&page=&size=` | 회원 목록 (`q`: 닉네임·아이디·이메일) | 🛡️ |
+| GET | `/api/admin/members/{memberId}` | 회원 상세 (개인정보 포함, 조회 기록 남김) | 🛡️ |
+| POST | `/api/admin/members/{memberId}/sanctions` | 제재 `{ type, days?, reason }` → `201` | 🛡️ |
+| GET | `/api/admin/comments?status=&q=&page=&size=` | 댓글 목록 (`q`: 내용·작성자 닉네임, 비밀 댓글 본문 포함) | 🛡️ |
+| PATCH | `/api/admin/comments/{commentId}` | 댓글 가림/복구/삭제 `{ status, reason }` | 🛡️ |
+| GET | `/api/admin/history?kind=&page=&size=` | 관리자 처리 이력 | 🛡️ |
+
+**상태 enum**
+
+| 구분 | API 값 (화면 표시) |
+| --- | --- |
+| 신고 `status` | `PENDING`(접수) · `IN_PROGRESS`(처리 중) · `DONE`(완료) · `REJECTED`(기각) |
+| 신고 `type` | `MEMBER`(유저) · `NO_SHOW`(노쇼) · `POST`(공고) · `COMMENT`(댓글) |
+| 신고 `action` | `WARN`(경고) · `SUSPEND`(이용 정지) · `BAN`(영구 정지) · `DELETE_CONTENT`(공고·댓글 삭제) · `DISMISS`(기각 시 자동) |
+| 공고 `status` | `OPEN`(모집 중) · `CLOSED`(마감) · `COMPLETED`(종료) · `DELETED`(삭제됨) |
+| 회원 `status` | `ACTIVE`(정상) · `WARNED`(경고) · `SUSPENDED`(이용 정지) · `BANNED`(영구 정지) · `WITHDRAWN`(탈퇴) |
+| 제재 `type` | `WARNING`(경고) · `SUSPEND`(기간 정지) · `BAN`(영구 정지) |
+| 댓글 `status` | `VISIBLE`(정상) · `REPORTED`(신고됨 — 목록 전용, VISIBLE 이면서 신고 1건 이상) · `HIDDEN`(가림) · `DELETED`(삭제) |
+| 이력 `kind` | `REPORT`(신고 처리) · `POST_DELETE`(공고 삭제) · `COMMENT`(댓글 가림·복구·삭제) · `SANCTION`(회원 제재) · `MEMBER_VIEW`(회원 정보 조회) · `LOGIN`(관리자 로그인) |
+
+**관리자 로그인 응답** `200 OK`
+
+```json
+{ "success": true, "data": { "accessToken": "eyJ...", "admin": { "id": 1, "userId": "master", "name": "관리자 마스터", "role": "ADMIN" } } }
+```
+
+**대시보드 응답**
+
+```json
+{
+  "pendingReportCount": 14,
+  "todayReportCount": 28,
+  "openPostCount": 156,
+  "recentSanctionCount": 42,
+  "recentSanctionDays": 7,
+  "recentSanctions": [
+    { "id": 3, "member": { "id": 2, "nickname": "비매너", "userId": "toxic" }, "type": "SUSPEND", "reason": "욕설",
+      "startsAt": "2026-11-13T01:51:54.000Z", "endsAt": "2026-11-20T01:51:54.000Z", "createdAt": "2026-11-13T01:51:54.000Z" }
+  ]
+}
+```
+
+- `pendingReportCount`: `PENDING` + `IN_PROGRESS` 신고 수
+- `todayReportCount`: 한국 시간 오늘 0시 이후 접수된 신고 수
+- `recentSanctionCount`: 최근 `recentSanctionDays`(7)일 동안의 제재 수, `recentSanctions` 는 최근 5건
+
+**목록 아이템**
+
+```json
+// 신고
+{ "id": 1, "createdAt": "...", "type": "MEMBER", "targetId": 2, "reason": "욕설", "target": { "id": 2, "nickname": "비매너" }, "reporter": { "id": 1, "nickname": "신고자" }, "status": "PENDING" }
+
+// 공고
+{ "id": 1, "createdAt": "...", "category": "aos", "game": "리그 오브 레전드", "partyType": "rank", "content": "솔로 랭크", "title": "...",
+  "author": { "id": 2, "nickname": "비매너" }, "current": 1, "max": 4, "status": "OPEN", "reportCount": 1 }
+
+// 회원 (탈퇴 회원은 nickname · userId 가 null)
+{ "id": 2, "nickname": "비매너", "userId": "toxic", "joinedAt": "...", "lastLoginAt": null, "mannerTemp": 36.5, "reportCount": 3, "sanctionCount": 1, "status": "SUSPENDED", "suspendedUntil": "..." }
+
+// 댓글
+{ "id": 1, "createdAt": "...", "post": { "id": 1, "title": "..." }, "parentId": null, "author": { "id": 2, "nickname": "비매너" }, "text": "...", "secret": false, "reportCount": 1, "status": "REPORTED" }
+
+// 처리 이력 (detail 은 처리마다 다름. targetLabel = 대상 이름, reason = 사유)
+{ "id": 7, "createdAt": "...", "kind": "SANCTION", "actionType": "MEMBER_SANCTION", "targetType": "MEMBER", "targetId": 2, "adminName": "관리자 마스터",
+  "detail": { "targetLabel": "비매너", "type": "WARNING", "days": null, "reason": "비매너" } }
+```
+
+**상세 응답에 추가되는 필드**
+
+| API | 추가 필드 |
+| --- | --- |
+| 신고 상세 | `detail`, `action`, `memo`, `handledBy`(관리자 이름), `handledAt`, `reporter.userId`, `target { id, nickname, userId, mannerTemp, status }`, `post { id, title }`, `comment { id, content }`(댓글 신고만), `sanctions[]`(피신고 회원의 제재 이력) |
+| 공고 상세 | `body`, `partyName`, `playStyle`, `requiredSpec`, `schedule`, `voiceRequired`, `views`, `commentCount`, `updatedAt`, `deletedAt`, `deleteReason`, `deletedBy`, `author.userId`, `author.mannerTemp`, `logs[]`(최근 20건) |
+| 회원 상세 | `email`, `phone`, `name`, `ageRange`, `bio`, `avatarUrl`, `reviewCount`, `level`, `withdrawnAt`, `stats { postCount, partyCount, noShowCount, reportCount }`, `games[] { game, isMain, characterName, playTimeSlot, playStyle }`, `sanctions[] { id, type, reason, startsAt, endsAt, reportId, releasedAt, adminName, createdAt }` |
+
+**신고 처리** `PATCH /api/admin/reports/{reportId}`
+
+| `status` | `action` | 처리 내용 |
 | --- | --- | --- |
-| GET | `/api/admin/dashboard` | 대시보드 통계 |
-| GET | `/api/admin/reports?status=&type=&page=` | 신고 목록 (`status`: 접수·처리 중·완료·기각) |
-| GET | `/api/admin/reports/{reportId}` | 신고 상세 |
-| PATCH | `/api/admin/reports/{reportId}` | 신고 처리 `{ status, action, memo }` |
-| GET | `/api/admin/posts?status=&q=&page=` | 공고 목록 (`status`: 모집 중·마감·종료·삭제됨) |
-| GET | `/api/admin/posts/{postId}` | 공고 상세 |
-| DELETE | `/api/admin/posts/{postId}` | 공고 삭제 `{ reason }` |
-| GET | `/api/admin/members?status=&q=&page=` | 회원 목록 (`status`: 정상·경고·이용 정지·영구 정지·탈퇴) |
-| GET | `/api/admin/members/{memberId}` | 회원 상세 |
-| POST | `/api/admin/members/{memberId}/sanctions` | 제재 `{ type: "WARNING"\|"SUSPEND"\|"BAN", days?, reason }` |
-| GET | `/api/admin/comments?status=&q=&page=` | 댓글 목록 (`status`: 정상·신고됨·가림·삭제) |
-| PATCH | `/api/admin/comments/{commentId}` | 댓글 가림/복구/삭제 `{ status, reason }` |
-| GET | `/api/admin/history?kind=&page=` | 관리자 처리 이력 |
+| `IN_PROGRESS` | 지정 불가 | 담당 관리자·메모만 기록 |
+| `DONE` | 필수: `WARN` · `SUSPEND`(+`days` 1~365) · `BAN` | 피신고 회원에게 제재 추가 (`sanction.report_id` = 이 신고) + 회원 상태 변경 + 알림 |
+| `DONE` | `DELETE_CONTENT` | 공고 신고면 공고 삭제(작성자 알림), 댓글 신고면 댓글 삭제. 이미 삭제된 대상은 삭제를 건너뜀. 회원·노쇼 신고에는 불가 |
+| `REJECTED` | 지정 불가 (`DISMISS` 로 저장) | 제재 없이 종료 |
 
-> 상태 값은 화면에는 한글로 표시하지만, API에서는 영문 enum(`RECEIVED`, `IN_PROGRESS`, `DONE`, `REJECTED` 등)으로 주고받고 프론트에서 매핑하는 것을 권장합니다.
+- `memo` (500자 이하)는 `admin_memo` 에 저장하고, 제재·삭제 사유로도 씁니다. 비우면 신고 사유(`reason_code`)를 씁니다.
+- `DONE` · `REJECTED` 가 된 신고는 다시 바꿀 수 없습니다 (`409 REPORT_ALREADY_HANDLED`).
+- 응답: `{ "id": 1, "status": "DONE", "action": "SUSPEND" }`
 
+**제재 규칙** (신고 처리와 `POST /members/{memberId}/sanctions` 공통)
+
+- `SUSPEND` 는 `days`(1~365) 필수, 그 외 타입은 `days` 지정 불가. `reason` 은 1~500자.
+- 회원 상태는 더 무거운 쪽으로만 바뀝니다 (`ACTIVE` < `WARNED` < `SUSPENDED` < `BANNED`). 정지 중인 회원에게 경고를 주면 `SUSPENDED` 가 유지됩니다.
+- 정지가 겹치면 더 늦게 끝나는 시각을 `member.suspended_until` 에 남깁니다.
+- 회원 알림함에 `SANCTION` 알림을 추가합니다. 공고 삭제 시에는 작성자에게 `POST_DELETED` 알림(사유 포함)을 보냅니다 (REQ-ADMIN-003).
+- 제재 응답 `201`: `{ "id": 2, "memberId": 2, "type": "WARNING", "memberStatus": "SUSPENDED", "suspendedUntil": "..." }`
+
+**댓글 처리** `PATCH /api/admin/comments/{commentId}` — `status`: `HIDDEN`(가림) · `VISIBLE`(복구) · `DELETED`(삭제), `reason` 1~200자 필수.
+삭제하면 공고의 `comment_count` 를 1 줄입니다. 삭제된 댓글은 되돌릴 수 없습니다.
+
+**관리자 API 에러 코드**
+
+| 상태 | code | 상황 |
+| --- | --- | --- |
+| 400 | `INVALID_INPUT` | 쿼리·본문·경로 id 형식 오류. `error.fields` 에 필드별 오류 |
+| 400 | `INVALID_REPORT_ACTION` | 회원·노쇼 신고에 `DELETE_CONTENT` |
+| 401 | `UNAUTHORIZED` · `TOKEN_EXPIRED` | 관리자 토큰 없음·위조·회원 토큰 / 만료 |
+| 401 | `INVALID_CREDENTIALS` | 관리자 아이디 또는 비밀번호 불일치 |
+| 403 | `ADMIN_INACTIVE` | `admin_account.status` 가 `ACTIVE` 가 아님 (로그인·토큰 사용 모두) |
+| 404 | `REPORT_NOT_FOUND` · `POST_NOT_FOUND` · `MEMBER_NOT_FOUND` · `COMMENT_NOT_FOUND` | 대상 없음 |
+| 409 | `REPORT_ALREADY_HANDLED` | 이미 완료·기각된 신고 |
+| 409 | `POST_ALREADY_DELETED` | 이미 삭제된 공고 |
+| 409 | `MEMBER_WITHDRAWN` · `MEMBER_ALREADY_BANNED` | 탈퇴 회원 / 이미 영구 정지된 회원 제재 |
+| 409 | `COMMENT_ALREADY_DELETED` · `COMMENT_STATUS_UNCHANGED` | 삭제된 댓글 변경 / 같은 상태로 변경 |
+
+**관리자 계정 등록 예시** (비밀번호는 BCrypt 해시로 저장)
+
+```bash
+# backend/ 에서 해시 만들기
+node -e "console.log(require('bcryptjs').hashSync('비밀번호', 10))"
+```
+
+```sql
+INSERT INTO admin_account (login_id, password_hash, name) VALUES ('master', '$2b$10$...', '관리자 마스터');
+```

@@ -39,6 +39,9 @@ function toMemberId(sub) {
  */
 function createTokenProvider({ jwtSecret, accessTokenTtlSeconds, refreshTokenTtlDays, rememberMeTtlDays }) {
   /**
+   * 토큰 서명·만료·종류를 검증하고 subject(회원 또는 관리자 id)를 돌려줍니다.
+   * @param {Date} [now] 만료 판단 기준 시각 (생략하면 현재 시각)
+   * @returns {number}
    * 서명 시각(now)을 기준으로 JWT 를 만듭니다. jti 를 무작위로 넣어 같은 초에 발급해도 토큰이 겹치지 않게 합니다.
    * @returns {{ token: string, expiresAt: Date }}
    */
@@ -64,6 +67,9 @@ function createTokenProvider({ jwtSecret, accessTokenTtlSeconds, refreshTokenTtl
         clockTimestamp: now && toSeconds(now),
       });
       if (payload.typ !== type) throw new Error(`expected ${type} token`);
+      const subject = Number(payload.sub);
+      if (!Number.isSafeInteger(subject) || subject <= 0) throw new Error('invalid subject');
+      return subject;
       if (typeof payload.sub !== 'string' || !payload.sub) throw new Error('missing subject');
       return payload.sub;
     } catch (err) {
@@ -73,6 +79,12 @@ function createTokenProvider({ jwtSecret, accessTokenTtlSeconds, refreshTokenTtl
     }
   }
 
+  const signAccess = (type, subject) =>
+    jwt.sign({ typ: type }, jwtSecret, {
+      algorithm: ALGORITHM,
+      subject: String(subject),
+      expiresIn: accessTokenTtlSeconds,
+    });
   /** verify 후 sub 를 회원 id 로 바꿉니다. 형식이 틀리면 verify 와 같은 형태로 throw 합니다. */
   function verifyMemberToken(type, token, now) {
     const sub = verify(type, token, now);
@@ -125,6 +137,13 @@ function createTokenProvider({ jwtSecret, accessTokenTtlSeconds, refreshTokenTtl
   }
 
   return {
+    createAccessToken: (memberId) => signAccess(tokenTypes.access, memberId),
+    verifyAccessToken: (token) => ({ memberId: verify(tokenTypes.access, token) }),
+    createRefreshToken,
+    verifyRefreshToken: (token, now) => ({ memberId: verify(tokenTypes.refresh, token, now) }),
+    /** 관리자 Access Token. Refresh Token 없이 만료되면 다시 로그인합니다. */
+    createAdminAccessToken: (adminId) => signAccess(tokenTypes.admin, adminId),
+    verifyAdminAccessToken: (token) => ({ adminId: verify(tokenTypes.admin, token) }),
     createAccessToken,
     verifyAccessToken: (token) => verifyMemberToken(tokenTypes.access, token),
     createRefreshToken,

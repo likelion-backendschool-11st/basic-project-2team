@@ -5,11 +5,10 @@ const cors = require('cors');
 const { env } = require('./config/env');
 const { notFoundHandler, errorHandler } = require('./common/errorHandler');
 const { createTokenProvider } = require('./common/tokenProvider');
-const { createRequireAuth } = require('./common/authMiddleware');
-const { createMailer } = require('./common/mailer');
-const { createEmailVerificationModule } = require('./emailVerification');
+const { createRequireAuth, createRequireAdmin } = require('./common/authMiddleware');
 const { createMemberModule } = require('./member');
 const { createPostModule } = require('./post');
+const { createAdminModule } = require('./admin');
 
 /**
  * Express 앱을 만듭니다. 서버 실행(server.js)과 분리해 테스트에서 DB 없이 띄울 수 있게 합니다.
@@ -17,8 +16,7 @@ const { createPostModule } = require('./post');
  *   pool?: import('mysql2/promise').Pool,
  *   memberRepository?: object,
  *   postRepository?: object,
- *   emailVerificationRepository?: object,
- *   mailer?: ReturnType<typeof createMailer>,
+ *   adminRepository?: object,
  *   corsOrigins: string[],
  *   bcryptRounds: number,
  *   auth?: typeof env.auth,
@@ -29,8 +27,7 @@ function createApp({
   pool,
   memberRepository,
   postRepository,
-  emailVerificationRepository,
-  mailer = createMailer(env.mail),
+  adminRepository,
   corsOrigins,
   bcryptRounds,
   auth = env.auth,
@@ -43,6 +40,7 @@ function createApp({
 
   const tokenProvider = createTokenProvider(auth);
   const requireAuth = createRequireAuth(tokenProvider);
+  const requireAdmin = createRequireAdmin(tokenProvider);
 
   const emailVerification = createEmailVerificationModule({
     pool,
@@ -58,6 +56,9 @@ function createApp({
 
   const post = createPostModule({ pool, postRepository, requireAuth, now });
   app.use('/api/posts', post.router);
+
+  const admin = createAdminModule({ pool, adminRepository, tokenProvider, requireAdmin, bcryptRounds, now });
+  app.use('/api/admin', admin.router);
 
   app.use(notFoundHandler);
   app.use(errorHandler);
