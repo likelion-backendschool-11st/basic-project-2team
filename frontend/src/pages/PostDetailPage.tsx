@@ -15,7 +15,7 @@ import ConfirmDialog from '../components/ui/ConfirmDialog';
 import Toast from '../components/ui/Toast';
 import LoggedInLayout from '../components/user/LoggedInLayout';
 import { commentText } from '../data/commentData';
-import { postText } from '../data/postData';
+import { postDetailText, postText } from '../data/postData';
 import { ROUTES } from '../data/routes';
 import { useComments } from '../hooks/useComments';
 import { usePostDetail } from '../hooks/usePostDetail';
@@ -37,8 +37,25 @@ export const PostDetailPage: React.FC<PostDetailPageProps> = () => {
 const PostDetailView: React.FC<{ readonly postId: string }> = ({ postId }) => {
   const navigate = useNavigate();
   const post = usePostDetail(postId);
-  const thread = useComments(post.detail.host.name, postId);
+  const thread = useComments(postId, post.detail?.commentCount ?? 0);
   const { detail } = post;
+
+  if (!detail) {
+    return (
+      <LoggedInLayout>
+        <div className="rounded-2xl border border-night-borderLight bg-night-surface p-10 text-center text-sm">
+          {post.loading ? (
+            <p className="text-fog-muted">{postDetailText.loading}</p>
+          ) : (
+            <>
+              <p className="text-rose-300">{post.error ?? postDetailText.loadFailed}</p>
+              <button type="button" onClick={() => navigate(ROUTES.board)} className="mt-4 px-4 py-2 rounded-lg border border-night-borderLight text-fog-sub hover:text-white">{postText.toList}</button>
+            </>
+          )}
+        </div>
+      </LoggedInLayout>
+    );
+  }
 
   return (
     <LoggedInLayout>

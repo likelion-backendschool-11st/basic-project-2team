@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { ME, commentText, type PostComment } from '../../data/commentData';
+import { commentText, type PostComment } from '../../data/commentData';
+import type { CommentAuthorProfile } from '../../hooks/useComments';
 import CommentComposer from './CommentComposer';
 import UserPopover from './UserPopover';
 
@@ -10,9 +11,10 @@ interface CommentItemProps {
   readonly isReplying: boolean;
   readonly isEditing: boolean;
   readonly popoverOpen: boolean;
+  readonly profile: CommentAuthorProfile;
   readonly ownerView: boolean;
   readonly onReply: () => void;
-  readonly onSubmitReply: (text: string) => boolean;
+  readonly onSubmitReply: (text: string) => boolean | Promise<boolean>;
   readonly onCancelReply: () => void;
   readonly onEdit: () => void;
   readonly onSaveEdit: (text: string) => void;
@@ -24,14 +26,18 @@ interface CommentItemProps {
   readonly renderReply: (reply: PostComment) => React.ReactNode;
 }
 
-const ago = (m: number) => (m <= 0 ? commentText.justNow : m < 60 ? `${m}분 전` : `${Math.floor(m / 60)}시간 전`);
+const ago = (m: number) =>
+  m <= 0 ? commentText.justNow : m < 60 ? `${m}분 전` : m < 60 * 24 ? `${Math.floor(m / 60)}시간 전` : `${Math.floor(m / (60 * 24))}일 전`;
 const action = 'flex items-center gap-1 text-[11px] text-fog-muted hover:text-white transition-colors';
 
 export const CommentItem: React.FC<CommentItemProps> = (p) => {
   const { comment: c, depth = 0 } = p;
-  const mine = c.author === ME;
-  const hidden = c.secret && !mine && !p.ownerView;
+  const { mine } = c;
+  // 서버가 본문을 보내지 않은 비밀 댓글
+  const hidden = c.locked;
   const [draft, setDraft] = useState(c.text);
+  const [showHidden, setShowHidden] = useState(false);
+  const collapsed = c.hidden && !showHidden;
   return (
     <div className={depth ? 'ml-8 mt-2 rounded-xl bg-night-base/70 p-3' : 'rounded-xl bg-night-base/50 p-4'}>
       <div className="flex items-center gap-2 text-xs">
@@ -42,7 +48,7 @@ export const CommentItem: React.FC<CommentItemProps> = (p) => {
         <span className="text-fog-muted">{ago(c.ageMin)}</span>
         {c.secret && <i className="fa-solid fa-lock text-[10px] text-amberAccent" />}
       </div>
-      {p.popoverOpen && <UserPopover name={c.author} onAction={p.onPopoverAction} onClose={p.onTogglePopover} />}
+      {p.popoverOpen && <UserPopover name={c.author} profile={p.profile} onAction={p.onPopoverAction} onClose={p.onTogglePopover} />}
       {p.isEditing ? (
         <div className="mt-2">
           <textarea value={draft} onChange={(e) => setDraft(e.target.value)} rows={2} className="w-full resize-none rounded-lg bg-night-surface border-0 p-3 text-sm text-fog-headline focus:ring-1 focus:ring-mercury" />
@@ -51,6 +57,11 @@ export const CommentItem: React.FC<CommentItemProps> = (p) => {
             <button type="button" onClick={() => p.onSaveEdit(draft)} className="px-4 py-1.5 rounded-lg bg-mercury text-white font-bold"><i className="fa-solid fa-check mr-1" />{commentText.save}</button>
           </div>
         </div>
+      ) : collapsed ? (
+        <p className="mt-2 text-sm leading-6 text-fog-muted italic">
+          {commentText.hiddenNotice}{' '}
+          <button type="button" onClick={() => setShowHidden(true)} className="not-italic text-xs text-mercury-light hover:underline">{commentText.showHidden}</button>
+        </p>
       ) : (
         <p className={`mt-2 text-sm leading-6 ${hidden ? 'text-fog-muted italic' : 'text-fog-headline'}`}>
           {hidden ? commentText.secretView : c.text} {c.edited && <span className="text-[10px] text-fog-muted">{commentText.edited}</span>}
@@ -61,7 +72,7 @@ export const CommentItem: React.FC<CommentItemProps> = (p) => {
           {depth === 0 && <button type="button" className={action} onClick={p.onReply}><i className="fa-solid fa-reply" />{commentText.reply}</button>}
           {mine ? (
             <>
-              <button type="button" className={action} onClick={p.onEdit}><i className="fa-solid fa-pen" />{commentText.edit}</button>
+              {!c.hidden && <button type="button" className={action} onClick={p.onEdit}><i className="fa-solid fa-pen" />{commentText.edit}</button>}
               <button type="button" className={action} onClick={p.onDelete}><i className="fa-regular fa-trash-can" />{commentText.remove}</button>
             </>
           ) : (

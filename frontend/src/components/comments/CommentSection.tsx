@@ -26,7 +26,9 @@ export const CommentSection: React.FC<CommentSectionProps> = ({ thread: t, owner
     </div>
     <CommentComposer allowSecret={!ownerView} placeholder={ownerView ? '공대원들에게 안내할 공지사항이나 답변을 남겨보세요...' : commentText.placeholder} submitLabel={commentText.submit} onSubmit={(text, secret) => t.add(text, { secret })} />
     <div className="mt-5 flex flex-col gap-3">
-      {t.visible.length === 0 && <p className="py-8 text-center text-sm text-fog-muted">{commentText.empty}</p>}
+      {t.error && <p className="py-8 text-center text-sm text-rose-300">{t.error}</p>}
+      {!t.error && t.loading && t.visible.length === 0 && <p className="py-8 text-center text-sm text-fog-muted">{commentText.loading}</p>}
+      {!t.error && !t.loading && t.visible.length === 0 && <p className="py-8 text-center text-sm text-fog-muted">{commentText.empty}</p>}
       {t.visible.map((c) => {
         const row = (item: typeof c, depth: 0 | 1, replies: readonly typeof c[], render: (r: typeof c) => React.ReactNode) => (
           <CommentItem
@@ -37,6 +39,7 @@ export const CommentSection: React.FC<CommentSectionProps> = ({ thread: t, owner
             isReplying={t.replyTo === item.id}
             isEditing={t.editing === item.id}
             popoverOpen={t.popoverFor === item.id}
+            profile={t.profileOf(item.authorId)}
             onReply={() => t.setReplyTo(t.replyTo === item.id ? null : item.id)}
             onSubmitReply={(text) => t.add(text, { parentId: item.id })}
             onCancelReply={() => t.setReplyTo(null)}

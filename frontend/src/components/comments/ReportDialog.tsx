@@ -4,7 +4,7 @@ import Modal from '../ui/Modal';
 
 interface ReportDialogProps {
   readonly isOpen: boolean;
-  readonly onConfirm: () => void;
+  readonly onConfirm: (reason: string) => void;
   readonly onClose: () => void;
 }
 
@@ -26,7 +26,7 @@ export const ReportDialog: React.FC<ReportDialogProps> = ({ isOpen, onConfirm, o
       </div>
       <div className="mt-6 grid grid-cols-2 gap-3">
         <button type="button" onClick={close} className="h-12 rounded-xl border border-night-borderLight text-sm font-semibold text-fog-sub hover:text-white">{d.cancel}</button>
-        <button type="button" disabled={!reason} onClick={() => { setReason(null); onConfirm(); }} className="h-12 rounded-xl bg-roseAccent text-sm font-bold text-white disabled:opacity-40 disabled:pointer-events-none">{d.confirm}</button>
+        <button type="button" disabled={!reason} onClick={() => { if (reason) onConfirm(reason); setReason(null); }} className="h-12 rounded-xl bg-roseAccent text-sm font-bold text-white disabled:opacity-40 disabled:pointer-events-none">{d.confirm}</button>
       </div>
     </Modal>
   );
