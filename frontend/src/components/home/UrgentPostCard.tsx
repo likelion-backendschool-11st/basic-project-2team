@@ -4,13 +4,14 @@ import { homeText } from '../../data/homeData';
 
 interface UrgentPostCardProps {
   readonly post: UrgentPost;
-  readonly onApply?: (id: string) => void;
+  readonly onSelect?: (id: string) => void;
 }
 
-export const UrgentPostCard: React.FC<UrgentPostCardProps> = ({ post, onApply }) => {
+export const UrgentPostCard: React.FC<UrgentPostCardProps> = ({ post, onSelect }) => {
   const critical = post.critical === true;
   return (
     <article
+      onClick={() => onSelect?.(post.id)}
       className={
         critical
           ? 'p-3.5 rounded-xl bg-night-card/70 border border-amberAccent/30 hover:border-amberAccent hover:bg-night-card transition-all duration-150 cursor-pointer group relative overflow-hidden'
@@ -43,17 +44,15 @@ export const UrgentPostCard: React.FC<UrgentPostCardProps> = ({ post, onApply })
       </h3>
       <div className="flex items-center justify-between text-xs text-fog-sub pt-2 border-t border-white/[0.04]">
         <span className="text-[11px] text-fog-muted">{post.meta}</span>
-        <button
-          type="button"
-          onClick={() => onApply?.(post.id)}
+        <span
           className={
             critical
-              ? 'px-3 py-1 bg-amber-500 hover:bg-amber-400 text-black font-bold text-[11px] rounded-lg transition-colors'
-              : 'px-3 py-1 bg-night-borderLight hover:bg-mercury text-white font-medium text-[11px] rounded-lg transition-colors'
+              ? 'px-3 py-1 bg-amber-500 group-hover:bg-amber-400 text-black font-bold text-[11px] rounded-lg transition-colors'
+              : 'px-3 py-1 bg-night-borderLight group-hover:bg-mercury text-white font-medium text-[11px] rounded-lg transition-colors'
           }
         >
           {post.actionLabel}
-        </button>
+        </span>
       </div>
     </article>
   );

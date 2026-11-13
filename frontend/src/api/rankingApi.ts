@@ -1,4 +1,4 @@
-import { homeText, type Accent, type MannerLeader } from '../data/homeData';
+import { homeText, memberAccents, memberIcons, type Accent, type MannerLeader, type MannerMember } from '../data/homeData';
 import { request } from './http';
 
 /** GET /api/rankings/manner 아이템 (docs/API_SPEC.md 8절) */
@@ -32,4 +32,19 @@ export const toMannerLeaders = (items: readonly MannerRankingItem[]): readonly M
       comment: item.topTag?.label ?? homeText.leaderNoTag,
       temperature: `${item.mannerTemp.toFixed(1)}°C`,
       recommends: homeText.leaderReviewCount(item.reviewCount),
+    }));
+
+/** 4~6위를 「HONOR」 카드로 바꿉니다. */
+export const toMannerMembers = (items: readonly MannerRankingItem[]): readonly MannerMember[] =>
+  items
+    .filter((item) => item.rank > homeText.leaderLimit && item.rank <= homeText.leaderLimit + homeText.memberLimit)
+    .map((item, i) => ({
+      id: String(item.id),
+      icon: memberIcons[i % memberIcons.length],
+      name: item.nickname,
+      role: item.mainGame?.name ?? homeText.leaderNoGame,
+      accent: memberAccents[i % memberAccents.length],
+      comment: item.topTag?.label ?? homeText.leaderNoTag,
+      praise: `${item.mannerTemp.toFixed(1)}°C`,
+      mvp: homeText.leaderReviewCount(item.reviewCount),
     }));

@@ -1,18 +1,18 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import type { Category } from '../../data/homeData';
 import { homeText } from '../../data/homeData';
 import { ROUTES } from '../../data/routes';
 import { useCategory } from '../../hooks/useCategory';
+import { useHomeCategories } from '../../hooks/useHomeData';
 import QuickFilterBox from './QuickFilterBox';
 
 interface CategorySidebarProps {
-  readonly categories: readonly Category[];
   readonly quickFilters: readonly string[];
   readonly initialActiveId?: string;
 }
 
-export const CategorySidebar: React.FC<CategorySidebarProps> = ({ categories, quickFilters, initialActiveId }) => {
+export const CategorySidebar: React.FC<CategorySidebarProps> = ({ quickFilters, initialActiveId }) => {
+  const categories = useHomeCategories();
   const { activeId, select } = useCategory(initialActiveId ?? categories[0]?.id ?? '');
 
   return (
@@ -45,7 +45,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({ categories, qu
                       : 'w-8 h-8 rounded-lg bg-night-card group-hover:bg-night-hover flex items-center justify-center text-fog-muted group-hover:text-mercury-light text-xs transition-colors'
                   }
                 >
-                  <i className={`fa-solid ${c.icon}`} />
+                  <i className={c.icon} />
                 </span>
                 <span className={active ? 'text-sm' : 'text-sm font-medium'}>{c.label}</span>
               </div>
@@ -56,7 +56,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({ categories, qu
                     : 'text-xs text-fog-muted group-hover:text-fog-sub'
                 }
               >
-                {c.count}
+                {c.count ?? ''}
               </span>
             </Link>
           );
