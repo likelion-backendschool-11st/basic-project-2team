@@ -1,6 +1,5 @@
 import React from 'react';
 import AuthTextField from './AuthTextField';
-import VerifyButton from './VerifyButton';
 import HelperNotice from './HelperNotice';
 import FormAlert from './FormAlert';
 import PrimaryButton from './PrimaryButton';
@@ -29,24 +28,16 @@ export const FindIdForm: React.FC<FindIdFormProps> = ({ className = '' }) => {
           autoComplete={email.autoComplete}
           icon={email.icon}
           id={email.id}
-          invalid={form.emailError}
+          invalid={form.error === 'invalidEmail'}
           label={email.label}
           onChange={form.onEmailChange}
           placeholder={email.placeholder}
-          trailing={
-            <VerifyButton
-              label={findIdText.verify}
-              onVerify={form.onVerify}
-              verified={form.emailVerified}
-              verifiedLabel={findIdText.verified}
-            />
-          }
           type="email"
           value={form.email}
         />
-        <HelperNotice>{form.emailError ? findIdText.verifyRequired : findIdText.helper}</HelperNotice>
+        <HelperNotice>{findIdText.helper}</HelperNotice>
       </div>
-      {form.submitError && <FormAlert message={findIdText.needVerify} />}
+      {form.error && <FormAlert message={findIdText[form.error]} />}
       {form.foundId && (
         <FormAlert
           message={

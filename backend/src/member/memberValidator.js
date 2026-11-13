@@ -146,39 +146,34 @@ function validateRefresh(body) {
   return { refreshToken };
 }
 
-/** 아이디·비밀번호 찾기의 공통 입력: email + 이메일 인증 토큰 */
-function collectRecoveryFields(source, fields) {
+/** 아이디·비밀번호 찾기의 공통 입력 email (가입 때처럼 소문자로 맞춰 비교) */
+function collectRecoveryEmail(source, fields) {
   const email = normalizeEmail(source.email);
   const emailMessage = fieldRules.email(email);
   if (emailMessage) fields.push({ field: 'email', message: emailMessage });
-
-  const verificationToken = asTrimmedString(source.verificationToken);
-  if (!verificationToken) {
-    fields.push({ field: 'verificationToken', message: memberMessages.verificationTokenRequired });
-  }
-  return { email, verificationToken };
+  return email;
 }
 
-/** 아이디 찾기 `{ nickname, email, verificationToken }` */
+/** 아이디 찾기 `{ nickname, email }` */
 function validateFindId(body) {
   const source = body && typeof body === 'object' ? body : {};
   const fields = [];
   const nickname = asTrimmedString(source.nickname);
   if (!nickname) fields.push({ field: 'nickname', message: memberMessages.nicknameRequired });
-  const recovery = collectRecoveryFields(source, fields);
+  const email = collectRecoveryEmail(source, fields);
   if (fields.length > 0) throw invalidInput(fields);
-  return { nickname, ...recovery };
+  return { nickname, email };
 }
 
-/** 비밀번호 찾기 `{ userId, email, verificationToken }` */
+/** 비밀번호 찾기 `{ userId, email }` */
 function validateFindPassword(body) {
   const source = body && typeof body === 'object' ? body : {};
   const fields = [];
   const userId = asTrimmedString(source.userId);
   if (!userId) fields.push({ field: 'userId', message: memberMessages.userIdRequired });
-  const recovery = collectRecoveryFields(source, fields);
+  const email = collectRecoveryEmail(source, fields);
   if (fields.length > 0) throw invalidInput(fields);
-  return { userId, ...recovery };
+  return { userId, email };
 }
 
 /** 비밀번호 재설정 `{ resetToken, newPassword }` — 새 비밀번호는 회원가입과 같은 규칙 */

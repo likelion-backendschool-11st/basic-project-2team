@@ -23,7 +23,7 @@
 
 ## 1. 전체 관계도
 
-테이블 사이의 관계만 표시합니다. `member_withdrawal`(탈퇴자 보관)과 `email_verification`(가입 전 이메일 인증)은 FK가 없는 독립 테이블이라 여기에는 나오지 않습니다.
+테이블 사이의 관계만 표시합니다. `member_withdrawal`(탈퇴자 보관)은 FK가 없는 독립 테이블이라 여기에는 나오지 않습니다.
 
 ```mermaid
 erDiagram
@@ -155,15 +155,6 @@ erDiagram
         char(64) token_hash UK
         datetime expires_at
         datetime revoked_at
-    }
-
-    email_verification {
-        bigint id PK
-        varchar(100) email "가입 전이라 member FK 없음"
-        char(64) code_hash
-        tinyint attempt_count
-        datetime expires_at
-        datetime verified_at
     }
 
     activity_point_log {
@@ -539,4 +530,3 @@ erDiagram
 | admin_action_log.target_id | 같은 이유. 이력은 대상이 지워져도 남아야 합니다. |
 | activity_point_log.ref_id | 근거가 공고·댓글·리뷰 중 하나라 하나의 FK로 걸 수 없습니다. 근거 글이 삭제돼도 점수 이력은 남아야 합니다. |
 | member_withdrawal.member_id | 보관용 사본이라 원본 회원 행과 독립적으로 파기 일정을 가져갑니다. |
-| email_verification.email | 가입 전 단계라 아직 회원 행이 없습니다. |

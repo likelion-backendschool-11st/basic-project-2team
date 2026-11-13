@@ -1,40 +1,40 @@
 import { useState, type ChangeEvent, type FormEvent } from 'react';
-import { findIdText } from '../data/authData';
-import { useEmailVerification } from './useEmailVerification';
+import { EMAIL_PATTERN, findIdText } from '../data/authData';
+
+type FindIdError = 'required' | 'invalidEmail' | null;
 
 export function useFindIdForm() {
   const [nickname, setNickname] = useState('');
   const [email, setEmail] = useState('');
   const [foundId, setFoundId] = useState<string | null>(null);
-  const [submitError, setSubmitError] = useState(false);
-  const verification = useEmailVerification({ resetAfterMs: findIdText.verifyResetMs });
-  const [verifiedOnce, setVerifiedOnce] = useState(false);
+  const [error, setError] = useState<FindIdError>(null);
+
+  const clearStatus = () => {
+    setFoundId(null);
+    setError(null);
+  };
 
   const onNicknameChange = (e: ChangeEvent<HTMLInputElement>) => {
     setNickname(e.target.value);
-    setFoundId(null);
+    clearStatus();
   };
   const onEmailChange = (e: ChangeEvent<HTMLInputElement>) => {
     setEmail(e.target.value);
-    setFoundId(null);
-    setVerifiedOnce(false);
-    verification.reset();
+    clearStatus();
   };
 
-  const onVerify = () => {
-    const ok = verification.verify(email);
-    setVerifiedOnce(ok);
-    if (ok) setSubmitError(false);
-  };
-
-  /** Simulated lookup: returns a mock id once the email has been verified. */
+  /** Simulated lookup (POST /api/auth/find-id): 닉네임·이메일 입력값만 확인하고 목 아이디를 보여줍니다. */
   const onSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!verifiedOnce) {
-      setSubmitError(true);
+    if (!nickname.trim() || !email.trim()) {
+      setError('required');
       return;
     }
-    setSubmitError(false);
+    if (!EMAIL_PATTERN.test(email.trim())) {
+      setError('invalidEmail');
+      return;
+    }
+    setError(null);
     setFoundId(findIdText.mockFoundId);
   };
 
@@ -42,12 +42,9 @@ export function useFindIdForm() {
     nickname,
     email,
     foundId,
-    submitError,
-    emailVerified: verification.verified,
-    emailError: verification.error,
+    error,
     onNicknameChange,
     onEmailChange,
-    onVerify,
     onSubmit,
   };
 }

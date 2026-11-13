@@ -27,6 +27,9 @@ export const recoveryTabs: readonly RecoveryTab[] = [
   { id: 'find-password', label: '비밀번호 찾기', icon: 'fa-solid fa-key', to: ROUTES.findPassword },
 ];
 
+/** 아이디·비밀번호 찾기 이메일 형식 검사 (백엔드 memberConstants.EMAIL_PATTERN 과 동일) */
+export const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 export const passwordToggleLabels = {
   show: '비밀번호 보기 토글',
 } as const;
@@ -98,13 +101,11 @@ export const findIdText = {
       autoComplete: 'email',
     },
   } satisfies Record<string, AuthFieldCopy>,
-  verify: '확인',
-  verified: '확인완료',
-  verifyRequired: '이메일 주소를 입력해주세요.',
-  helper: '확인을 눌러주세요',
+  helper: '가입할 때 등록한 닉네임과 이메일을 입력해주세요.',
   submit: '아이디 찾기',
   submitIcon: 'fa-solid fa-magnifying-glass',
-  needVerify: '이메일 확인을 먼저 진행해주세요.',
+  required: '닉네임과 이메일을 모두 입력해주세요.',
+  invalidEmail: '올바른 이메일 주소를 입력해주세요.',
   resultPrefix: '회원님의 아이디는',
   resultSuffix: '입니다.',
   mockFoundId: 'gamer_pro77',
@@ -112,7 +113,6 @@ export const findIdText = {
   altLink: { label: '비밀번호를 잊으셨나요?', to: ROUTES.findPassword } satisfies AuthLinkItem,
   supportPrompt: '가입한 이메일을 분실하셨나요?',
   supportLink: { label: '고객지원 센터 문의', to: ROUTES.home } satisfies AuthLinkItem,
-  verifyResetMs: 3000,
 } as const;
 
 /* ------------------------------------------------------------------ */
@@ -121,7 +121,7 @@ export const findIdText = {
 export const findPasswordText = {
   emblemIcon: 'fa-solid fa-lock',
   title: '비밀번호 찾기',
-  subtitle: '계정 인증 후 새로운 비밀번호를 설정하실 수 있습니다.',
+  subtitle: '아이디와 이메일이 일치하면 새로운 비밀번호를 설정하실 수 있습니다.',
   verifyLegend: '계정 본인 확인',
   newPasswordLegend: '새 비밀번호 입력',
   fields: {
@@ -150,14 +150,10 @@ export const findPasswordText = {
       autoComplete: 'new-password',
     },
   } satisfies Record<string, AuthFieldCopy>,
-  verify: '확인',
-  verified: '확인 완료',
-  verifyInvalid: '올바른 이메일 주소를 입력해주세요.',
-  helperPrefix: '이메일 입력 후 ',
-  helperEmphasis: '확인',
-  helperSuffix: '을 눌러주세요',
+  helper: '가입할 때 등록한 아이디와 이메일을 입력해주세요.',
   submit: '비밀번호 재설정',
-  needVerify: '이메일 확인을 먼저 진행해주세요.',
+  required: '모든 항목을 입력해주세요.',
+  invalidEmail: '올바른 이메일 주소를 입력해주세요.',
   mismatch: '새 비밀번호가 일치하지 않습니다.',
   success: '비밀번호가 재설정되었습니다. 새 비밀번호로 로그인해주세요.',
   backToLogin: { label: '로그인으로 돌아가기', to: ROUTES.login } satisfies AuthLinkItem,

@@ -127,20 +127,6 @@ CREATE TABLE activity_point_log (
 -- 인증
 -- =====================================================================
 
-CREATE TABLE email_verification (
-  id             BIGINT UNSIGNED  NOT NULL AUTO_INCREMENT,
-  email          VARCHAR(100)     NOT NULL COMMENT '가입 전이라 member FK 없음',
-  code_hash      CHAR(64)         NOT NULL,
-  attempt_count  TINYINT UNSIGNED NOT NULL DEFAULT 0,
-  expires_at     DATETIME         NOT NULL,
-  verified_at    DATETIME         NULL,
-  created_at     DATETIME         NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at     DATETIME         NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (id),
-  INDEX idx_email_verification_email_created (email, created_at),
-  INDEX idx_email_verification_expires_at    (expires_at)
-) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '이메일 인증코드';
-
 CREATE TABLE password_reset_token (
   id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   member_id   BIGINT UNSIGNED NOT NULL,

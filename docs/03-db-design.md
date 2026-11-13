@@ -22,7 +22,7 @@ OurParty 서비스의 테이블 설계안입니다. [요구사항 명세](./02-r
 | 도메인 | 테이블 | 용도 |
 | --- | --- | --- |
 | 회원 | `member`, `member_agreement`, `member_game_profile`, `member_withdrawal`, `activity_point_log` | 계정, 약관 동의 이력, 게이머 프로필, 탈퇴자 분리 보관, 활동 점수 이력 |
-| 인증 | `email_verification`, `password_reset_token`, `refresh_token` | 이메일 인증, 비밀번호 재설정, 토큰 |
+| 인증 | `password_reset_token`, `refresh_token` | 비밀번호 재설정, 토큰 |
 | 마스터 | `category`, `game`, `game_content`, `tag`, `review_tag` | 장르, 게임, 레이드·던전, 공고 태그, 평가 태그 |
 | 공고 | `post`, `post_tag`, `post_draft`, `post_scrap` | 공고, 공고-태그 연결, 임시저장, 공고 즐겨찾기(스크랩) |
 | 파티 | `post_application` | 신청·승인·취소. 승인된 신청이 곧 파티원입니다. |
@@ -115,7 +115,6 @@ API의 `level`은 **서비스 활동 레벨**(`member.level`)입니다. 공고 �
 
 | 테이블 | 컬럼 | 비고 |
 | --- | --- | --- |
-| `email_verification` | id, email VARCHAR(100), code_hash CHAR(64), attempt_count TINYINT, expires_at, verified_at, created_at | 인증코드는 해시로 저장. 시도 횟수를 제한 |
 | `password_reset_token` | id, member_id FK, token_hash CHAR(64) UNIQUE, expires_at, used_at, created_at | LOGIN-007. 한 번 쓰면 `used_at` 기록 |
 | `refresh_token` | id, member_id FK, token_hash CHAR(64) UNIQUE, expires_at, revoked_at, created_at | API_SPEC의 JWT 방식(Access + Refresh)으로 확정. 토큰 원문 대신 해시를 저장하고, 로그아웃·비밀번호 변경 시 `revoked_at`을 기록 |
 
@@ -272,7 +271,6 @@ PK와 UNIQUE는 그 자체가 인덱스라서, 중복되는 인덱스는 따로 
 | sanction | (ends_at) | 정지 자동 해제 배치 | |
 | admin_action_log | (admin_id, created_at), (action_type, created_at), (target_type, target_id) | 관리자 이력의 `kind` 필터, 대상별 이력 | |
 | member_withdrawal | (phone_hash), (email_hash), (purge_at) | 재가입 차단 확인, 파기 배치 | |
-| email_verification | (email, created_at), (expires_at) | 최근 발송 건 조회와 재발송 제한, 만료 데이터 정리 | |
 | refresh_token / password_reset_token | UQ(token_hash), (member_id) | 토큰 검증, 로그아웃 시 전부 폐기 | |
 
 ## 5. 삭제 정책
@@ -285,7 +283,7 @@ PK와 UNIQUE는 그 자체가 인덱스라서, 중복되는 인덱스는 따로 
 | 신청 취소 | 상태 변경 | 행을 지우지 않고 CANCELED로 바꿉니다. 노쇼와 구분해 기록하려면 이력이 남아야 합니다. |
 | 신고, 제재, 관리 이력, 리뷰, 활동 점수 이력 | 삭제하지 않음 | 증빙과 감사 기록. 활동 점수는 회수할 때도 행을 지우지 않고 음수 행을 추가합니다. |
 | 스크랩, 즐겨찾기, 태그 연결 | 하드 삭제 | 지워도 남겨야 할 이력이 아닙니다. |
-| 인증코드, 토큰, 임시저장, 알림 | 하드 삭제 (배치) | 만료되거나 보관 기간이 지나면 지웁니다. |
+| 토큰, 임시저장, 알림 | 하드 삭제 (배치) | 만료되거나 보관 기간이 지나면 지웁니다. |
 
 ## 6. 결정 사항
 

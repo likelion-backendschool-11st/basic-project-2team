@@ -1,7 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import AuthTextField from './AuthTextField';
-import VerifyButton from './VerifyButton';
 import HelperNotice from './HelperNotice';
 import FormAlert from './FormAlert';
 import PrimaryButton from './PrimaryButton';
@@ -15,8 +14,7 @@ interface FindPasswordFormProps {
 export const FindPasswordForm: React.FC<FindPasswordFormProps> = ({ className = '' }) => {
   const form = useFindPasswordForm();
   const { userId, email, newPassword, confirmPassword } = findPasswordText.fields;
-  const errorMessage =
-    form.error === 'needVerify' ? findPasswordText.needVerify : form.error === 'mismatch' ? findPasswordText.mismatch : null;
+  const errorMessage = form.error ? findPasswordText[form.error] : null;
 
   return (
     <form className={`space-y-4 ${className}`} noValidate onSubmit={form.onSubmit}>
@@ -34,33 +32,14 @@ export const FindPasswordForm: React.FC<FindPasswordFormProps> = ({ className = 
           <AuthTextField
             autoComplete={email.autoComplete}
             id={email.id}
-            invalid={form.emailError}
+            invalid={form.error === 'invalidEmail'}
             label={email.label}
             onChange={form.onEmailChange}
             placeholder={email.placeholder}
-            trailing={
-              <VerifyButton
-                label={findPasswordText.verify}
-                onVerify={form.onVerify}
-                tone="accent"
-                verified={form.emailVerified}
-                verifiedLabel={findPasswordText.verified}
-              />
-            }
             type="email"
             value={form.email}
           />
-          <HelperNotice>
-            {form.emailError ? (
-              findPasswordText.verifyInvalid
-            ) : (
-              <>
-                {findPasswordText.helperPrefix}
-                <span className="underline underline-offset-2">{findPasswordText.helperEmphasis}</span>
-                {findPasswordText.helperSuffix}
-              </>
-            )}
-          </HelperNotice>
+          <HelperNotice>{findPasswordText.helper}</HelperNotice>
         </div>
       </fieldset>
 

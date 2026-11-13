@@ -78,8 +78,6 @@ const memberMessages = Object.freeze({
   accountSuspended: '이용이 정지된 계정입니다.',
   accountBanned: '영구 정지된 계정입니다.',
   invalidRefreshToken: '로그인이 만료되었습니다. 다시 로그인해주세요.',
-  verificationTokenRequired: '이메일 인증을 먼저 진행해주세요.',
-  emailNotVerified: '이메일 인증이 만료되었거나 올바르지 않습니다. 이메일 인증을 다시 진행해주세요.',
   memberNotFound: '입력하신 정보와 일치하는 회원이 없습니다.',
   resetTokenRequired: 'resetToken 을 입력해주세요.',
   invalidResetToken: '비밀번호 재설정 시간이 만료되었습니다. 처음부터 다시 진행해주세요.',

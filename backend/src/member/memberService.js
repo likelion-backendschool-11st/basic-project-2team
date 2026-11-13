@@ -69,7 +69,7 @@ function toDuplicateError(err) {
 }
 
 /**
- * 회원가입 · 중복 확인 · 로그인 · 토큰 재발급 · 로그아웃 비즈니스 로직.
+ * 회원가입 · 중복 확인 · 로그인 · 토큰 재발급 · 로그아웃 · 아이디/비밀번호 찾기 비즈니스 로직.
  * @param {{
  *   memberRepository: ReturnType<typeof import('./memberRepository').createMemberRepository>,
  *   tokenProvider: ReturnType<typeof import('../common/tokenProvider').createTokenProvider>,
@@ -206,33 +206,18 @@ function createMemberService({ memberRepository, tokenProvider, bcryptRounds, no
     await memberRepository.revokeAllRefreshTokens({ memberId, now: now() });
   }
 
-  /** 이메일 인증 토큰이 유효하고, 요청한 이메일로 인증한 것인지 확인합니다. */
-  function assertEmailVerified({ verificationToken, email }, current) {
-    let verifiedEmail;
-    try {
-      ({ email: verifiedEmail } = tokenProvider.verifyEmailVerificationToken(verificationToken, current));
-    } catch {
-      verifiedEmail = null;
-    }
-    if (verifiedEmail !== email) throw new ApiError(401, 'EMAIL_NOT_VERIFIED', memberMessages.emailNotVerified);
-  }
-
-  /** POST /api/auth/find-id — 이메일 인증 후 닉네임·이메일이 일치하는 회원의 아이디 */
+  /** POST /api/auth/find-id — 닉네임·이메일이 모두 일치하는 회원의 아이디 */
   async function findId(body) {
     const input = validateFindId(body);
-    assertEmailVerified(input, now());
-
     const userId = await memberRepository.findLoginIdByNicknameAndEmail(input);
     if (!userId) throw memberNotFound();
     return { userId };
   }
 
-  /** POST /api/auth/find-password — 이메일 인증 후 아이디·이메일이 일치하면 재설정 토큰 발급 */
+  /** POST /api/auth/find-password — 아이디·이메일이 모두 일치하면 재설정 토큰 발급 */
   async function findPassword(body) {
     const input = validateFindPassword(body);
     const current = now();
-    assertEmailVerified(input, current);
-
     const memberId = await memberRepository.findMemberIdByLoginIdAndEmail({ loginId: input.userId, email: input.email });
     if (!memberId) throw memberNotFound();
 

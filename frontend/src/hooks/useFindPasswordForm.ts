@@ -1,7 +1,7 @@
 import { useState, type ChangeEvent, type FormEvent } from 'react';
-import { useEmailVerification } from './useEmailVerification';
+import { EMAIL_PATTERN } from '../data/authData';
 
-type FindPasswordError = 'needVerify' | 'mismatch' | null;
+type FindPasswordError = 'required' | 'invalidEmail' | 'mismatch' | null;
 
 export function useFindPasswordForm() {
   const [userId, setUserId] = useState('');
@@ -10,7 +10,6 @@ export function useFindPasswordForm() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState<FindPasswordError>(null);
   const [success, setSuccess] = useState(false);
-  const verification = useEmailVerification();
 
   const clearStatus = () => {
     setError(null);
@@ -23,7 +22,6 @@ export function useFindPasswordForm() {
   };
   const onEmailChange = (e: ChangeEvent<HTMLInputElement>) => {
     setEmail(e.target.value);
-    verification.reset();
     clearStatus();
   };
   const onNewPasswordChange = (e: ChangeEvent<HTMLInputElement>) => {
@@ -35,15 +33,18 @@ export function useFindPasswordForm() {
     clearStatus();
   };
 
-  const onVerify = () => {
-    if (verification.verify(email)) setError(null);
-  };
-
-  /** Simulated reset: requires verified email and matching passwords. */
+  /**
+   * Simulated reset. 실제 연동 시 POST /api/auth/find-password(아이디·이메일 일치 확인 → resetToken)
+   * → POST /api/auth/reset-password 를 차례로 호출합니다.
+   */
   const onSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!verification.verified) {
-      setError('needVerify');
+    if (!userId.trim() || !email.trim() || !newPassword || !confirmPassword) {
+      setError('required');
+      return;
+    }
+    if (!EMAIL_PATTERN.test(email.trim())) {
+      setError('invalidEmail');
       return;
     }
     if (newPassword !== confirmPassword) {
@@ -61,13 +62,10 @@ export function useFindPasswordForm() {
     confirmPassword,
     error,
     success,
-    emailVerified: verification.verified,
-    emailError: verification.error,
     onUserIdChange,
     onEmailChange,
     onNewPasswordChange,
     onConfirmPasswordChange,
-    onVerify,
     onSubmit,
   };
 }

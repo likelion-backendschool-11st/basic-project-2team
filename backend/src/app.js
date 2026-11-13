@@ -6,8 +6,6 @@ const { env } = require('./config/env');
 const { notFoundHandler, errorHandler } = require('./common/errorHandler');
 const { createTokenProvider } = require('./common/tokenProvider');
 const { createRequireAuth, createOptionalAuth, createRequireAdmin } = require('./common/authMiddleware');
-const { createMailer } = require('./common/mailer');
-const { createEmailVerificationModule } = require('./emailVerification');
 const { createMemberModule } = require('./member');
 const { createPostModule } = require('./post');
 const { createGameModule } = require('./game');
@@ -22,8 +20,6 @@ const { createAdminModule } = require('./admin');
  *   postRepository?: object,
  *   gameRepository?: object,
  *   boardRepository?: object,
- *   emailVerificationRepository?: object,
- *   mailer?: ReturnType<typeof createMailer>,
  *   adminRepository?: object,
  *   corsOrigins: string[],
  *   bcryptRounds: number,
@@ -37,8 +33,6 @@ function createApp({
   postRepository,
   gameRepository,
   boardRepository,
-  emailVerificationRepository,
-  mailer = createMailer(env.mail),
   adminRepository,
   corsOrigins,
   bcryptRounds,
@@ -54,15 +48,6 @@ function createApp({
   const requireAuth = createRequireAuth(tokenProvider);
   const optionalAuth = createOptionalAuth(tokenProvider);
   const requireAdmin = createRequireAdmin(tokenProvider);
-
-  const emailVerification = createEmailVerificationModule({
-    pool,
-    emailVerificationRepository,
-    tokenProvider,
-    mailer,
-    now,
-  });
-  app.use('/api/auth/email', emailVerification.router);
 
   const member = createMemberModule({ pool, memberRepository, tokenProvider, requireAuth, bcryptRounds, now });
   app.use('/api/auth', member.router);
