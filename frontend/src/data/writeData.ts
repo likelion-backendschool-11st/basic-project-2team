@@ -23,6 +23,11 @@ export interface ToolbarAction {
 export const writeText = {
   crumbRoot: '파티 찾기',
   crumbCurrent: '공고글 작성하기',
+  crumbEdit: '공고글 수정하기',
+  submitEdit: '수정하기',
+  editLoadFailed: '수정할 공고를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.',
+  editNotOwner: '작성자만 공고를 수정할 수 있습니다.',
+  updateFailed: '공고 수정에 실패했습니다. 잠시 후 다시 시도해주세요.',
   draftSaved: (time: string) => `임시저장됨 (${time})`,
   draftButton: '임시저장',
   draftLoaded: '임시저장된 글을 불러왔습니다.',

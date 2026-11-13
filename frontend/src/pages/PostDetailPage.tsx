@@ -16,7 +16,7 @@ import Toast from '../components/ui/Toast';
 import LoggedInLayout from '../components/user/LoggedInLayout';
 import { commentText } from '../data/commentData';
 import { postDetailText, postText } from '../data/postData';
-import { ROUTES } from '../data/routes';
+import { paths, ROUTES } from '../data/routes';
 import { useComments } from '../hooks/useComments';
 import { usePostDetail } from '../hooks/usePostDetail';
 
@@ -61,7 +61,7 @@ const PostDetailView: React.FC<{ readonly postId: string }> = ({ postId }) => {
     <LoggedInLayout>
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_380px] gap-6 items-start">
         <div className="flex flex-col gap-5 min-w-0">
-          <PostHeader detail={detail} filled={post.filled} state={post.state} scrapped={post.scrapped} onScrap={post.toggleScrap} onShare={post.copyLink} onEdit={() => navigate(ROUTES.postWrite)} onRemove={post.remove.open} />
+          <PostHeader detail={detail} filled={post.filled} state={post.state} scrapped={post.scrapped} onScrap={post.toggleScrap} onShare={post.copyLink} onEdit={() => navigate(paths.postEdit(String(detail.id)))} onRemove={post.remove.open} />
           {detail.isOwner && <ApplicantBanner count={post.applicants.length} onManage={post.applicantsDialog.open} />}
           <PostTiles tiles={detail.tiles} />
           <PostDescription detail={detail} />
