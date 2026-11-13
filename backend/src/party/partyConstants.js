@@ -25,6 +25,16 @@ const MESSAGE_MAX_LENGTH = 200;
 /** 수락된 신청을 출발 이 시간 이내(이미 지난 경우 포함)에 취소하면 late_cancel 로 기록 (REQ-APPLY-002) */
 const LATE_CANCEL_HOURS = 3;
 
+/** notification.type (docs/03-db-design.md 2.12) */
+const NOTIFICATION_TYPE = Object.freeze({
+  applicationReceived: 'APPLICATION_RECEIVED',
+  applicationResult: 'APPLICATION_RESULT',
+  applicationCanceled: 'APPLICATION_CANCELED',
+  postUpdated: 'POST_UPDATED',
+});
+/** notification.message VARCHAR(200). 공고 제목이 길면 잘라서 넣습니다. */
+const NOTIFICATION_TITLE_MAX = 40;
+
 const partyMessages = Object.freeze({
   invalidInput: '입력값을 확인해주세요.',
   roleInvalid: `포지션은 ${ROLE_MAX_LENGTH}자 이하로 입력해주세요.`,
@@ -49,10 +59,21 @@ const partyMessages = Object.freeze({
   alreadyDecided: '이미 처리된 신청입니다.',
   cancelNotAllowed: '완료된 파티에서는 신청을 취소할 수 없습니다.',
   withdrawnMember: '탈퇴한 회원',
+  /** 알림함 문구. title 은 공고 제목(잘린 것), nickname 은 신청자 닉네임 */
+  notice: Object.freeze({
+    applicationReceived: (nickname, title) => `${nickname}님이 '${title}' 공고에 참가를 신청했습니다.`,
+    applicationCanceled: (nickname, title) => `${nickname}님이 '${title}' 파티 참가를 취소했습니다.`,
+    accepted: (title) => `'${title}' 공고 참가 신청이 수락되었습니다.`,
+    rejected: (title) => `'${title}' 공고 참가 신청이 거절되었습니다.`,
+    closed: (title) => `'${title}' 공고의 모집이 마감되었습니다.`,
+    completed: (title) => `'${title}' 파티가 완료 처리되었습니다.`,
+  }),
 });
 
 module.exports = {
   APPLICATION_STATUS,
+  NOTIFICATION_TYPE,
+  NOTIFICATION_TITLE_MAX,
   DECISION_STATUSES,
   LIST_STATUSES,
   POST_STATUS,

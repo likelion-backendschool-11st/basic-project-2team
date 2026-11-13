@@ -1,7 +1,15 @@
 'use strict';
 
 const { ApiError } = require('../common/ApiError');
-const { APPLICATION_STATUS: S, POST_STATUS, MEMBER_STATUS, LATE_CANCEL_HOURS, partyMessages: m } = require('./partyConstants');
+const {
+  APPLICATION_STATUS: S,
+  POST_STATUS,
+  MEMBER_STATUS,
+  LATE_CANCEL_HOURS,
+  NOTIFICATION_TYPE,
+  NOTIFICATION_TITLE_MAX,
+  partyMessages: m,
+} = require('./partyConstants');
 const { parseId, validateApply, validateDecision, validatePostStatus, parseListStatus } = require('./partyValidator');
 
 const toIso = (value) => (value ? new Date(value).toISOString() : null);
@@ -16,6 +24,9 @@ function assertCanApply(member, current) {
     throw new ApiError(403, 'ACCOUNT_SUSPENDED', m.accountSuspended);
   }
 }
+
+/** 알림 문구에 넣는 공고 제목 (길면 줄임표로 자름) */
+const clipTitle = (title) => (Array.from(title).length > NOTIFICATION_TITLE_MAX ? `${Array.from(title).slice(0, NOTIFICATION_TITLE_MAX).join('')}…` : title);
 
 /** 신청자·파티원 행 → API 의 회원 요약. 탈퇴한 회원은 닉네임·아바타를 가립니다. */
 function toMember(row) {
@@ -51,23 +62,29 @@ function createPartyService({ partyRepository, now = () => new Date() }) {
   /** POST /api/posts/:postId/applications — 마감·가득 찬 공고, 본인 공고, 중복 신청은 거절. 취소했던 신청은 같은 행을 되살립니다. */
   async function apply(rawPostId, memberId, body) {
     const input = validateApply(body);
-    assertCanApply(await partyRepository.findMemberStatus(memberId), now());
+    const applicant = await partyRepository.findMemberStatus(memberId);
+    assertCanApply(applicant, now());
     const post = await loadPost(rawPostId);
 
     if (post.authorId === memberId) throw new ApiError(403, 'CANNOT_APPLY_OWN_POST', m.cannotApplyOwnPost);
     if (post.currentCount >= post.headcount) throw new ApiError(409, 'PARTY_FULL', m.partyFull);
     if (post.status !== POST_STATUS.open) throw new ApiError(409, 'POST_CLOSED', m.postClosed);
 
+    const notice = {
+      memberId: post.authorId,
+      type: NOTIFICATION_TYPE.applicationReceived,
+      message: m.notice.applicationReceived(applicant.nickname, clipTitle(post.title)),
+    };
     const existing = await partyRepository.findMyApplication(post.id, memberId);
     const alreadyApplied = () => new ApiError(409, 'ALREADY_APPLIED', m.alreadyApplied);
     if (existing) {
       if ([S.pending, S.accepted].includes(existing.status)) throw alreadyApplied();
       if (existing.status !== S.canceled) throw new ApiError(403, 'REAPPLY_NOT_ALLOWED', m.reapplyNotAllowed);
-      if (!(await partyRepository.reapply({ id: existing.id, ...input }))) throw alreadyApplied();
+      if (!(await partyRepository.reapply({ id: existing.id, postId: post.id, notice, ...input }))) throw alreadyApplied();
       return { id: existing.id, status: S.pending };
     }
 
-    const id = await partyRepository.createApplication({ postId: post.id, applicantId: memberId, ...input });
+    const id = await partyRepository.createApplication({ postId: post.id, applicantId: memberId, notice, ...input });
     if (id === null) throw alreadyApplied();
     return { id, status: S.pending };
   }
@@ -79,7 +96,13 @@ function createPartyService({ partyRepository, now = () => new Date() }) {
 
     const current = now();
     const lateCancel = post.scheduleAt ? new Date(post.scheduleAt).getTime() - current.getTime() <= LATE_CANCEL_HOURS * 3_600_000 : false;
-    const canceled = await partyRepository.cancelApplication({ postId: post.id, applicantId: memberId, canceledAt: current, lateCancel });
+    const applicant = await partyRepository.findMemberStatus(memberId);
+    const notice = {
+      memberId: post.authorId,
+      type: NOTIFICATION_TYPE.applicationCanceled,
+      message: m.notice.applicationCanceled(applicant?.nickname ?? m.withdrawnMember, clipTitle(post.title)),
+    };
+    const canceled = await partyRepository.cancelApplication({ postId: post.id, applicantId: memberId, canceledAt: current, lateCancel, notice });
     if (!canceled) throw applicationNotFound();
   }
 
@@ -105,7 +128,17 @@ function createPartyService({ partyRepository, now = () => new Date() }) {
     const applicationId = parseId(rawApplicationId);
     if (applicationId === null) throw applicationNotFound();
 
-    const outcome = await partyRepository.decideApplication({ postId: post.id, applicationId, status, decidedAt: now() });
+    const outcome = await partyRepository.decideApplication({
+      postId: post.id,
+      applicationId,
+      status,
+      decidedAt: now(),
+      notices: {
+        accepted: m.notice.accepted(clipTitle(post.title)),
+        rejected: m.notice.rejected(clipTitle(post.title)),
+        closed: m.notice.closed(clipTitle(post.title)),
+      },
+    });
     switch (outcome.result) {
       case 'OK':
         return { id: applicationId, status, current: outcome.current, max: outcome.max, postStatus: outcome.postStatus };
@@ -124,7 +157,9 @@ function createPartyService({ partyRepository, now = () => new Date() }) {
   async function changeStatus(rawPostId, memberId, body) {
     const { status } = validatePostStatus(body);
     const post = await loadOwnedPost(rawPostId, memberId);
-    const outcome = await partyRepository.changePostStatus({ postId: post.id, status, now: now() });
+    const title = clipTitle(post.title);
+    const notice = { [POST_STATUS.closed]: m.notice.closed(title), [POST_STATUS.completed]: m.notice.completed(title) }[status] ?? null;
+    const outcome = await partyRepository.changePostStatus({ postId: post.id, status, now: now(), notice });
     switch (outcome.result) {
       case 'OK':
         return { id: post.id, status: outcome.status, current: outcome.current, max: outcome.max };

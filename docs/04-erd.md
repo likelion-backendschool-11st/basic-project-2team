@@ -364,7 +364,7 @@ erDiagram
     notification {
         bigint id PK
         bigint member_id FK
-        varchar(30) type "APPLICATION_RESULT / POST_UPDATED / INTEREST_POST / POST_DELETED / SANCTION"
+        varchar(30) type "APPLICATION_RECEIVED / APPLICATION_RESULT / APPLICATION_CANCELED / POST_UPDATED / INTEREST_POST / POST_DELETED / SANCTION"
         varchar(200) message
         bigint post_id FK "NULL 허용"
         boolean is_read

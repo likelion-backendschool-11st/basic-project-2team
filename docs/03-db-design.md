@@ -205,7 +205,7 @@ API의 `level`은 **서비스 활동 레벨**(`member.level`)입니다. 공고 �
 
 | 테이블 | 컬럼 | 비고 |
 | --- | --- | --- |
-| `notification` | id, member_id FK, type VARCHAR(30), message VARCHAR(200), post_id FK NULL, is_read BOOLEAN, created_at | type 예: APPLICATION_RESULT, POST_UPDATED, INTEREST_POST, POST_DELETED, SANCTION |
+| `notification` | id, member_id FK, type VARCHAR(30), message VARCHAR(200), post_id FK NULL, is_read BOOLEAN, created_at | type 예: APPLICATION_RECEIVED, APPLICATION_RESULT, APPLICATION_CANCELED, POST_UPDATED, INTEREST_POST, POST_DELETED, SANCTION |
 | `notification_subscription` | id, member_id FK, game_id FK, game_content_id FK NULL, enabled BOOLEAN | NOTI-001 관심 게임·레이드 |
 
 ### 2.13 신고 · 관리

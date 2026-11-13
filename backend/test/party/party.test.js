@@ -14,7 +14,8 @@ const C = 4;
 
 /** DB 대신 메모리에 저장하는 가짜 repository. 승인·취소의 인원 계산은 실제 repository 와 같은 규칙입니다. */
 function createFakeRepository() {
-  const state = { posts: new Map(), members: new Map(), applications: [], nextId: 1 };
+  const state = { posts: new Map(), members: new Map(), applications: [], notifications: [], nextId: 1 };
+  const notify = (memberId, type, message) => state.notifications.push({ memberId, type, message });
   const find = (postId, memberId) => state.applications.find((a) => a.postId === postId && a.applicantId === memberId);
   const memberRow = (id) => ({ memberId: id, nickname: `회원${id}`, avatarUrl: null, level: 1, mannerTemp: '36.5', reviewCount: 0, memberStatus: state.members.get(id)?.status ?? 'ACTIVE' });
   return {
@@ -24,28 +25,31 @@ function createFakeRepository() {
       return p && p.status !== 'DELETED' ? { id: postId, ...p } : null;
     },
     async findMemberStatus(memberId) {
-      return state.members.get(memberId) ?? { status: 'ACTIVE', suspendedUntil: null };
+      return { nickname: `회원${memberId}`, status: 'ACTIVE', suspendedUntil: null, ...state.members.get(memberId) };
     },
     async findMyApplication(postId, memberId) {
       const a = find(postId, memberId);
       return a ? { id: a.id, status: a.status } : null;
     },
-    async createApplication({ postId, applicantId, role, message }) {
+    async createApplication({ postId, applicantId, role, message, notice }) {
       if (find(postId, applicantId)) return null;
+      notify(notice.memberId, notice.type, notice.message);
       const a = { id: state.nextId++, postId, applicantId, role, message, status: 'PENDING', lateCancel: false };
       state.applications.push(a);
       return a.id;
     },
-    async reapply({ id, role, message }) {
+    async reapply({ id, role, message, notice }) {
       const a = state.applications.find((x) => x.id === id);
       if (a.status !== 'CANCELED') return false;
+      notify(notice.memberId, notice.type, notice.message);
       Object.assign(a, { status: 'PENDING', role, message });
       return true;
     },
-    async cancelApplication({ postId, applicantId, lateCancel }) {
+    async cancelApplication({ postId, applicantId, lateCancel, notice }) {
       const a = find(postId, applicantId);
       if (!a || !['PENDING', 'ACCEPTED'].includes(a.status)) return false;
       if (a.status === 'ACCEPTED') {
+        notify(notice.memberId, notice.type, notice.message);
         const post = state.posts.get(postId);
         if (post.status === 'CLOSED' && post.currentCount >= post.headcount) post.status = 'OPEN';
         post.currentCount -= 1;
@@ -59,7 +63,7 @@ function createFakeRepository() {
         .filter((a) => a.postId === postId && ['PENDING', 'ACCEPTED', 'REJECTED'].includes(a.status) && (!status || a.status === status))
         .map((a) => ({ ...a, appliedAt: NOW, ...memberRow(a.applicantId) }));
     },
-    async decideApplication({ postId, applicationId, status }) {
+    async decideApplication({ postId, applicationId, status, notices }) {
       const post = state.posts.get(postId);
       const a = state.applications.find((x) => x.id === applicationId && x.postId === postId);
       if (!a) return { result: 'NOT_FOUND' };
@@ -71,9 +75,13 @@ function createFakeRepository() {
         if (post.currentCount >= post.headcount) post.status = 'CLOSED';
       }
       a.status = status;
+      notify(a.applicantId, 'APPLICATION_RESULT', status === 'ACCEPTED' ? notices.accepted : notices.rejected);
+      if (post.status === 'CLOSED' && status === 'ACCEPTED' && post.currentCount >= post.headcount) {
+        state.applications.filter((x) => x.postId === postId && x.status === 'PENDING').forEach((x) => notify(x.applicantId, 'POST_UPDATED', notices.closed));
+      }
       return { result: 'OK', current: post.currentCount, max: post.headcount, postStatus: post.status };
     },
-    async changePostStatus({ postId, status, now }) {
+    async changePostStatus({ postId, status, now, notice }) {
       const post = state.posts.get(postId);
       const out = () => ({ result: 'OK', status: post.status, current: post.currentCount, max: post.headcount });
       if (post.status === status) return out();
@@ -84,6 +92,9 @@ function createFakeRepository() {
         if (post.scheduleAt && post.scheduleAt > now) return { result: 'NOT_STARTED' };
       }
       post.status = status;
+      if (notice) {
+        state.applications.filter((x) => x.postId === postId && ['PENDING', 'ACCEPTED'].includes(x.status)).forEach((x) => notify(x.applicantId, 'POST_UPDATED', notice));
+      }
       return out();
     },
     async findParticipants(postId) {
@@ -112,10 +123,10 @@ describe('party application API', () => {
   });
   after(() => server.close());
   beforeEach(() => {
-    Object.assign(repo.state, { applications: [], nextId: 1 });
+    Object.assign(repo.state, { applications: [], notifications: [], nextId: 1 });
     repo.state.members.clear();
     repo.state.posts.clear();
-    repo.state.posts.set(1, { authorId: HOST, status: 'OPEN', headcount: 3, currentCount: 1, scheduleAt: new Date('2026-11-14T12:00:00Z') });
+    repo.state.posts.set(1, { authorId: HOST, title: '카멘 하드 숙련팟', status: 'OPEN', headcount: 3, currentCount: 1, scheduleAt: new Date('2026-11-14T12:00:00Z') });
   });
 
   const call = (method, path, body, memberId) =>
@@ -387,6 +398,76 @@ describe('party application API', () => {
       repo.state.posts.get(1).status = 'CLOSED';
       await call('DELETE', '/1/applications/me', undefined, A);
       assert.equal(repo.state.posts.get(1).status, 'CLOSED');
+    });
+  });
+
+  describe('알림 전송 (#38)', () => {
+    const sent = () => repo.state.notifications.map((n) => [n.memberId, n.type, n.message]);
+
+    it('신청하면 파티장에게, 다시 신청해도 파티장에게 알린다', async () => {
+      await apply(A);
+      await call('DELETE', '/1/applications/me', undefined, A); // 대기 중 취소는 알리지 않음
+      await apply(A);
+      assert.deepEqual(sent(), [
+        [HOST, 'APPLICATION_RECEIVED', "회원2님이 '카멘 하드 숙련팟' 공고에 참가를 신청했습니다."],
+        [HOST, 'APPLICATION_RECEIVED', "회원2님이 '카멘 하드 숙련팟' 공고에 참가를 신청했습니다."],
+      ]);
+    });
+
+    it('승인·거절 결과를 신청자에게 알린다', async () => {
+      await apply(A);
+      await apply(B);
+      repo.state.notifications.length = 0;
+      await decide(1, 'ACCEPTED');
+      await decide(2, 'REJECTED');
+      assert.deepEqual(sent(), [
+        [A, 'APPLICATION_RESULT', "'카멘 하드 숙련팟' 공고 참가 신청이 수락되었습니다."],
+        [B, 'APPLICATION_RESULT', "'카멘 하드 숙련팟' 공고 참가 신청이 거절되었습니다."],
+      ]);
+    });
+
+    it('수락된 파티원이 취소하면 파티장에게 알리고, 처리 실패한 요청은 알리지 않는다', async () => {
+      await apply(A);
+      await decide(1, 'ACCEPTED');
+      repo.state.notifications.length = 0;
+      await decide(1, 'REJECTED'); // 409 ALREADY_DECIDED
+      await call('DELETE', '/1/applications/me', undefined, A);
+      assert.deepEqual(sent(), [[HOST, 'APPLICATION_CANCELED', "회원2님이 '카멘 하드 숙련팟' 파티 참가를 취소했습니다."]]);
+    });
+
+    it('마지막 자리가 차서 자동 마감되면 대기 중인 신청자에게 마감을 알린다', async () => {
+      for (const id of [A, B, C]) await apply(id);
+      repo.state.posts.get(1).currentCount = 2;
+      repo.state.notifications.length = 0;
+      await decide(1, 'ACCEPTED'); // 3/3 → 자동 마감
+      assert.deepEqual(sent(), [
+        [A, 'APPLICATION_RESULT', "'카멘 하드 숙련팟' 공고 참가 신청이 수락되었습니다."],
+        [B, 'POST_UPDATED', "'카멘 하드 숙련팟' 공고의 모집이 마감되었습니다."],
+        [C, 'POST_UPDATED', "'카멘 하드 숙련팟' 공고의 모집이 마감되었습니다."],
+      ]);
+    });
+
+    it('작성자가 마감·완료하면 대기 중·수락된 신청자에게 알리고, 재개는 알리지 않는다', async () => {
+      await apply(A);
+      await apply(B);
+      await decide(1, 'ACCEPTED');
+      repo.state.notifications.length = 0;
+      await call('PATCH', '/1/status', { status: 'CLOSED' }, HOST);
+      await call('PATCH', '/1/status', { status: 'OPEN' }, HOST);
+      repo.state.posts.get(1).scheduleAt = new Date('2026-11-13T00:00:00Z');
+      await call('PATCH', '/1/status', { status: 'COMPLETED' }, HOST);
+      assert.deepEqual(sent(), [
+        [A, 'POST_UPDATED', "'카멘 하드 숙련팟' 공고의 모집이 마감되었습니다."],
+        [B, 'POST_UPDATED', "'카멘 하드 숙련팟' 공고의 모집이 마감되었습니다."],
+        [A, 'POST_UPDATED', "'카멘 하드 숙련팟' 파티가 완료 처리되었습니다."],
+        [B, 'POST_UPDATED', "'카멘 하드 숙련팟' 파티가 완료 처리되었습니다."],
+      ]);
+    });
+
+    it('긴 공고 제목은 40자에서 줄임표로 자른다', async () => {
+      repo.state.posts.get(1).title = '가'.repeat(60);
+      await apply(A);
+      assert.equal(repo.state.notifications[0].message, `회원2님이 '${'가'.repeat(40)}…' 공고에 참가를 신청했습니다.`);
     });
   });
 

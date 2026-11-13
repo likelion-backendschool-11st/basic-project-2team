@@ -430,7 +430,36 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
  { "id": 2, "nickname": "달빛힐러", "avatarUrl": null, "level": 3, "mannerTemp": 36.5, "reviewCount": 0, "role": "서포터", "isHost": false }]
 ```
 
-⚠️ 알림 발송(지원 결과·신청 알림)은 별도 이슈(#38)라 이번 범위에 없습니다.
+**알림 전송** — 아래 파티 이벤트가 일어나면 같은 트랜잭션 안에서 `notification` 에 한 건씩 저장합니다(이벤트가 실패해 롤백되면 알림도 남지 않음). 문구는 `partyConstants.js` 의 `partyMessages.notice`, 공고 제목은 40자에서 줄임표로 자릅니다.
+
+| 이벤트 | 받는 사람 | `type` |
+| --- | --- | --- |
+| 참가 신청 · 재신청 | 파티장 | `APPLICATION_RECEIVED` |
+| 신청 승인/거절 | 신청자 | `APPLICATION_RESULT` |
+| 수락된 파티원의 신청 취소 (대기 중 취소는 알리지 않음) | 파티장 | `APPLICATION_CANCELED` |
+| 승인으로 정원이 차서 자동 마감 | 아직 대기 중인 신청자 | `POST_UPDATED` |
+| 작성자가 마감(`CLOSED`)·완료(`COMPLETED`) 처리 (재개는 알리지 않음) | 대기 중·수락된 신청자 | `POST_UPDATED` |
+
+### 알림함 (Notification)
+
+구현: `backend/src/notification/` (`/api/notifications` 에 마운트). 모두 🔒 이며 **내 알림만** 다룹니다(관리자가 보낸 `SANCTION` · `POST_DELETED` 포함). 실시간 푸시 없이 프론트가 폴링합니다.
+
+| Method | URI | 설명 |
+| --- | --- | --- |
+| GET | `/api/notifications?page=&size=&unread=` | 내 알림 목록(최신순). `size` 기본 20 · 최대 50, `unread=true` 면 안 읽은 알림만 |
+| GET | `/api/notifications/unread-count` | 안 읽은 알림 수 `{ count }` (헤더 배지 폴링용) |
+| PATCH | `/api/notifications/{notificationId}/read` | 알림 하나를 읽음 처리 → `204` (이미 읽은 알림도 `204`) |
+| PATCH | `/api/notifications/read-all` | 내 안 읽은 알림을 모두 읽음 처리 → `204` |
+
+```json
+{
+  "items": [{ "id": 12, "type": "APPLICATION_RESULT", "message": "'카멘 하드 숙련팟' 공고 참가 신청이 수락되었습니다.", "postId": 7, "read": false, "createdAt": "2026-11-13T05:00:00.000Z" }],
+  "page": 1, "size": 20, "totalCount": 1, "totalPages": 1, "unreadCount": 1
+}
+```
+
+- `postId` 는 연결된 공고가 없거나 공고가 삭제돼 연결이 끊어지면 `null` 입니다. `unreadCount` 는 `unread` 필터와 상관없이 내 전체 안 읽은 알림 수입니다.
+- 오류: 400 `INVALID_INPUT`(`page` · `size` · `unread`), 401 `UNAUTHORIZED`, 404 `NOTIFICATION_NOT_FOUND`(없음, 남의 알림, 형식이 틀린 id — 남의 알림은 존재 여부를 알리지 않으려고 404).
 
 ## 5. 댓글 (Comment)
 

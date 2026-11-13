@@ -1,6 +1,6 @@
 'use strict';
 
-const { APPLICATION_STATUS: S, POST_STATUS } = require('./partyConstants');
+const { APPLICATION_STATUS: S, POST_STATUS, NOTIFICATION_TYPE } = require('./partyConstants');
 
 const ALIVE_POST = "p.deleted_at IS NULL AND p.status <> 'DELETED'";
 const APPLICANT_COLUMNS = `m.id AS memberId, m.nickname, m.avatar_url AS avatarUrl, m.level,
@@ -11,10 +11,24 @@ const APPLICANT_COLUMNS = `m.id AS memberId, m.nickname, m.avatar_url AS avatarU
  * @param {import('mysql2/promise').Pool} pool
  */
 function createPartyRepository(pool) {
+  /** 알림함에 한 건 추가. 호출한 트랜잭션 안에서 실행되므로 원래 작업이 롤백되면 알림도 함께 사라집니다. */
+  async function insertNotification(connection, { memberId, type, message, postId }) {
+    await connection.query('INSERT INTO notification (member_id, type, message, post_id) VALUES (?, ?, ?, ?)', [memberId, type, message, postId]);
+  }
+
+  /** 이 공고에 대기 중·수락된 신청자 전원에게 같은 알림을 보냅니다 (statuses 로 대상 상태를 좁힐 수 있음). */
+  async function notifyApplicants(connection, { postId, type, message, statuses }) {
+    await connection.query(
+      `INSERT INTO notification (member_id, type, message, post_id)
+       SELECT applicant_id, ?, ?, post_id FROM post_application WHERE post_id = ? AND status IN (?)`,
+      [type, message, postId, statuses],
+    );
+  }
+
   /** 삭제되지 않은 공고의 신청에 필요한 정보. 없으면 null */
   async function findPost(postId) {
     const [rows] = await pool.query(
-      `SELECT p.id, p.author_id AS authorId, p.status, p.headcount, p.current_count AS currentCount, p.schedule_at AS scheduleAt
+      `SELECT p.id, p.author_id AS authorId, p.title, p.status, p.headcount, p.current_count AS currentCount, p.schedule_at AS scheduleAt
          FROM post p WHERE p.id = ? AND ${ALIVE_POST} LIMIT 1`,
       [postId],
     );
@@ -23,7 +37,7 @@ function createPartyRepository(pool) {
 
   /** 신청자의 계정 상태. 없으면 null */
   async function findMemberStatus(memberId) {
-    const [rows] = await pool.query('SELECT status, suspended_until AS suspendedUntil FROM member WHERE id = ? LIMIT 1', [memberId]);
+    const [rows] = await pool.query('SELECT nickname, status, suspended_until AS suspendedUntil FROM member WHERE id = ? LIMIT 1', [memberId]);
     return rows[0] ?? null;
   }
 
@@ -37,15 +51,18 @@ function createPartyRepository(pool) {
   }
 
   /** 새 신청을 저장하고 id 를 돌려줍니다. 동시에 같은 신청이 들어와 UNIQUE 에 걸리면 null */
-  async function createApplication({ postId, applicantId, role, message }) {
+  async function createApplication({ postId, applicantId, role, message, notice }) {
     try {
-      const [result] = await pool.query('INSERT INTO post_application (post_id, applicant_id, role, message) VALUES (?, ?, ?, ?)', [
-        postId,
-        applicantId,
-        role,
-        message,
-      ]);
-      return result.insertId;
+      return await inTransaction(async (connection) => {
+        const [result] = await connection.query('INSERT INTO post_application (post_id, applicant_id, role, message) VALUES (?, ?, ?, ?)', [
+          postId,
+          applicantId,
+          role,
+          message,
+        ]);
+        await insertNotification(connection, { ...notice, postId });
+        return result.insertId;
+      });
     } catch (err) {
       if (err.code === 'ER_DUP_ENTRY') return null;
       throw err;
@@ -56,13 +73,17 @@ function createPartyRepository(pool) {
    * 취소했던 신청을 같은 행에서 다시 PENDING 으로 되돌립니다. 그 사이 상태가 바뀌었으면 false.
    * 취소 기록(late_cancel · canceled_at)은 지우지 않습니다. 직전 취소 이력을 재신청으로 지울 수 없게 하기 위해서입니다.
    */
-  async function reapply({ id, role, message }) {
-    const [result] = await pool.query(
-      `UPDATE post_application SET status = '${S.pending}', role = ?, message = ?, decided_at = NULL
-        WHERE id = ? AND status = '${S.canceled}'`,
-      [role, message, id],
-    );
-    return result.affectedRows > 0;
+  async function reapply({ id, role, message, postId, notice }) {
+    return inTransaction(async (connection) => {
+      const [result] = await connection.query(
+        `UPDATE post_application SET status = '${S.pending}', role = ?, message = ?, decided_at = NULL
+          WHERE id = ? AND status = '${S.canceled}'`,
+        [role, message, id],
+      );
+      if (result.affectedRows === 0) return false;
+      await insertNotification(connection, { ...notice, postId });
+      return true;
+    });
   }
 
   /** 트랜잭션 하나로 fn(connection) 을 실행합니다. 실패하면 롤백합니다. */
@@ -85,7 +106,7 @@ function createPartyRepository(pool) {
    * 내 신청을 취소합니다. 수락된 신청이면 확정 인원(current_count)도 1 줄이고 lateCancel 을 기록합니다.
    * @returns {Promise<boolean>} 취소했으면 true, 취소할 신청(PENDING · ACCEPTED)이 없으면 false
    */
-  async function cancelApplication({ postId, applicantId, canceledAt, lateCancel }) {
+  async function cancelApplication({ postId, applicantId, canceledAt, lateCancel, notice }) {
     return inTransaction(async (connection) => {
       // 인원 계산이 승인 처리와 겹치지 않게 공고 행부터 잠급니다.
       const [[post]] = await connection.query('SELECT status, headcount, current_count AS current FROM post WHERE id = ? FOR UPDATE', [postId]);
@@ -102,6 +123,7 @@ function createPartyRepository(pool) {
         [canceledAt, wasAccepted && lateCancel, application.id],
       );
       if (wasAccepted) {
+        await insertNotification(connection, { ...notice, postId }); // 수락됐던 파티원이 빠지면 파티장에게 알립니다.
         // 정원이 차서 마감된 공고에서 자리가 나면 다시 모집 중으로 돌립니다.
         const reopen = post.status === POST_STATUS.closed && post.current >= post.headcount;
         await connection.query(`UPDATE post SET current_count = GREATEST(current_count - 1, 1)${reopen ? `, status = '${POST_STATUS.open}'` : ''} WHERE id = ?`, [postId]);
@@ -125,10 +147,10 @@ function createPartyRepository(pool) {
    * 신청을 승인/거절합니다. 공고 행을 잠근 채 상태·정원을 확인하므로 동시에 승인해도 정원을 넘지 않습니다.
    * @returns {Promise<{ result: 'OK' | 'NOT_FOUND' | 'ALREADY_DECIDED' | 'POST_CLOSED' | 'FULL', current?: number, max?: number }>}
    */
-  async function decideApplication({ postId, applicationId, status, decidedAt }) {
+  async function decideApplication({ postId, applicationId, status, decidedAt, notices }) {
     return inTransaction(async (connection) => {
       const [[post]] = await connection.query('SELECT status, headcount, current_count AS current FROM post WHERE id = ? FOR UPDATE', [postId]);
-      const [[application]] = await connection.query('SELECT status FROM post_application WHERE id = ? AND post_id = ? FOR UPDATE', [
+      const [[application]] = await connection.query('SELECT status, applicant_id AS applicantId FROM post_application WHERE id = ? AND post_id = ? FOR UPDATE', [
         applicationId,
         postId,
       ]);
@@ -146,6 +168,16 @@ function createPartyRepository(pool) {
         await connection.query('UPDATE post SET current_count = ?, status = ? WHERE id = ?', [current, postStatus, postId]);
       }
       await connection.query('UPDATE post_application SET status = ?, decided_at = ? WHERE id = ?', [status, decidedAt, applicationId]);
+      await insertNotification(connection, {
+        memberId: application.applicantId,
+        type: NOTIFICATION_TYPE.applicationResult,
+        message: status === S.accepted ? notices.accepted : notices.rejected,
+        postId,
+      });
+      // 이 승인으로 정원이 차서 마감됐다면, 아직 결과를 기다리는 신청자에게 알립니다.
+      if (postStatus === POST_STATUS.closed && post.status !== POST_STATUS.closed) {
+        await notifyApplicants(connection, { postId, type: NOTIFICATION_TYPE.postUpdated, message: notices.closed, statuses: [S.pending] });
+      }
       return { result: 'OK', current, max: post.headcount, postStatus };
     });
   }
@@ -155,7 +187,7 @@ function createPartyRepository(pool) {
    * 완료 처리는 승인된 파티원이 있고 출발 시간이 지난 뒤(일정 미정이면 제외)에만 가능합니다.
    * @returns {Promise<{ result: 'OK' | 'NOT_FOUND' | 'COMPLETED' | 'FULL' | 'NO_MEMBERS' | 'NOT_STARTED', status?: string, current?: number, max?: number }>}
    */
-  async function changePostStatus({ postId, status, now }) {
+  async function changePostStatus({ postId, status, now, notice }) {
     return inTransaction(async (connection) => {
       const [[post]] = await connection.query(
         `SELECT status, headcount, current_count AS current, schedule_at AS scheduleAt FROM post p WHERE p.id = ? AND ${ALIVE_POST} FOR UPDATE`,
@@ -171,6 +203,10 @@ function createPartyRepository(pool) {
         if (post.scheduleAt && new Date(post.scheduleAt) > now) return { result: 'NOT_STARTED' };
       }
       await connection.query('UPDATE post SET status = ? WHERE id = ?', [status, postId]);
+      // 마감·완료는 대기 중이거나 수락된 신청자에게 알립니다 (모집 재개는 알리지 않음).
+      if (notice) {
+        await notifyApplicants(connection, { postId, type: NOTIFICATION_TYPE.postUpdated, message: notice, statuses: [S.pending, S.accepted] });
+      }
       return { ...unchanged, status };
     });
   }
