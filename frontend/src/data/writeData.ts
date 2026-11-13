@@ -38,6 +38,9 @@ export const writeText = {
   syncNote: '등록 시 OurParty 게시판 및 실시간 매칭 채널에 자동 동기화됩니다.',
   submit: '게시하기',
   submitInvalid: '제목과 본문을 입력해 주세요.',
+  placeholders: { game: '게임을 선택해주세요', type: '모집 유형을 선택해주세요', detail: '상세 분류를 선택해주세요' },
+  optionsLoadFailed: '게임 목록을 불러오지 못했습니다. 새로고침 후 다시 시도해주세요.',
+  submitFailed: '공고 등록에 실패했습니다. 잠시 후 다시 시도해주세요.',
   panelTitle: '파티 모집 상세 설정',
   panelBadge: 'MATCH OPTION',
   section1: 'SECTION 1. 기본 정보',
@@ -60,33 +63,16 @@ export const writeText = {
   draftConfirm: { title: '작성을 취소할까요?', description: '지금 나가면 작성 중인 내용이 사라집니다. 임시저장을 하면 나중에 이어서 쓸 수 있어요.', confirm: '작성 취소', cancel: '계속 작성' },
 };
 
-export const gameChoices: readonly SelectOption[] = [
-  { value: 'lostark', label: '로스트아크 (Lost Ark)' },
-  { value: 'valorant', label: '발로란트 (Valorant)' },
-  { value: 'lol', label: '리그 오브 레전드' },
-  { value: 'overwatch', label: '오버워치 2' },
-];
+/** 모집 유형 코드(GET /api/games 의 contents[].type) → 화면 표시 이름 */
+export const typeLabels: Readonly<Record<string, string>> = {
+  raid: '레이드',
+  dungeon: '던전',
+  rank: '경쟁전 / 랭크',
+  normal: '일반 게임',
+};
 
-export const typeChoices: readonly SelectOption[] = [
-  { value: 'raid', label: '레이드 (어비스/군단장)' },
-  { value: 'rank', label: '경쟁전 / 랭크' },
-  { value: 'casual', label: '일반 / 즐겜' },
-];
-
-export const detailChoices: readonly SelectOption[] = [
-  { value: 'kamen', label: '어둠군단장 카멘 (하드 1-3관)' },
-  { value: 'echidna', label: '에키드나 (하드)' },
-  { value: 'illiakan', label: '일리아칸 (하드)' },
-];
-
-/** Selectable party sizes including the author (the slider snaps to these). Range 2~16. */
-export const headcounts: readonly { readonly value: number; readonly label: string }[] = [
-  { value: 2, label: '2명 (듀오)' },
-  { value: 4, label: '4명' },
-  { value: 5, label: '5명' },
-  { value: 8, label: '8명 (풀파티)' },
-  { value: 16, label: '16명' },
-];
+export const HEADCOUNT_MIN = 2;
+export const HEADCOUNT_MAX = 16;
 
 export const styleChoices: readonly StyleOption[] = [
   { id: 'hard', emoji: '⚡', label: '빡겜 / 클리어 지향' },
@@ -119,9 +105,10 @@ export const initialDraft = {
 
 신청 주시면 스펙 확인 후 5분 내로 수락 드립니다. 편하게 지원해주세요!`,
   partyName: '카멘 1-3관 숙련 쾌속팟',
-  game: 'lostark',
-  type: 'raid',
-  detail: 'kamen',
+  // 게임·모집 유형·상세 분류는 GET /api/games 로 불러온 뒤 채웁니다.
+  game: '',
+  type: '',
+  detail: '',
   headcount: 8,
   style: 'hard',
   tbd: true,
