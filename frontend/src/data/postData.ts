@@ -8,7 +8,6 @@ export interface Participant {
   readonly name: string;
   readonly role: string;
   readonly leader?: boolean;
-  readonly online: boolean;
 }
 
 export interface PostDetail {
@@ -30,7 +29,6 @@ export interface PostDetail {
   readonly tags: readonly string[];
   readonly slots: readonly { readonly role: string; readonly filled: number; readonly total: number }[];
   readonly conditions: readonly { readonly label: string; readonly value: string }[];
-  readonly participants: readonly Participant[];
   readonly status: PostStatus;
   readonly commentCount: number;
   readonly scrapCount: number;
@@ -130,6 +128,7 @@ export const postText = {
       : `${names.slice(0, 3).join(', ')}${names.length > 3 ? ` 외 ${names.length - 3}명` : ''}님이 승인 대기 중입니다.`,
   manageApplicants: '신청자 목록 관리 / 승인',
   participantsTitle: '파티 참가자 명단',
+  emptySlot: '모집 중',
   conditionsTitle: '파티 모집 상세 조건',
   closeRecruit: '공고 모집 마감 완료',
   pauseRecruit: '모집 일시 중단',

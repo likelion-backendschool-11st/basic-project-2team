@@ -67,4 +67,13 @@ export interface RelatedPostResponse {
   readonly current: number;
   readonly max: number;
 }
+/** GET /api/posts/{postId}/participants 아이템: 파티장이 먼저, 이어서 수락된 순 */
+export interface ParticipantResponse {
+  readonly id: number;
+  readonly nickname: string;
+  readonly role: string | null;
+  readonly isHost: boolean;
+}
+export const getParticipants = (postId: string) => request<readonly ParticipantResponse[]>('GET', postUrl(postId, '/participants'));
+
 export const getRelatedPosts = (postId: string) => request<readonly RelatedPostResponse[]>('GET', postUrl(postId, '/related?limit=3'));
