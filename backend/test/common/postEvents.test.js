@@ -47,3 +47,14 @@ describe('postEvents 허브', () => {
     assert.equal(hub.connectionCount(), 1);
   });
 });
+
+describe('postEvents 구독 해제', () => {
+  it('같은 해제 함수를 두 번 불러도 새로 생긴 구독을 지우지 않는다', () => {
+    const hub = createPostEvents();
+    const stop = hub.subscribe(1, () => {});
+    stop();
+    hub.subscribe(1, () => {});
+    stop();
+    assert.equal(hub.connectionCount(), 1);
+  });
+});

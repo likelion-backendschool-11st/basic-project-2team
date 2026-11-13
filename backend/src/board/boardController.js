@@ -32,8 +32,11 @@ function createBoardController(boardService, { postEvents, heartbeatMs = HEARTBE
   async function events(req, res) {
     const postId = parsePostId(req.params.postId);
     if (postId === null) throw new ApiError(404, 'POST_NOT_FOUND', boardMessages.postNotFound);
-    if (postEvents.connectionCount() >= MAX_EVENT_CONNECTIONS) throw new ApiError(503, 'TOO_MANY_CONNECTIONS', boardMessages.tooManyConnections);
+    const tooMany = () => new ApiError(503, 'TOO_MANY_CONNECTIONS', boardMessages.tooManyConnections);
+    if (postEvents.connectionCount() >= MAX_EVENT_CONNECTIONS) throw tooMany();
     await boardService.assertPostExists(postId);
+    // await 사이에 다른 요청이 자리를 채웠을 수 있어, 구독 직전에 다시 확인합니다(await 없이 이어지므로 이 뒤로는 경합이 없습니다).
+    if (postEvents.connectionCount() >= MAX_EVENT_CONNECTIONS) throw tooMany();
     if (req.destroyed || res.destroyed) return; // 확인하는 사이 클라이언트가 끊었으면 구독하지 않습니다(close 는 이미 지나감)
 
     res.set({
@@ -49,7 +52,10 @@ function createBoardController(boardService, { postEvents, heartbeatMs = HEARTBE
     // 프록시·로드밸런서가 유휴 연결을 끊지 않도록 주기적으로 주석 줄을 보냅니다.
     const heartbeat = setInterval(() => res.write(': ping\n\n'), heartbeatMs);
     heartbeat.unref();
+    let closed = false;
     const cleanup = () => {
+      if (closed) return;
+      closed = true;
       clearInterval(heartbeat);
       unsubscribe();
     };

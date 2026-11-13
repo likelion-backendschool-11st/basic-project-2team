@@ -23,7 +23,8 @@ function createPostEvents() {
     set.add(listener);
     return () => {
       set.delete(listener);
-      if (set.size === 0) listeners.delete(postId);
+      // 이미 비워져 새로 만들어진 집합을 지우지 않도록, 같은 집합일 때만 항목을 제거합니다.
+      if (set.size === 0 && listeners.get(postId) === set) listeners.delete(postId);
     };
   }
 
