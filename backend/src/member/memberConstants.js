@@ -39,6 +39,19 @@ const duplicateErrors = Object.freeze({
   phone: { constraint: 'uq_member_phone', code: 'DUPLICATE_PHONE', message: '이미 가입된 휴대폰 번호입니다.' },
 });
 
+/** 로그인 실패 잠금 (REQ-LOGIN-006): 연속 실패 횟수와 잠금 시간 */
+const MAX_LOGIN_FAILURES = 5;
+const LOGIN_LOCK_MINUTES = 10;
+
+/** member.status 값 (docs/04-erd.md) */
+const memberStatus = Object.freeze({
+  active: 'ACTIVE',
+  warned: 'WARNED',
+  suspended: 'SUSPENDED',
+  banned: 'BANNED',
+  withdrawn: 'WITHDRAWN',
+});
+
 const memberMessages = Object.freeze({
   invalidInput: '입력값을 확인해주세요.',
   userIdRequired: '아이디를 입력해주세요.',
@@ -57,6 +70,14 @@ const memberMessages = Object.freeze({
   checkTypeInvalid: 'type 은 userId, nickname, email 중 하나여야 합니다.',
   checkValueRequired: '확인할 값을 입력해주세요.',
   rejoinRestricted: '탈퇴 후 재가입이 제한된 정보입니다. 고객센터로 문의해주세요.',
+  rememberMeInvalid: 'rememberMe 는 true 또는 false 여야 합니다.',
+  refreshTokenRequired: 'refreshToken 을 입력해주세요.',
+  // 아이디와 비밀번호 중 무엇이 틀렸는지 구분하지 않음 (REQ-LOGIN-006)
+  invalidCredentials: '아이디 또는 비밀번호가 일치하지 않습니다.',
+  accountLocked: `로그인에 ${MAX_LOGIN_FAILURES}회 연속 실패해 계정이 잠겼습니다. ${LOGIN_LOCK_MINUTES}분 후 다시 시도해주세요.`,
+  accountSuspended: '이용이 정지된 계정입니다.',
+  accountBanned: '영구 정지된 계정입니다.',
+  invalidRefreshToken: '로그인이 만료되었습니다. 다시 로그인해주세요.',
 });
 
 module.exports = {
@@ -73,5 +94,8 @@ module.exports = {
   requiredAgreementKeys,
   checkTypeColumns,
   duplicateErrors,
+  MAX_LOGIN_FAILURES,
+  LOGIN_LOCK_MINUTES,
+  memberStatus,
   memberMessages,
 };

@@ -2,26 +2,38 @@
 
 const express = require('express');
 const cors = require('cors');
+const { env } = require('./config/env');
 const { notFoundHandler, errorHandler } = require('./common/errorHandler');
+const { createTokenProvider } = require('./common/tokenProvider');
+const { createRequireAuth } = require('./common/authMiddleware');
 const { createMemberModule } = require('./member');
 const { createPostModule } = require('./post');
 
 /**
  * Express 앱을 만듭니다. 서버 실행(server.js)과 분리해 테스트에서 DB 없이 띄울 수 있게 합니다.
- * @param {{ pool?: import('mysql2/promise').Pool, memberRepository?: object, postRepository?: object, authenticate?: import('express').RequestHandler, corsOrigins: string[], bcryptRounds: number }} options
+ * @param {{
+ *   pool?: import('mysql2/promise').Pool,
+ *   memberRepository?: object,
+ *   postRepository?: object,
+ *   corsOrigins: string[],
+ *   bcryptRounds: number,
+ *   auth?: typeof env.auth,
+ *   now?: () => Date,
+ * }} options
  */
-function createApp({ pool, memberRepository, postRepository, authenticate, corsOrigins, bcryptRounds }) {
+function createApp({ pool, memberRepository, postRepository, corsOrigins, bcryptRounds, auth = env.auth, now }) {
   const app = express();
 
   app.use(cors({ origin: corsOrigins }));
   app.use(express.json());
-  // 로그인/JWT 구현 전까지는 req.memberId 를 채우는 미들웨어가 없어 🔒 API 는 401 입니다.
-  if (authenticate) app.use(authenticate);
 
-  const member = createMemberModule({ pool, memberRepository, bcryptRounds });
+  const tokenProvider = createTokenProvider(auth);
+  const requireAuth = createRequireAuth(tokenProvider);
+
+  const member = createMemberModule({ pool, memberRepository, tokenProvider, requireAuth, bcryptRounds, now });
   app.use('/api/auth', member.router);
 
-  const post = createPostModule({ pool, postRepository });
+  const post = createPostModule({ pool, postRepository, requireAuth, now });
   app.use('/api/posts', post.router);
 
   app.use(notFoundHandler);

@@ -15,6 +15,20 @@ const env = Object.freeze({
     database: process.env.DB_NAME ?? 'beggdb',
   }),
   bcryptRounds: Number(process.env.BCRYPT_ROUNDS ?? 10),
+  auth: Object.freeze({
+    /** JWT 서명 키. 운영 환경에서는 반드시 길고 무작위한 값으로 지정합니다. */
+    jwtSecret: process.env.JWT_SECRET ?? 'ourparty-local-dev-secret',
+    /** Access Token 유효 시간(초) */
+    accessTokenTtlSeconds: Number(process.env.ACCESS_TOKEN_TTL_SECONDS ?? 1800),
+    /** Refresh Token 유효 기간(일) — 로그인 상태 유지 미선택 */
+    refreshTokenTtlDays: Number(process.env.REFRESH_TOKEN_TTL_DAYS ?? 1),
+    /** Refresh Token 유효 기간(일) — 로그인 상태 유지 선택 */
+    rememberMeTtlDays: Number(process.env.REMEMBER_ME_TTL_DAYS ?? 14),
+  }),
 });
+
+if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET) {
+  throw new Error('JWT_SECRET 환경 변수를 설정해야 합니다.');
+}
 
 module.exports = { env };

@@ -6,10 +6,10 @@ const { createPostController } = require('./postController');
 const { createPostRouter } = require('./postRoutes');
 
 /** repository → service → controller → router 를 조립합니다. 테스트에서는 repository 를 바꿔 끼웁니다. */
-function createPostModule({ pool, postRepository = createPostRepository(pool), now }) {
+function createPostModule({ pool, postRepository = createPostRepository(pool), requireAuth, now }) {
   const postService = createPostService({ postRepository, now });
   const postController = createPostController(postService);
-  return { router: createPostRouter(postController) };
+  return { router: createPostRouter(postController, { requireAuth }) };
 }
 
 module.exports = { createPostModule };

@@ -3,6 +3,15 @@
 const { describe, it, before, after, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
 const { createApp } = require('../../src/app');
+const { createTokenProvider } = require('../../src/common/tokenProvider');
+
+const AUTH = Object.freeze({
+  jwtSecret: 'test-secret',
+  accessTokenTtlSeconds: 1800,
+  refreshTokenTtlDays: 1,
+  rememberMeTtlDays: 14,
+});
+const MEMBER_ID = 7;
 
 /** DB 대신 메모리에 저장하는 가짜 repository */
 function createFakeRepository() {
@@ -44,12 +53,7 @@ describe('POST /api/posts', () => {
   const repo = createFakeRepository();
 
   before(async () => {
-    // x-member-id 헤더가 있으면 로그인한 것으로 간주하는 테스트용 인증
-    const authenticate = (req, res, next) => {
-      if (req.headers['x-member-id']) req.memberId = Number(req.headers['x-member-id']);
-      next();
-    };
-    const app = createApp({ postRepository: repo, authenticate, corsOrigins: [], bcryptRounds: 4 });
+    const app = createApp({ postRepository: repo, corsOrigins: [], bcryptRounds: 4, auth: AUTH });
     await new Promise((resolve) => {
       server = app.listen(0, resolve);
     });
@@ -63,7 +67,10 @@ describe('POST /api/posts', () => {
   const post = (body, loggedIn = true) =>
     fetch(`${baseUrl}/api/posts`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json', ...(loggedIn ? { 'x-member-id': '7' } : {}) },
+      headers: {
+        'content-type': 'application/json',
+        ...(loggedIn ? { Authorization: `Bearer ${createTokenProvider(AUTH).createAccessToken(MEMBER_ID)}` } : {}),
+      },
       body: JSON.stringify(body),
     });
 
@@ -72,7 +79,7 @@ describe('POST /api/posts', () => {
     assert.equal(res.status, 201);
     assert.deepEqual(await res.json(), { success: true, data: { id: 1 } });
     const saved = repo.state.posts[0];
-    assert.equal(saved.authorId, 7);
+    assert.equal(saved.authorId, MEMBER_ID);
     assert.equal(saved.categoryCode, 'mmorpg');
     assert.equal(saved.gameContentId, 10);
     assert.deepEqual(saved.tags, ['숙련', '디코필수']);

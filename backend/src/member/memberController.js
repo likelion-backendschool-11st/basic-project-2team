@@ -14,7 +14,23 @@ function createMemberController(memberService) {
     return sendSuccess(res, 200, data);
   }
 
-  return { signup, check };
+  async function login(req, res) {
+    const data = await memberService.login(req.body);
+    return sendSuccess(res, 200, data);
+  }
+
+  async function refresh(req, res) {
+    const data = await memberService.refresh(req.body);
+    return sendSuccess(res, 200, data);
+  }
+
+  /** req.auth 는 requireAuth 미들웨어가 채웁니다. */
+  async function logout(req, res) {
+    await memberService.logout(req.auth.memberId);
+    return res.status(204).end();
+  }
+
+  return { signup, check, login, refresh, logout };
 }
 
 module.exports = { createMemberController };
