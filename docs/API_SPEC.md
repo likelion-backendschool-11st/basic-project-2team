@@ -389,7 +389,67 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 | PATCH | `/api/comments/{commentId}` | 댓글 수정 `{ text }` | 🔒 작성자 |
 | DELETE | `/api/comments/{commentId}` | 댓글 삭제 (대댓글 함께 삭제) | 🔒 작성자 |
 
-- 비밀 댓글은 댓글 작성자와 공고 작성자에게만 본문을 노출합니다.
+- 비밀 댓글은 댓글 작성자와 공고 작성자에게만 본문을 노출합니다. 대댓글이면 부모 댓글 작성자에게도 노출합니다.
+
+**댓글 목록 (`GET /api/posts/{postId}/comments`)**
+
+- 로그인 없이 조회할 수 있습니다. `Authorization` 헤더를 보내면 `mine` 과 비밀 댓글 본문이 로그인한 사용자 기준으로 채워집니다 (토큰이 틀리면 401).
+- `sort`: `oldest`(기본, 등록순) · `newest`(최신순). 루트 댓글에만 적용되고 `replies` 는 항상 등록순입니다.
+- 페이징은 루트 댓글 기준입니다. `size` 기본 4, 최대 50. `totalCount` 는 루트 댓글 수입니다 (대댓글 포함 전체 수는 공고 상세의 `commentCount`).
+- 삭제된 댓글(`DELETED`)은 빠지고, 루트 댓글이 삭제되면 그 대댓글도 함께 빠집니다. 관리자가 가린 댓글(`HIDDEN`)은 `hidden: true` 로 내려주며 프론트에서 [펼쳐보기] 뒤에 보여줍니다.
+- 오류: 400 `INVALID_INPUT`(sort·page·size), 404 `POST_NOT_FOUND`.
+
+```json
+{
+  "items": [
+    {
+      "id": 12, "parentId": null,
+      "author": { "id": 9, "nickname": "홀리한빛", "avatarUrl": null },
+      "isPostAuthor": false, "mine": false,
+      "text": "극신속 홀나 1625입니다. 스펙 확인 부탁드려요!",
+      "secret": false, "hidden": false, "reported": false,
+      "createdAt": "2026-11-12T11:40:00.000Z",
+      "replies": [
+        {
+          "id": 13, "parentId": 12,
+          "author": { "id": 3, "nickname": "빛나는오더", "avatarUrl": null },
+          "isPostAuthor": true, "mine": true,
+          "text": null, "secret": true, "hidden": false, "reported": false,
+          "createdAt": "2026-11-12T11:45:00.000Z"
+        }
+      ]
+    }
+  ],
+  "page": 1, "size": 4, "totalCount": 6, "totalPages": 2
+}
+```
+
+- `text` 는 비밀 댓글을 볼 수 없는 사용자에게 `null` 입니다. 탈퇴한 작성자는 `author.nickname` 이 `"탈퇴한 회원"`, `avatarUrl` 이 `null` 입니다.
+- `isPostAuthor`: 공고 작성자가 쓴 댓글 (화면의 "작성자" 배지), `mine`: 로그인한 사용자가 쓴 댓글 ("내 댓글" 배지, 비로그인이면 항상 `false`).
+- `reported`: 로그인한 사용자가 이미 신고한 댓글 ("신고됨" 표시, 비로그인이면 항상 `false`).
+- 댓글 작성자 프로필(팝오버)은 `author.id` 로 `GET /api/members/{memberId}` (8절) 를 호출합니다.
+
+**댓글 · 대댓글 작성 (`POST /api/posts/{postId}/comments`)** 🔒
+
+```json
+{ "text": "디코 채널 링크 알려주시면 바로 들어가겠습니다.", "parentId": 12, "secret": false }
+```
+
+- `text` 필수(앞뒤 공백 제거 후 1~500자), `secret` 선택(boolean, 기본 `false`), `parentId` 선택 — 넣으면 그 댓글의 대댓글이 됩니다.
+- 대댓글은 1단계까지입니다. `parentId` 는 같은 공고의 삭제되지 않은 루트 댓글이어야 합니다.
+- 응답 `201` — 작성된 댓글 (목록 아이템과 같은 형식, `replies` 없음). 공고의 `commentCount` 가 1 오릅니다.
+- 오류: 400 `INVALID_INPUT`(필드별) · `REPLY_DEPTH_EXCEEDED`(대댓글에 답글), 401 `UNAUTHORIZED`, 403 `ACCOUNT_SUSPENDED` · `ACCOUNT_BANNED`, 404 `POST_NOT_FOUND` · `COMMENT_NOT_FOUND`(부모 댓글 없음).
+
+**댓글 수정 (`PATCH /api/comments/{commentId}`)** 🔒 작성자
+
+- 요청 `{ "text": "고친 내용" }` — 작성 규칙과 같음(1~500자). 응답 `200` — 수정된 댓글 (목록 아이템 형식, `replies` 없음).
+- 공고 작성자라도 다른 사람의 댓글은 고칠 수 없습니다. 관리자가 가린(`HIDDEN`) 댓글은 고칠 수 없습니다.
+- 오류: 400 `INVALID_INPUT`, 401 `UNAUTHORIZED`, 403 `NOT_COMMENT_AUTHOR` · `COMMENT_HIDDEN` · `ACCOUNT_SUSPENDED` · `ACCOUNT_BANNED`, 404 `COMMENT_NOT_FOUND`(없음, 삭제됨, 공고 삭제됨).
+
+**댓글 삭제 (`DELETE /api/comments/{commentId}`)** 🔒 작성자
+
+- 응답 `204`. 소프트 삭제(`status = DELETED`, `deleted_at`)이며, 루트 댓글이면 대댓글도 함께 삭제됩니다. 삭제된 수만큼 공고의 `commentCount` 가 줄어듭니다.
+- 오류: 401 `UNAUTHORIZED`, 403 `NOT_COMMENT_AUTHOR`, 404 `COMMENT_NOT_FOUND`(없음, 이미 삭제됨).
 
 ## 6. 신고 (Report)
 
@@ -398,6 +458,18 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 | POST | `/api/reports` | 신고 `{ targetType: "USER"\|"NO_SHOW"\|"POST"\|"COMMENT", targetId, reason, detail? }` | 🔒 |
 
 - `reason`: `욕설 및 비하 발언` · `스팸 / 도배` · `부적절한 광고` · `개인정보 노출` · `기타`
+- ⚠️ 현재 구현은 **`COMMENT` 신고만** 받습니다. 다른 `targetType` 은 400 `INVALID_INPUT` 입니다 (USER · NO_SHOW · POST 는 추후 구현).
+
+**댓글 신고**
+
+```json
+{ "targetType": "COMMENT", "targetId": 12, "reason": "욕설 및 비하 발언", "detail": "반복적인 욕설" }
+```
+
+- 응답 `201 { id }`. `reason` 은 위 문구 그대로 `report.reason_code` 에 저장합니다 (관리자 신고 목록에 그대로 표시). `detail` 선택, 500자 이하.
+- 같은 사람이 같은 댓글을 두 번 신고할 수 없고(409), 본인 댓글은 신고할 수 없습니다(400).
+- 신고하면 댓글의 `report_count` 가 1 오르고, 서로 다른 신고자가 5명 이상이 되면 댓글이 `HIDDEN` 으로 자동 가려집니다 (REQ-REPORT-004).
+- 오류: 400 `INVALID_INPUT` · `CANNOT_REPORT_SELF`, 401 `UNAUTHORIZED`, 404 `COMMENT_NOT_FOUND`, 409 `ALREADY_REPORTED`.
 
 ## 7. 리뷰 · 매너 평가 (Review)
 
