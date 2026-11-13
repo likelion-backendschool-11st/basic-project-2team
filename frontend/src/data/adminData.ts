@@ -229,7 +229,6 @@ export const historyKindLabel: Record<HistoryKind, string> = {
   POST_DELETE: '공고 삭제',
   COMMENT: '댓글 가림·복구',
   SANCTION: '회원 제재·정지',
-  MEMBER_VIEW: '회원 정보 조회',
   LOGIN: '관리자 로그인',
 };
 export const historyTone: Record<HistoryKind, Tone> = {
@@ -237,7 +236,6 @@ export const historyTone: Record<HistoryKind, Tone> = {
   POST_DELETE: 'rose',
   COMMENT: 'indigo',
   SANCTION: 'rose',
-  MEMBER_VIEW: 'sky',
   LOGIN: 'slate',
 };
 export const historyKindOptions = toOptions(historyKindLabel);

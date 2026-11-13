@@ -24,6 +24,7 @@ const {
   actionType,
   commentActionTypes,
   historyKinds,
+  historyActionTypes,
   actionTypeKinds,
   logTargetType,
   notificationType,
@@ -598,7 +599,7 @@ function createAdminService({ adminRepository, tokenProvider, bcryptRounds, now 
     const { kind, size, ...filters } = input;
     const result = await adminRepository.listActionLogs({
       ...filters,
-      actionTypes: kind ? historyKinds[kind] : null,
+      actionTypes: kind ? historyKinds[kind] : historyActionTypes,
       limit: size,
     });
     return toPage(result, input, (row) => ({

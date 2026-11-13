@@ -20,8 +20,7 @@ export const AdminHistoryPage: React.FC = () => {
   return (
     <AdminLayout
       title="처리 이력"
-      badge={<span className="text-[11px] font-normal px-2.5 py-1 rounded-full border border-night-borderLight bg-night-card text-fog-sub">감사 로그 보안 준수</span>}
-      description="관리자가 처리한 신고, 삭제, 제재, 정보 조회 내역을 확인합니다. 이력은 수정하거나 삭제할 수 없습니다."
+      description="관리자가 처리한 신고, 삭제, 제재 내역을 확인합니다. 이력은 수정하거나 삭제할 수 없습니다."
     >
       <AdminFilterPanel onSearch={l.apply} onReset={l.reset}>
         <FilterField label="검색어"><input className={filterControl} value={l.draft.q} onChange={(e) => l.set('q', e.target.value)} placeholder="처리자, 대상, 사유" /></FilterField>

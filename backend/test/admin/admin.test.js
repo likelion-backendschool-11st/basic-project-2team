@@ -482,5 +482,15 @@ describe('admin API', () => {
     assert.equal(body.data.items[0].kind, 'SANCTION');
     assert.equal(body.data.items[0].adminName, '관리자 마스터');
     assert.equal((await request('GET', '/history?kind=ETC')).status, 400);
+    assert.equal((await request('GET', '/history?kind=MEMBER_VIEW')).status, 400);
+  });
+
+  it('회원 상세 조회(MEMBER_VIEW)는 처리 이력 목록에 나오지 않는다', async () => {
+    await request('POST', '/members/11/sanctions', { body: { type: 'WARNING', reason: '비매너' } });
+    await request('GET', '/members/11');
+    const { body } = await json(await request('GET', '/history'));
+    assert.equal(repo.state.logs.at(-1).actionType, 'MEMBER_VIEW');
+    assert.ok(body.data.items.length > 0);
+    assert.ok(body.data.items.every((h) => h.actionType !== 'MEMBER_VIEW'));
   });
 });
