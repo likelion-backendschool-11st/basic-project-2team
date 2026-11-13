@@ -1,4 +1,4 @@
-import { ACCESS_TOKEN_KEY, request } from './http';
+import { ACCESS_TOKEN_KEY, AUTH_CHANGE_EVENT, REFRESH_TOKEN_KEY, USER_KEY, request } from './http';
 
 /** POST /api/auth/login 응답의 user (docs/API_SPEC.md 2절) */
 export interface LoginUser {
@@ -15,10 +15,6 @@ interface LoginResult {
   readonly refreshToken: string;
   readonly user: LoginUser;
 }
-
-const REFRESH_TOKEN_KEY = 'refreshToken';
-const USER_KEY = 'authUser';
-const AUTH_CHANGE_EVENT = 'auth-change';
 
 const storage = {
   get: (key: string) => {
