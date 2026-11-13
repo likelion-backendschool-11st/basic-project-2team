@@ -102,6 +102,7 @@ describe('GET /api/posts (목록)', () => {
     await get();
     assert.deepEqual(repo.state.lastFilter, {
       category: null,
+      q: '',
       sort: 'recent',
       tags: [],
       excludeClosed: false,
@@ -110,10 +111,11 @@ describe('GET /api/posts (목록)', () => {
     });
   });
 
-  it('category·sort·tags·page·size·excludeClosed 를 조건으로 넘긴다', async () => {
-    await get('?category=fps&sort=urgent&tags=숙련,%23디코필수&tags=숙련&page=3&size=5&excludeClosed=true');
+  it('category·q·sort·tags·page·size·excludeClosed 를 조건으로 넘긴다', async () => {
+    await get('?category=fps&q=%20카멘%20&sort=urgent&tags=숙련,%23디코필수&tags=숙련&page=3&size=5&excludeClosed=true');
     assert.deepEqual(repo.state.lastFilter, {
       category: 'fps',
+      q: '카멘',
       sort: 'urgent',
       tags: ['숙련', '디코필수'],
       excludeClosed: true,
@@ -131,11 +133,11 @@ describe('GET /api/posts (목록)', () => {
   });
 
   it('잘못된 쿼리는 필드별 오류와 함께 400', async () => {
-    const res = await get('?category=A%20B&sort=best&page=0&size=51&excludeClosed=maybe&tags=1,2,3,4,5,6');
+    const res = await get('?category=A%20B&sort=best&page=0&size=51&excludeClosed=maybe&tags=1,2,3,4,5,6&q=' + 'a'.repeat(51));
     assert.equal(res.status, 400);
     const { error } = await res.json();
     assert.equal(error.code, 'INVALID_INPUT');
-    assert.deepEqual(error.fields.map((f) => f.field).sort(), ['category', 'excludeClosed', 'page', 'size', 'sort', 'tags']);
+    assert.deepEqual(error.fields.map((f) => f.field).sort(), ['category', 'excludeClosed', 'page', 'q', 'size', 'sort', 'tags']);
     assert.equal(repo.state.lastFilter, null);
   });
 

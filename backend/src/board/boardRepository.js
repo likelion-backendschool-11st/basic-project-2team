@@ -73,14 +73,23 @@ function createBoardRepository(pool) {
 
   /**
    * 공고 목록 한 페이지와 전체 건수. 삭제된 공고는 제외하고, tags 는 모두 가진 공고만(AND) 남깁니다.
-   * @param {{ category: string | null, sort: string, tags: string[], excludeClosed: boolean, limit: number, offset: number }} filter
+   * @param {{ category: string | null, q: string, sort: string, tags: string[], excludeClosed: boolean, limit: number, offset: number }} filter
    */
-  async function findPostPage({ category, sort, tags, excludeClosed, limit, offset }) {
+  async function findPostPage({ category, q, sort, tags, excludeClosed, limit, offset }) {
     const where = [ALIVE_POST];
     const params = [];
     if (category) {
       where.push('p.category_code = ?');
       params.push(category);
+    }
+    if (q) {
+      // ponytail: LIKE 전체 탐색. 공고가 많아지면 FULLTEXT(ftx_post_title_party_name)로 교체
+      where.push(
+        `(p.title LIKE ? OR p.party_name LIKE ? OR g.name LIKE ?
+          OR EXISTS (SELECT 1 FROM post_tag st JOIN tag stt ON stt.id = st.tag_id WHERE st.post_id = p.id AND stt.name LIKE ?))`,
+      );
+      const pattern = `%${q.replace(/[\\%_]/g, '\\$&')}%`;
+      params.push(pattern, pattern, pattern, pattern);
     }
     if (excludeClosed) where.push(`p.status = '${POST_STATUS.open}'`);
     if (tags.length > 0) {
@@ -92,7 +101,7 @@ function createBoardRepository(pool) {
     }
     const condition = where.join(' AND ');
 
-    const [[{ totalCount }]] = await pool.query(`SELECT COUNT(*) AS totalCount FROM post p WHERE ${condition}`, params);
+    const [[{ totalCount }]] = await pool.query(`SELECT COUNT(*) AS totalCount FROM post p JOIN game g ON g.id = p.game_id WHERE ${condition}`, params);
     const [rows] = await pool.query(
       `SELECT p.id, p.category_code AS categoryCode, g.code AS gameCode, g.name AS gameName,
               p.party_type AS partyType, p.title, p.headcount, p.current_count AS currentCount,
