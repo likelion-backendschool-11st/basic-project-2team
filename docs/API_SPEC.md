@@ -51,7 +51,7 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 | PATCH | `/api/members/me` | 프로필 수정 (닉네임, 소개, 주 게임, 플레이 스타일) | 🔒 |
 | PATCH | `/api/members/me/password` | 비밀번호 변경 `{ currentPassword, newPassword }` | 🔒 |
 | DELETE | `/api/members/me` | 회원 탈퇴 `{ password, reason }` | 🔒 |
-| GET | `/api/members/{memberId}` | 다른 회원 프로필 (닉네임, 레벨, 매너 온도, 상위 태그) | |
+| GET | `/api/members/{memberId}` | 다른 회원 프로필 (닉네임, 레벨, 매너 온도, 상위 태그) — 응답은 8절 | |
 
 **회원가입 요청 예시**
 
@@ -356,12 +356,100 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 
 | Method | URI | 설명 | 인증 |
 | --- | --- | --- | --- |
-| GET | `/api/members/me/summary` | 프로필 통계 (매너 온도, 파티 수, 상위 태그 Top3) | 🔒 |
-| GET | `/api/members/me/posts?page=` | 내가 쓴 공고 | 🔒 |
-| GET | `/api/members/me/comments?page=` | 내가 쓴 댓글 | 🔒 |
+| GET | `/api/members/me/summary` | 내 프로필 요약 (매너 온도, 평균 별점, 게시글·완료 파티 수, 상위 태그 Top3) | 🔒 |
+| GET | `/api/members/me/posts?page=&size=` | 내가 쓴 공고 | 🔒 |
+| GET | `/api/members/me/applications?status=&page=&size=` | 내가 신청한 공고 (신청 상태 포함) | 🔒 |
+| GET | `/api/members/me/comments?page=&size=` | 내가 쓴 댓글 | 🔒 |
 | GET | `/api/members/me/favorites` | 즐겨찾는 유저 목록 | 🔒 |
-| POST / DELETE | `/api/members/me/favorites/{memberId}` | 즐겨찾기 추가 / 해제 | 🔒 |
+| POST / DELETE | `/api/members/me/favorites/{memberId}` | 즐겨찾기 추가 / 해제 → `204` | 🔒 |
+| GET | `/api/members/{memberId}` | 회원 프로필 (로그인하면 `viewer` 포함) | |
 | GET | `/api/rankings/manner` | 매너 랭킹 (메인 명예의 전당) | |
+
+구현: `backend/src/mypage/` (`/api/members` 에 마운트)
+
+**프로필 (`GET /api/members/me/summary`, `GET /api/members/{memberId}`)**
+
+```json
+{
+  "id": 1,
+  "nickname": "빛나는힐러",
+  "avatarUrl": null,
+  "bio": "멘탈 강하고 트라이 즐기는 힐러입니다.",
+  "ageRange": "20대",
+  "level": 48,
+  "mannerTemp": 98.4,
+  "reviewCount": 30,
+  "averageRating": 4.7,
+  "postCount": 24,
+  "completedPartyCount": 156,
+  "games": [{ "code": "lostark", "name": "로스트아크", "isMain": true, "playStyle": "casual", "playTimeSlot": "평일 21-24" }],
+  "topTags": [{ "rank": 1, "code": "kind", "label": "#친절함", "count": 28, "percent": 93 }],
+  "createdAt": "2026-10-01T00:00:00.000Z",
+  "ageRangePublic": false,
+  "viewer": { "isMe": false, "favorited": true }
+}
+```
+
+- `averageRating`: 최근 30건 평가의 평균 별점(소수 첫째 자리). 평가가 없으면 `null`.
+- `postCount`: 삭제되지 않은 작성 공고 수. `completedPartyCount`: `COMPLETED` 공고 중 파티장이었거나 `ACCEPTED` 로 참여한 수.
+- `topTags`: 받은 평가 태그 상위 3개. `percent` = 그 태그를 고른 평가 수 ÷ 받은 평가 수 × 100 (반올림).
+- `games`: 게이머 프로필(`member_game_profile`), 대표 게임이 먼저 옵니다.
+- `ageRange`: 비공개(`ageRangePublic: false`)면 본인 외에는 `null`.
+- `ageRangePublic` 은 `me/summary` 에만, `viewer` 는 `{memberId}` 에만 있습니다. `viewer` 는 비로그인이면 `null`.
+- 오류: `me/summary` — 401 `UNAUTHORIZED` (토큰 없음·만료, 탈퇴한 회원). `{memberId}` — 404 `MEMBER_NOT_FOUND` (없음, 탈퇴, `memberId` 가 1 이상의 정수가 아님), 401 (헤더가 있는데 토큰이 잘못됨).
+
+**목록 공통**
+
+- `page`(기본 1) · `size`(기본 10, 최대 50), 최신순. 응답은 `{ items, page, size, totalCount, totalPages }`, 값이 올바르지 않으면 400 `INVALID_INPUT`(필드별).
+- 삭제된 공고(와 그 공고의 신청·댓글)는 나오지 않습니다.
+
+**내가 쓴 공고 아이템 (`/me/posts`)**
+
+```json
+{
+  "id": 7, "category": "mmorpg", "game": "lostark", "gameName": "로스트아크", "type": "raid",
+  "title": "[카멘] 숙련 서폿 구해요", "current": 8, "max": 8,
+  "schedule": "2026-11-15T12:00:00.000Z", "scheduleTbd": false, "status": "COMPLETED",
+  "views": 129, "commentCount": 3, "createdAt": "2026-11-12T11:30:00.000Z"
+}
+```
+
+**내가 신청한 공고 아이템 (`/me/applications`)**
+
+- `status`: `PENDING` · `ACCEPTED` · `REJECTED` · `CANCELED` · `NO_SHOW` 중 하나로 거를 수 있습니다 (생략 시 전체). 지원 중인 공고는 `status=PENDING`, 참여한 파티는 `status=ACCEPTED`.
+- `post` 는 내가 쓴 공고 아이템에서 `views`·`commentCount`·`createdAt` 을 빼고 `host`(파티장 닉네임, 탈퇴 시 `"탈퇴한 회원"`)를 더한 형태입니다.
+
+```json
+{
+  "id": 3, "status": "PENDING", "role": "서포터", "appliedAt": "2026-11-12T00:00:00.000Z",
+  "post": { "id": 7, "category": "mmorpg", "game": "lostark", "gameName": "로스트아크", "type": "raid", "title": "...", "current": 7, "max": 8, "schedule": null, "scheduleTbd": true, "status": "OPEN", "host": "빛나는오더" }
+}
+```
+
+**내가 쓴 댓글 아이템 (`/me/comments`)**
+
+- 삭제된 댓글은 제외하고, 가려진 댓글(`HIDDEN`)은 본인에게 `status` 와 함께 보여줍니다. `reply` 는 대댓글 여부입니다.
+
+```json
+{
+  "id": 5, "postId": 7, "postTitle": "[에키드나] 바로 출발", "game": "lostark", "gameName": "로스트아크",
+  "content": "서폿 자리 남았으면 신청합니다!", "secret": false, "reply": false, "status": "VISIBLE",
+  "createdAt": "2026-11-11T00:00:00.000Z"
+}
+```
+
+**즐겨찾기 (`/me/favorites`)**
+
+- 목록은 배열이며 최근 추가순, 탈퇴한 회원은 빠집니다. `mainGame` 은 대표 게임(없으면 `null`), `playStyle` 은 대표 게임의 플레이 스타일입니다.
+- 추가·해제는 `204`. 이미 즐겨찾기한 유저를 추가하거나, 즐겨찾기하지 않은 유저를 해제해도 `204` 입니다.
+- 추가 오류: 400 `CANNOT_FAVORITE_SELF` (자기 자신), 404 `MEMBER_NOT_FOUND` (없음·탈퇴·잘못된 id).
+
+```json
+[
+  { "id": 2, "nickname": "철수", "avatarUrl": null, "level": 52, "mannerTemp": 36.5,
+    "mainGame": { "code": "lostark", "name": "로스트아크" }, "playStyle": "hard", "favoritedAt": "2026-11-01T00:00:00.000Z" }
+]
+```
 
 ## 9. 관리자 (Admin) 🛡️
 
