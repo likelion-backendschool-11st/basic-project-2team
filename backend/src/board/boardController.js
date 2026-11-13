@@ -7,6 +7,8 @@ const { parsePostId } = require('./boardValidator');
 
 /** HTTP 요청/응답 변환만 담당하고 로직은 boardService 에 맡깁니다. */
 const HEARTBEAT_MS = 25_000;
+/** 서버 전체 SSE 연결 상한(메모리·소켓 고갈 방지). 넘으면 503 이고 화면은 30초 폴링으로 대신합니다. */
+const MAX_EVENT_CONNECTIONS = 2000;
 
 function createBoardController(boardService, { postEvents, heartbeatMs = HEARTBEAT_MS } = {}) {
   async function getDetail(req, res) {
@@ -30,7 +32,9 @@ function createBoardController(boardService, { postEvents, heartbeatMs = HEARTBE
   async function events(req, res) {
     const postId = parsePostId(req.params.postId);
     if (postId === null) throw new ApiError(404, 'POST_NOT_FOUND', boardMessages.postNotFound);
+    if (postEvents.connectionCount() >= MAX_EVENT_CONNECTIONS) throw new ApiError(503, 'TOO_MANY_CONNECTIONS', boardMessages.tooManyConnections);
     await boardService.assertPostExists(postId);
+    if (req.destroyed || res.destroyed) return; // 확인하는 사이 클라이언트가 끊었으면 구독하지 않습니다(close 는 이미 지나감)
 
     res.set({
       'Content-Type': 'text/event-stream; charset=utf-8',
@@ -45,10 +49,12 @@ function createBoardController(boardService, { postEvents, heartbeatMs = HEARTBE
     // 프록시·로드밸런서가 유휴 연결을 끊지 않도록 주기적으로 주석 줄을 보냅니다.
     const heartbeat = setInterval(() => res.write(': ping\n\n'), heartbeatMs);
     heartbeat.unref();
-    req.on('close', () => {
+    const cleanup = () => {
       clearInterval(heartbeat);
       unsubscribe();
-    });
+    };
+    req.on('close', cleanup);
+    res.on('error', cleanup);
   }
 
   async function list(req, res) {
