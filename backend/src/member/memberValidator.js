@@ -119,4 +119,31 @@ function validateCheckQuery(query) {
   return { type, value };
 }
 
-module.exports = { validateSignup, validateCheckQuery };
+/**
+ * 로그인 요청 본문을 검증합니다. 형식이 틀린 아이디·비밀번호는 어차피 일치하지 않으므로
+ * 가입 규칙(패턴)은 검사하지 않고, 비어 있는지만 확인합니다.
+ * @returns {{ userId: string, password: string, rememberMe: boolean }}
+ */
+function validateLogin(body) {
+  const source = body && typeof body === 'object' ? body : {};
+  const userId = asTrimmedString(source.userId);
+  const password = typeof source.password === 'string' ? source.password : '';
+  const rememberMe = source.rememberMe ?? false;
+
+  const fields = [];
+  if (!userId) fields.push({ field: 'userId', message: memberMessages.userIdRequired });
+  if (!password) fields.push({ field: 'password', message: memberMessages.passwordRequired });
+  if (typeof rememberMe !== 'boolean') fields.push({ field: 'rememberMe', message: memberMessages.rememberMeInvalid });
+  if (fields.length > 0) throw invalidInput(fields);
+
+  return { userId, password, rememberMe };
+}
+
+/** 토큰 재발급 요청 본문 `{ refreshToken }` 을 검증합니다. */
+function validateRefresh(body) {
+  const refreshToken = body && typeof body === 'object' ? asTrimmedString(body.refreshToken) : '';
+  if (!refreshToken) throw invalidInput([{ field: 'refreshToken', message: memberMessages.refreshTokenRequired }]);
+  return { refreshToken };
+}
+
+module.exports = { validateSignup, validateCheckQuery, validateLogin, validateRefresh };

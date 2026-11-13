@@ -3,8 +3,43 @@
 const crypto = require('node:crypto');
 const bcrypt = require('bcryptjs');
 const { ApiError } = require('../common/ApiError');
-const { TERMS_VERSION, checkTypeColumns, duplicateErrors, memberMessages } = require('./memberConstants');
-const { validateSignup, validateCheckQuery } = require('./memberValidator');
+const {
+  TERMS_VERSION,
+  checkTypeColumns,
+  duplicateErrors,
+  MAX_LOGIN_FAILURES,
+  LOGIN_LOCK_MINUTES,
+  memberStatus,
+  memberMessages,
+} = require('./memberConstants');
+const { validateSignup, validateCheckQuery, validateLogin, validateRefresh } = require('./memberValidator');
+
+/** 존재하지 않는 아이디에도 bcrypt 비교를 한 번 해서, 응답 시간으로 아이디 존재 여부를 알 수 없게 합니다. */
+const DUMMY_PASSWORD = 'ourparty-dummy-password';
+
+const invalidCredentials = () => new ApiError(401, 'INVALID_CREDENTIALS', memberMessages.invalidCredentials);
+const accountLocked = () => new ApiError(403, 'ACCOUNT_LOCKED', memberMessages.accountLocked);
+const invalidRefreshToken = () => new ApiError(401, 'INVALID_REFRESH_TOKEN', memberMessages.invalidRefreshToken);
+
+/** 제재 중인 회원이면 403 (정지 기간이 지난 SUSPENDED 는 로그인 허용) */
+function assertNotSanctioned(member, current) {
+  if (member.status === memberStatus.banned) {
+    throw new ApiError(403, 'ACCOUNT_BANNED', memberMessages.accountBanned);
+  }
+  if (member.status === memberStatus.suspended && (!member.suspendedUntil || member.suspendedUntil > current)) {
+    throw new ApiError(403, 'ACCOUNT_SUSPENDED', memberMessages.accountSuspended);
+  }
+}
+
+/** 로그인 응답의 user (프론트 `LoggedInUser`, docs/API_SPEC.md 2절) */
+const toLoggedInUser = (member) => ({
+  id: member.id,
+  nickname: member.nickname,
+  level: member.level,
+  mannerTemp: member.mannerTemp,
+  avatarUrl: member.avatarUrl,
+  online: true,
+});
 
 /** member_withdrawal 의 phone_hash / email_hash 와 같은 방식(SHA-256 hex) */
 const sha256 = (value) => crypto.createHash('sha256').update(value).digest('hex');
@@ -24,10 +59,28 @@ function toDuplicateError(err) {
 }
 
 /**
- * 회원가입 · 중복 확인 비즈니스 로직.
- * @param {{ memberRepository: ReturnType<typeof import('./memberRepository').createMemberRepository>, bcryptRounds: number, now?: () => Date }} deps
+ * 회원가입 · 중복 확인 · 로그인 · 토큰 재발급 · 로그아웃 비즈니스 로직.
+ * @param {{
+ *   memberRepository: ReturnType<typeof import('./memberRepository').createMemberRepository>,
+ *   tokenProvider: ReturnType<typeof import('../common/tokenProvider').createTokenProvider>,
+ *   bcryptRounds: number,
+ *   now?: () => Date,
+ * }} deps
  */
-function createMemberService({ memberRepository, bcryptRounds, now = () => new Date() }) {
+function createMemberService({ memberRepository, tokenProvider, bcryptRounds, now = () => new Date() }) {
+  let dummyHash;
+  const getDummyHash = () => (dummyHash ??= bcrypt.hash(DUMMY_PASSWORD, bcryptRounds));
+
+  /** Refresh Token 을 저장하고 Access Token 과 함께 돌려줍니다. */
+  async function issueTokens(memberId, refreshToken) {
+    await memberRepository.saveRefreshToken({
+      memberId,
+      tokenHash: refreshToken.tokenHash,
+      expiresAt: refreshToken.expiresAt,
+    });
+    return { accessToken: tokenProvider.createAccessToken(memberId), refreshToken: refreshToken.token };
+  }
+
   /** GET /api/auth/check */
   async function checkAvailability(query) {
     const { type, value } = validateCheckQuery(query);
@@ -69,7 +122,81 @@ function createMemberService({ memberRepository, bcryptRounds, now = () => new D
     return { id: memberId, userId: input.userId, nickname: input.nickname };
   }
 
-  return { checkAvailability, signup };
+  /**
+   * POST /api/auth/login
+   * 순서: 아이디 조회 → 잠금 확인 → 비밀번호 비교(실패 시 횟수 기록) → 제재 확인 → 토큰 발급.
+   * 제재 여부는 비밀번호가 맞을 때만 알려줍니다.
+   */
+  async function login(body) {
+    const input = validateLogin(body);
+    const current = now();
+
+    const member = await memberRepository.findAuthMemberByLoginId(input.userId);
+    if (!member || !member.passwordHash) {
+      await bcrypt.compare(input.password, await getDummyHash());
+      throw invalidCredentials();
+    }
+
+    if (member.lockedUntil && member.lockedUntil > current) throw accountLocked();
+
+    if (!(await bcrypt.compare(input.password, member.passwordHash))) {
+      await memberRepository.recordLoginFailure({
+        memberId: member.id,
+        maxFailures: MAX_LOGIN_FAILURES,
+        lockedUntil: new Date(current.getTime() + LOGIN_LOCK_MINUTES * 60 * 1000),
+      });
+      throw member.loginFailCount + 1 >= MAX_LOGIN_FAILURES ? accountLocked() : invalidCredentials();
+    }
+
+    assertNotSanctioned(member, current);
+
+    await memberRepository.recordLoginSuccess({ memberId: member.id, now: current });
+    const refreshToken = tokenProvider.createRefreshToken({
+      memberId: member.id,
+      rememberMe: input.rememberMe,
+      now: current,
+    });
+    const tokens = await issueTokens(member.id, refreshToken);
+    return { ...tokens, user: toLoggedInUser(member) };
+  }
+
+  /**
+   * POST /api/auth/refresh
+   * JWT 서명·만료·종류를 검증한 뒤, DB 에서 폐기되지 않은 토큰인지 확인합니다.
+   * 사용한 Refresh Token 은 폐기하고 새로 발급합니다(rotation). 만료 시각은 처음 로그인 때 정한 값을 유지합니다.
+   */
+  async function refresh(body) {
+    const { refreshToken } = validateRefresh(body);
+    const current = now();
+
+    let memberId;
+    try {
+      ({ memberId } = tokenProvider.verifyRefreshToken(refreshToken, current));
+    } catch {
+      throw invalidRefreshToken();
+    }
+
+    const stored = await memberRepository.findRefreshToken(tokenProvider.hashToken(refreshToken));
+    if (!stored || stored.memberId !== memberId || stored.revokedAt || stored.expiresAt <= current) {
+      throw invalidRefreshToken();
+    }
+    // 같은 토큰으로 동시에 요청하면 먼저 폐기한 쪽만 성공
+    if (!(await memberRepository.revokeRefreshToken({ id: stored.id, now: current }))) throw invalidRefreshToken();
+
+    const member = await memberRepository.findAuthMemberById(stored.memberId);
+    if (!member || member.status === memberStatus.withdrawn) throw invalidRefreshToken();
+    assertNotSanctioned(member, current);
+
+    const next = tokenProvider.createRefreshToken({ memberId: member.id, now: current, expiresAt: stored.expiresAt });
+    return issueTokens(member.id, next);
+  }
+
+  /** POST /api/auth/logout — 회원의 Refresh Token 을 모두 폐기합니다 (docs/03-db-design.md 인덱스 표). */
+  async function logout(memberId) {
+    await memberRepository.revokeAllRefreshTokens({ memberId, now: now() });
+  }
+
+  return { checkAvailability, signup, login, refresh, logout };
 }
 
 module.exports = { createMemberService };

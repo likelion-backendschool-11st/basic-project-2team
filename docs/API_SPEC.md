@@ -104,6 +104,66 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 | 403 | `REJOIN_RESTRICTED` | 탈퇴 후 재가입 제한 기간이 남은 휴대폰/이메일 (`member_withdrawal`) |
 | 409 | `DUPLICATE_LOGIN_ID` · `DUPLICATE_NICKNAME` · `DUPLICATE_EMAIL` · `DUPLICATE_PHONE` | 이미 사용 중인 값 |
 
+### 로그인 · 토큰 재발급 · 로그아웃
+
+구현: `backend/src/member/memberService.js` (`login`, `refresh`, `logout`), 토큰: `backend/src/common/tokenProvider.js`, 인증 미들웨어: `backend/src/common/authMiddleware.js`
+
+**토큰 정책** (값은 `backend/.env` 로 변경 가능)
+
+| 항목 | 내용 |
+| --- | --- |
+| 공통 | 둘 다 JWT(HS256), 서명 키 `JWT_SECRET`. `sub` = 회원 id, `typ` = `access` / `refresh` 로 종류를 구분해 서로의 자리에 쓸 수 없음 |
+| Access Token | 유효 시간 30분 (`ACCESS_TOKEN_TTL_SECONDS`). DB 에 저장하지 않음 |
+| Refresh Token | `jti`(UUID) 포함. 폐기 처리를 위해 DB `refresh_token` 에 토큰의 SHA-256 해시를 저장하고, 재발급 시 JWT 검증과 DB 확인(폐기·만료)을 모두 통과해야 함. 유효 기간: `rememberMe=false` 1일 (`REFRESH_TOKEN_TTL_DAYS`), `true` 14일 (`REMEMBER_ME_TTL_DAYS`) |
+| 재발급 | 사용한 Refresh Token 은 폐기하고 새로 발급(rotation). 만료 시각은 처음 로그인 때 값을 유지 |
+| 로그아웃 | 해당 회원의 Refresh Token 을 모두 폐기 (`revoked_at` 기록) |
+| 로그인 실패 잠금 | 5회 연속 실패 시 10분 잠금 (`member.login_fail_count`, `locked_until`). 로그인 성공 시 초기화 (REQ-LOGIN-006) |
+
+**로그인 요청** `POST /api/auth/login`
+
+```json
+{ "userId": "healer01", "password": "********", "rememberMe": false }
+```
+
+- `userId`, `password` 는 필수(빈 값이면 `400 INVALID_INPUT`). 가입 규칙(패턴)은 검사하지 않음
+- `rememberMe` 는 생략 시 `false`, boolean 이 아니면 `400 INVALID_INPUT`
+
+**로그인 응답** `200 OK`
+
+```json
+{
+  "success": true,
+  "data": {
+    "accessToken": "eyJhbGciOiJIUzI1NiIs...",
+    "refreshToken": "eyJhbGciOiJIUzI1NiIs...",
+    "user": { "id": 1, "nickname": "빛나는힐러", "level": 48, "mannerTemp": 98.4, "avatarUrl": null, "online": true }
+  }
+}
+```
+
+**토큰 재발급** `POST /api/auth/refresh` — 요청 `{ "refreshToken": "eyJhbGciOiJIUzI1NiIs..." }`
+
+```json
+{ "success": true, "data": { "accessToken": "eyJ...", "refreshToken": "새 토큰" } }
+```
+
+**로그아웃** 🔒 `POST /api/auth/logout` — `Authorization: Bearer {accessToken}` 필요, 본문 없음 → `204 No Content`
+
+**로그인 · 토큰 에러 코드**
+
+| 상태 | code | 상황 |
+| --- | --- | --- |
+| 400 | `INVALID_INPUT` | `userId`·`password` 누락, `rememberMe` 가 boolean 아님, `refreshToken` 누락 |
+| 401 | `INVALID_CREDENTIALS` | 아이디가 없거나 비밀번호가 틀림 (둘을 구분하지 않음) |
+| 401 | `INVALID_REFRESH_TOKEN` | Refresh Token 이 위조·만료·폐기됐거나 Access Token 을 보냄 → 다시 로그인 |
+| 401 | `UNAUTHORIZED` | 🔒 API 에 Access Token 이 없거나 위조됨 (Refresh Token 을 보낸 경우 포함) |
+| 401 | `TOKEN_EXPIRED` | Access Token 만료 → `/api/auth/refresh` 로 재발급 후 재시도 |
+| 403 | `ACCOUNT_LOCKED` | 로그인 5회 연속 실패로 잠김(5번째 실패 응답부터). 잠금 중에는 비밀번호가 맞아도 거부 |
+| 403 | `ACCOUNT_SUSPENDED` | 이용 정지 기간 중 (`suspended_until` 이 지나면 로그인 허용) |
+| 403 | `ACCOUNT_BANNED` | 영구 정지 |
+
+> 정지·영구 정지 여부는 비밀번호가 맞을 때만 알려줍니다. 탈퇴 회원은 `login_id` 가 `NULL` 이라 `INVALID_CREDENTIALS` 로 응답합니다.
+
 **내 정보 응답 (`LoggedInUser`)**
 
 ```json
