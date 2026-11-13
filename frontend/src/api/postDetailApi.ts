@@ -131,8 +131,6 @@ export function toPostDetail(res: PostDetailResponse): PostDetail {
       { label: t.conditionSpec, value: res.requiredSpec ?? t.specNone },
       { label: t.conditionVoice, value: res.voiceRequired ? t.voiceOn : t.voiceOff },
     ],
-    // 확정 파티원 목록 API(GET /api/posts/{postId}/participants) 연동 전까지 파티장만 표시합니다.
-    participants: [{ name: res.host.nickname, role: t.leaderRole, leader: true, online: true }],
     status: res.status,
     commentCount: res.commentCount,
     scrapCount: res.scrapCount,

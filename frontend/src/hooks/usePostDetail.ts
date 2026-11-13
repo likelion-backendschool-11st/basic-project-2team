@@ -9,12 +9,13 @@ import {
   changePostStatus,
   decideApplication,
   deletePost,
+  getParticipants,
   getPendingApplications,
   getRelatedPosts,
   removeScrap,
 } from '../api/postApi';
 import { getPostDetail, toPostDetail } from '../api/postDetailApi';
-import { postDetailText, postText, type PostDetail, type PostStatus, type RelatedPost } from '../data/postData';
+import { postDetailText, postText, type Participant, type PostDetail, type PostStatus, type RelatedPost } from '../data/postData';
 import { paths, ROUTES } from '../data/routes';
 import { useModal } from './useModal';
 import { useToast } from './useToast';
@@ -42,6 +43,7 @@ export function usePostDetail(postId: string) {
   const [related, setRelated] = useState<readonly RelatedPost[]>([]);
   const [following, setFollowing] = useState(false);
   const [applicants, setApplicants] = useState<readonly Applicant[]>([]);
+  const [participants, setParticipants] = useState<readonly Participant[]>([]);
   const toast = useToast();
   const applicantsDialog = useModal(false);
   const remove = useModal(false);
@@ -115,6 +117,20 @@ export function usePostDetail(postId: string) {
       cancelled = true;
     };
   }, [postId, isOwner, version]);
+
+  // 확정 파티원 명단(파티장 + 승인된 파티원). 승인·취소로 바뀔 수 있어 상세를 다시 불러올 때마다 함께 갱신합니다.
+  useEffect(() => {
+    let cancelled = false;
+    getParticipants(postId)
+      .then((items) => {
+        if (cancelled) return;
+        setParticipants(items.map((p) => ({ name: p.nickname, role: p.isHost ? postDetailText.leaderRole : (p.role ?? postDetailText.slotRole), leader: p.isHost })));
+      })
+      .catch(() => !cancelled && setParticipants([]));
+    return () => {
+      cancelled = true;
+    };
+  }, [postId, version]);
 
   // 파티원 화면: 작성자를 이미 즐겨찾기했는지. 비로그인이면 401 이라 false 로 둡니다.
   useEffect(() => {
@@ -194,7 +210,7 @@ export function usePostDetail(postId: string) {
     applied: detail?.applicationStatus === 'PENDING' || detail?.applicationStatus === 'ACCEPTED',
     apply, scrapped, toggleScrap, copyLink,
     following, toggleFollow, state, togglePause: () => setStatus(state === 'open' ? 'PAUSED' : 'OPEN'),
-    applicants, resolveApplicant, applicantsDialog,
+    applicants, resolveApplicant, applicantsDialog, participants,
     filled, percent: detail ? Math.round((filled / detail.max) * 100) : 0, toast,
     remove, disband, leave, closeRecruit, confirmLeave, confirmRemove, confirmDisband, confirmClose,
   };
