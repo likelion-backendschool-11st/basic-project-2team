@@ -41,6 +41,8 @@ export const writeText = {
   syncNote: '등록 시 OurParty 게시판 및 실시간 매칭 채널에 자동 동기화됩니다.',
   submit: '게시하기',
   submitInvalid: '제목과 본문을 입력해 주세요.',
+  scheduleRequired: '플레이 일정을 입력하거나 일정 미정을 선택해 주세요.',
+  schedulePast: '플레이 일정은 현재 시각 이후로 선택해 주세요.',
   placeholders: { game: '게임을 선택해주세요', type: '모집 유형을 선택해주세요', detail: '상세 분류를 선택해주세요' },
   optionsLoadFailed: '게임 목록을 불러오지 못했습니다. 새로고침 후 다시 시도해주세요.',
   submitFailed: '공고 등록에 실패했습니다. 잠시 후 다시 시도해주세요.',
@@ -107,7 +109,7 @@ export const initialDraft = {
   headcount: 8,
   style: 'hard',
   tbd: true,
-  date: '2024-05-17',
-  time: '22:00',
+  date: '',
+  time: '',
   voice: true,
 };
