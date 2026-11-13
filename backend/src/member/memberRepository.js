@@ -95,6 +95,25 @@ function createMemberRepository(pool) {
   }
 
   /**
+   * 로그인을 막고 있는 제재(해제되지 않은 SUSPEND 또는 BAN) 중 가장 늦게 끝나는 것.
+   * 정지가 겹치면 member.suspended_until 은 더 늦게 끝나는 쪽을 따르므로(adminService.applySanction) 그 제재를 고릅니다.
+   * @param {{ memberId: number, type: 'SUSPEND' | 'BAN' }} params
+   * @returns {Promise<{ reason: string, startsAt: Date, endsAt: Date | null } | null>}
+   */
+  async function findActiveRestriction({ memberId, type }) {
+    const [rows] = await pool.query(
+      `SELECT reason, starts_at, ends_at
+         FROM sanction
+        WHERE member_id = ? AND type = ? AND released_at IS NULL
+        ORDER BY ends_at IS NULL DESC, ends_at DESC, id DESC
+        LIMIT 1`,
+      [memberId, type],
+    );
+    const row = rows[0];
+    return row ? { reason: row.reason, startsAt: row.starts_at, endsAt: row.ends_at } : null;
+  }
+
+  /**
    * 로그인 실패 횟수를 1 늘리고, maxFailures 에 닿으면 locked_until 을 걸고 횟수를 0 으로 되돌립니다.
    * 동시 요청에도 횟수가 빠지지 않도록 현재 값을 기준으로 한 번에 갱신합니다.
    * (MySQL 은 SET 을 왼쪽부터 적용하므로 locked_until 을 먼저 계산합니다.)
@@ -233,6 +252,7 @@ function createMemberRepository(pool) {
     createMember,
     findAuthMemberByLoginId,
     findAuthMemberById,
+    findActiveRestriction,
     recordLoginFailure,
     recordLoginSuccess,
     saveRefreshToken,

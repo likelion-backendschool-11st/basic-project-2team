@@ -1,3 +1,4 @@
+import type { LoginSanction } from '../api/authApi';
 import { ROUTES } from './routes';
 
 export interface AuthLinkItem {
@@ -81,6 +82,65 @@ export const loginText = {
     onlineSuffix: '동시 접속 중',
   },
   successRedirect: ROUTES.homeLoggedIn,
+} as const;
+
+/* ------------------------------------------------------------------ */
+/* 로그인 — 정지 회원 안내 모달                                         */
+/* ------------------------------------------------------------------ */
+
+/** 안내 문장 조각. highlight 인 조각은 강조해서 그립니다. */
+export interface NoticeSegment {
+  readonly text: string;
+  readonly highlight?: boolean;
+}
+
+export interface SanctionNoticeRow {
+  readonly label: string;
+  readonly value: string;
+}
+
+const pad = (n: number) => String(n).padStart(2, '0');
+/** ISO 시각 → 브라우저 시간대 기준 "2026-11-16" */
+const formatDate = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+/** ISO 시각 → 브라우저 시간대 기준 "2026-11-16 14:30" */
+const formatDateTime = (d: Date) => `${formatDate(d)} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+
+/** "3일 정지" · "영구 정지". 정지 일수를 모르면 "이용 정지" */
+const sanctionPeriodLabel = (sanction: LoginSanction) => {
+  if (sanction.type === 'BAN') return '영구 정지';
+  return sanction.days ? `${sanction.days}일 정지` : '이용 정지';
+};
+
+export const sanctionNoticeText = {
+  ariaLabel: '이용 제한 안내',
+  title: { SUSPEND: '이용이 정지된 계정입니다', BAN: '영구 정지된 계정입니다' } satisfies Record<LoginSanction['type'], string>,
+  icon: { SUSPEND: 'fa-user-clock', BAN: 'fa-user-slash' } satisfies Record<LoginSanction['type'], string>,
+  /** 사유가 기록되지 않은 제재일 때 */
+  fallbackReason: '운영 정책 위반',
+  rowLabels: { period: '처분 내용', endsAt: '해제 예정' },
+  contact: '처분에 이의가 있으시면 고객센터로 문의해주세요.',
+  confirm: '확인',
+  /** "(닉네임)님은 (사유)의 이유로 3일 정지 처분을 받아 2026-11-16까지 이용이 불가합니다." */
+  message(sanction: LoginSanction): readonly NoticeSegment[] {
+    const endsAt = sanction.endsAt ? new Date(sanction.endsAt) : null;
+    return [
+      { text: sanction.nickname, highlight: true },
+      { text: '님은 ' },
+      { text: sanction.reason ?? this.fallbackReason, highlight: true },
+      { text: '의 이유로 ' },
+      { text: sanctionPeriodLabel(sanction), highlight: true },
+      { text: ' 처분을 받아 ' },
+      ...(endsAt ? [{ text: formatDate(endsAt), highlight: true }, { text: '까지 ' }] : []),
+      { text: sanction.type === 'BAN' ? '서비스 이용이 불가합니다.' : '이용이 불가합니다.' },
+    ];
+  },
+  /** 모달 하단 요약 표 */
+  rows(sanction: LoginSanction): readonly SanctionNoticeRow[] {
+    return [
+      { label: this.rowLabels.period, value: sanctionPeriodLabel(sanction) },
+      ...(sanction.endsAt ? [{ label: this.rowLabels.endsAt, value: formatDateTime(new Date(sanction.endsAt)) }] : []),
+    ];
+  },
 } as const;
 
 /* ------------------------------------------------------------------ */
