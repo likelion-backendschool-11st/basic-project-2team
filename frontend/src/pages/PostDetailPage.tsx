@@ -69,7 +69,7 @@ const PostDetailView: React.FC<{ readonly postId: string }> = ({ postId }) => {
         </div>
         <aside className="flex flex-col gap-5 xl:sticky xl:top-24">
           {detail.isOwner ? (
-            <OwnerPanel detail={detail} state={post.state} onClose={post.closeRecruit.open} onTogglePause={() => post.setState(post.state === 'paused' ? 'open' : 'paused')} onDisband={post.disband.open} />
+            <OwnerPanel detail={detail} state={post.state} onClose={post.closeRecruit.open} onTogglePause={post.togglePause} onDisband={post.disband.open} />
           ) : (
             <>
               <PartyStatusCard detail={detail} filled={post.filled} percent={post.percent} applied={post.applied} state={post.state} scrapped={post.scrapped} onApply={post.apply} onLeave={post.leave.open} onScrap={post.toggleScrap} onCopy={post.copyLink} />

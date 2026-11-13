@@ -5,7 +5,7 @@ import type { Applicant } from '../../hooks/usePostDetail';
 interface ApplicantsDialogProps {
   readonly isOpen: boolean;
   readonly applicants: readonly Applicant[];
-  readonly onResolve: (name: string, accepted: boolean) => void;
+  readonly onResolve: (applicant: Applicant, accepted: boolean) => void;
   readonly onClose: () => void;
 }
 
@@ -17,11 +17,11 @@ export const ApplicantsDialog: React.FC<ApplicantsDialogProps> = ({ isOpen, appl
     ) : (
       <ul className="space-y-2">
         {applicants.map((a) => (
-          <li key={a.name} className="flex items-center justify-between gap-3 rounded-xl bg-night-base/60 p-3">
+          <li key={a.id} className="flex items-center justify-between gap-3 rounded-xl bg-night-base/60 p-3">
             <div><div className="text-sm font-semibold text-white">{a.name}</div><div className="text-xs text-fog-muted">{a.spec}</div></div>
             <div className="flex gap-2 text-xs">
-              <button type="button" onClick={() => onResolve(a.name, false)} className="px-3 py-1.5 rounded-lg border border-night-borderLight text-fog-sub hover:text-white">거절</button>
-              <button type="button" onClick={() => onResolve(a.name, true)} className="px-3 py-1.5 rounded-lg bg-mercury text-white font-semibold">승인</button>
+              <button type="button" onClick={() => onResolve(a, false)} className="px-3 py-1.5 rounded-lg border border-night-borderLight text-fog-sub hover:text-white">거절</button>
+              <button type="button" onClick={() => onResolve(a, true)} className="px-3 py-1.5 rounded-lg bg-mercury text-white font-semibold">승인</button>
             </div>
           </li>
         ))}

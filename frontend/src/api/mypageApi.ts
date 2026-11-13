@@ -122,7 +122,10 @@ const pageQuery = (page: number, size: number) => `page=${page}&size=${size}`;
 export const getMySummary = () => request<MySummaryResponse>('GET', '/api/members/me/summary');
 
 /** GET /api/members/{memberId} — 다른 회원의 공개 프로필 (내 요약과 같은 필드, 비공개 항목 제외) */
-export type MemberProfileResponse = Omit<MySummaryResponse, 'ageRangePublic'>;
+/** GET /api/members/{memberId}. viewer 는 로그인했을 때만 옵니다(favorited: 내가 즐겨찾기한 회원인지). */
+export type MemberProfileResponse = Omit<MySummaryResponse, 'ageRangePublic'> & {
+  readonly viewer?: { readonly isMe: boolean; readonly favorited: boolean } | null;
+};
 
 export const getMemberProfile = (memberId: number) => request<MemberProfileResponse>('GET', `/api/members/${memberId}`);
 
@@ -135,6 +138,8 @@ export const getMyComments = (page: number, size: number) =>
   request<Page<MyCommentItem>>('GET', `/api/members/me/comments?${pageQuery(page, size)}`);
 
 export const getMyFavorites = () => request<readonly FavoriteItem[]>('GET', '/api/members/me/favorites');
+
+export const addFavorite = (memberId: number) => request<void>('POST', `/api/members/me/favorites/${memberId}`);
 
 export const removeFavorite = (memberId: number) => request<void>('DELETE', `/api/members/me/favorites/${memberId}`);
 

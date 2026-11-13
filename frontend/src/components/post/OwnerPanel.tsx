@@ -42,7 +42,7 @@ export const OwnerPanel: React.FC<OwnerPanelProps> = ({ detail, state, onClose, 
       </dl>
       <div className="mt-4 flex flex-col gap-2">
         <button type="button" onClick={onClose} disabled={state === 'closed'} className="h-12 rounded-xl bg-gradient-to-r from-mercury to-indigo-500 text-white text-sm font-bold disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center gap-2"><i className="fa-regular fa-circle-check" />{postText.closeRecruit}</button>
-        <button type="button" onClick={onTogglePause} disabled={state === 'closed'} className="h-11 rounded-xl border border-night-borderLight bg-night-base text-xs font-semibold text-amber-300 disabled:opacity-40 disabled:pointer-events-none">{state === 'paused' ? postText.resumeRecruit : postText.pauseRecruit}</button>
+        <button type="button" onClick={onTogglePause} className="h-11 rounded-xl border border-night-borderLight bg-night-base text-xs font-semibold text-amber-300">{state === 'closed' ? postText.resumeRecruit : postText.pauseRecruit}</button>
         <button type="button" onClick={onDisband} className="h-11 rounded-xl border border-roseAccent/30 text-xs font-semibold text-rose-300 hover:bg-roseAccent/10">파티 해산</button>
         <p className="text-[11px] text-fog-muted text-center">{postText.closedNote}</p>
       </div>

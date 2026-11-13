@@ -1,5 +1,3 @@
-import { boardPosts } from './boardData';
-import { paths } from './routes';
 
 /** Stitch screens: "공고글 상세 - 파티원 모드 / 작성자 모드" (project 15649597777945524469), comments (project 270338861769685965) */
 
@@ -49,13 +47,6 @@ export interface RelatedPost {
   readonly to: string;
 }
 
-export function getRelatedPosts(postId: string): readonly RelatedPost[] {
-  return boardPosts
-    .filter((p) => p.id !== postId && p.category === 'mmorpg')
-    .slice(0, 3)
-    .map((p) => ({ id: p.id, game: p.game, title: p.title, meta: `${p.current}/${p.max}명`, state: p.membersTone === 'urgent' ? '마감임박' : '모집중', to: paths.postDetail(p.id) }));
-}
-
 /** 공고 상세 API 응답을 화면 문구로 바꿀 때 쓰는 문구 (api/postDetailApi.ts toPostDetail) */
 export const postDetailText = {
   loading: '공고를 불러오는 중입니다...',
@@ -95,6 +86,15 @@ export const postText = {
   scrapped: '스크랩됨',
   copyLink: '링크 복사',
   linkCopied: '링크가 복사되었습니다.',
+  actionFailed: '요청을 처리하지 못했습니다. 잠시 후 다시 시도해주세요.',
+  deleted: '공고를 삭제했습니다.',
+  followAdded: '작성자를 즐겨찾기에 추가했습니다.',
+  followRemoved: '즐겨찾기를 해제했습니다.',
+  loginRequired: '로그인 후 이용할 수 있습니다.',
+  applySuccess: '참가 신청이 완료되었습니다.',
+  applyCanceled: '참가 신청을 취소했습니다.',
+  closedDone: '모집을 마감했습니다.',
+  reopened: '모집을 다시 시작했습니다.',
   scrapAdded: '스크랩에 추가했습니다.',
   scrapRemoved: '스크랩을 해제했습니다.',
   recruiting: (c: number, m: number) => `모집중 ${c}/${m}`,
