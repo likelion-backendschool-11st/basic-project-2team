@@ -103,6 +103,12 @@ export interface MyCommentItem {
   readonly createdAt: string;
 }
 
+/** GET /api/members/me/scraps 아이템 */
+export interface MyScrapItem extends PostSummary {
+  readonly host: string;
+  readonly scrappedAt: string;
+}
+
 /** GET /api/members/me/favorites 아이템 */
 export interface FavoriteItem {
   readonly id: number;
@@ -137,7 +143,10 @@ export const getMyApplications = (status: ApplicationStatus | null, page: number
 export const getMyComments = (page: number, size: number) =>
   request<Page<MyCommentItem>>('GET', `/api/members/me/comments?${pageQuery(page, size)}`);
 
-export const getMyFavorites = () => request<readonly FavoriteItem[]>('GET', '/api/members/me/favorites');
+export const getMyScraps = (page: number, size: number) =>
+  request<Page<MyScrapItem>>('GET', `/api/members/me/scraps?${pageQuery(page, size)}`);
+
+export const getMyFavorites =() => request<readonly FavoriteItem[]>('GET', '/api/members/me/favorites');
 
 export const addFavorite = (memberId: number) => request<void>('POST', `/api/members/me/favorites/${memberId}`);
 
@@ -221,6 +230,15 @@ export const toPartyPost = (item: MyApplicationItem, no: number): ActivityPost =
   title: `${item.post.title} · ${activityText.hostPrefix}${item.post.host}`,
   date: toShortDate(item.appliedAt),
   action: actionOf(item.post.status, false, item.review),
+});
+
+export const toScrapPost = (item: MyScrapItem, no: number): ActivityPost => ({
+  ...postRowBase(item, no),
+  id: `scrap-${item.id}`,
+  title: `${item.title} · ${activityText.hostPrefix}${item.host}`,
+  date: toShortDate(item.scrappedAt),
+  action: actionOf(item.status, false, null),
+  scrapped: true,
 });
 
 export function toActivityComment(item: MyCommentItem, no: number): ActivityComment {

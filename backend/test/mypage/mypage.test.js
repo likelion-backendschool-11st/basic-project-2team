@@ -54,6 +54,7 @@ function createFakeRepository() {
     posts: [],
     applications: [],
     comments: [],
+    scraps: [],
     favorites: new Set(),
     calls: [],
   };
@@ -86,6 +87,10 @@ function createFakeRepository() {
     },
     async findMyCommentPage(filter) {
       return slice(state.comments, filter);
+    },
+    async findMyScrapPage(filter) {
+      state.calls.push({ name: 'findMyScrapPage', ...filter });
+      return slice(state.scraps, filter);
     },
     async findFavorites(memberId) {
       return [...state.favorites]
@@ -139,6 +144,7 @@ describe('마이페이지 API (/api/members)', () => {
     state.posts = [];
     state.applications = [];
     state.comments = [];
+    state.scraps = [];
     state.favorites.clear();
     state.calls = [];
 
@@ -456,6 +462,62 @@ describe('마이페이지 API (/api/members)', () => {
     it('댓글이 없으면 빈 목록과 totalPages 0', async () => {
       const { data } = await (await get('/me/comments', as(ME))).json();
       assert.deepEqual(data, { items: [], page: 1, size: 10, totalCount: 0, totalPages: 0 });
+    });
+  });
+
+  describe('GET /me/scraps', () => {
+    beforeEach(() => {
+      repo.state.scraps = Array.from({ length: 3 }, (_, index) => ({
+        ...postColumns({ postId: 30 - index, postStatus: 'OPEN', currentCount: 3 }),
+        scrappedAt: new Date('2026-11-14T00:00:00Z'),
+        hostNickname: '빛나는오더',
+        hostStatus: 'ACTIVE',
+      }));
+    });
+
+    it('스크랩한 공고를 파티장·스크랩 일시와 함께 돌려준다', async () => {
+      const res = await get('/me/scraps?page=1&size=2', as(ME));
+      assert.equal(res.status, 200);
+      const { data } = await res.json();
+      assert.deepEqual(
+        { page: data.page, size: data.size, totalCount: data.totalCount, totalPages: data.totalPages },
+        { page: 1, size: 2, totalCount: 3, totalPages: 2 },
+      );
+      assert.deepEqual(data.items[0], {
+        id: 30,
+        category: 'mmorpg',
+        game: 'lostark',
+        gameName: '로스트아크',
+        type: 'raid',
+        title: '[카멘] 숙련 서폿 구해요',
+        current: 3,
+        max: 8,
+        schedule: '2026-11-15T12:00:00.000Z',
+        scheduleTbd: false,
+        status: 'OPEN',
+        host: '빛나는오더',
+        scrappedAt: '2026-11-14T00:00:00.000Z',
+      });
+      assert.deepEqual(repo.state.calls.at(-1), { name: 'findMyScrapPage', memberId: ME, limit: 2, offset: 0 });
+    });
+
+    it('파티장이 탈퇴했으면 host 는 「탈퇴한 회원」이다', async () => {
+      repo.state.scraps[0].hostStatus = 'WITHDRAWN';
+      const { data } = await (await get('/me/scraps', as(ME))).json();
+      assert.equal(data.items[0].host, '탈퇴한 회원');
+    });
+
+    it('page·size 가 잘못되면 400 INVALID_INPUT', async () => {
+      const res = await get('/me/scraps?page=0&size=99', as(ME));
+      assert.equal(res.status, 400);
+      const { error } = await res.json();
+      assert.equal(error.code, 'INVALID_INPUT');
+      assert.deepEqual(error.fields.map((f) => f.field), ['page', 'size']);
+    });
+
+    it('토큰이 없으면 401', async () => {
+      const res = await get('/me/scraps');
+      assert.equal(res.status, 401);
     });
   });
 

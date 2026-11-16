@@ -4,9 +4,11 @@ import {
   getMyApplications,
   getMyComments,
   getMyPosts,
+  getMyScraps,
   toActivityComment,
   toActivityPost,
   toPartyPost,
+  toScrapPost,
 } from '../api/mypageApi';
 import { activityText, type ActivityComment, type ActivityPost, type ActivityTab } from '../data/myPageData';
 
@@ -32,12 +34,16 @@ async function fetchActivity(tab: ActivityTab, page: number): Promise<ActivityRe
     const res = await getMyApplications('ACCEPTED', page, PAGE_SIZE);
     return { tab, posts: res.items.map((a, i) => toPartyPost(a, offset + i + 1)), comments: [], totalCount: res.totalCount, totalPages: res.totalPages };
   }
+  if (tab === 'scraps') {
+    const res = await getMyScraps(page, PAGE_SIZE);
+    return { tab, posts: res.items.map((s, i) => toScrapPost(s, offset + i + 1)), comments: [], totalCount: res.totalCount, totalPages: res.totalPages };
+  }
   const res = await getMyPosts(page, PAGE_SIZE);
   return { tab, posts: res.items.map((p, i) => toActivityPost(p, offset + i + 1)), comments: [], totalCount: res.totalCount, totalPages: res.totalPages };
 }
 
 /**
- * 마이페이지 활동 목록 (내 공고 · 참여한 파티 · 댓글). 서버 페이지네이션을 씁니다.
+ * 마이페이지 활동 목록 (내 공고 · 참여한 파티 · 댓글 · 스크랩). 서버 페이지네이션을 씁니다.
  * `reload()` 는 지금 탭·페이지를 다시 불러옵니다 (활동 완료·별점 평가 뒤 진행 상황 갱신).
  */
 export function useMyActivity() {

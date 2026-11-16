@@ -59,15 +59,15 @@ const toMyPost = (now) => (row) => ({
   review: toReviewProgress(row, row.postStatus === POST_STATUS_COMPLETED),
 });
 
+/** 파티장 닉네임 (탈퇴했으면 「탈퇴한 회원」) */
+const hostName = (row) => (row.hostStatus === WITHDRAWN ? mypageMessages.withdrawnMember : row.hostNickname);
+
 const toMyApplication = (row) => ({
   id: row.id,
   status: row.status,
   role: row.role ?? null,
   appliedAt: toIso(row.appliedAt),
-  post: {
-    ...toPostSummary(row),
-    host: row.hostStatus === WITHDRAWN ? mypageMessages.withdrawnMember : row.hostNickname,
-  },
+  post: { ...toPostSummary(row), host: hostName(row) },
   review: toReviewProgress(row, row.status === APPLICATION_ACCEPTED && row.postStatus === POST_STATUS_COMPLETED),
 });
 
@@ -82,6 +82,12 @@ const toMyComment = (row) => ({
   reply: row.parentId !== null && row.parentId !== undefined,
   status: row.status,
   createdAt: toIso(row.createdAt),
+});
+
+const toMyScrap = (row) => ({
+  ...toPostSummary(row),
+  host: hostName(row),
+  scrappedAt: toIso(row.scrappedAt),
 });
 
 const toFavorite = (row) => ({
@@ -205,6 +211,17 @@ function createMypageService({ mypageRepository, now = () => new Date() }) {
     return toPage(result, paging, toMyComment);
   }
 
+  /** GET /api/members/me/scraps — 내가 스크랩한 공고 */
+  async function listMyScraps(memberId, query) {
+    const paging = parsePageQuery(query);
+    const result = await mypageRepository.findMyScrapPage({
+      memberId,
+      limit: paging.size,
+      offset: (paging.page - 1) * paging.size,
+    });
+    return toPage(result, paging, toMyScrap);
+  }
+
   /** GET /api/members/me/favorites — 즐겨찾는 유저 목록 */
   async function listFavorites(memberId) {
     const rows = await mypageRepository.findFavorites(memberId);
@@ -232,6 +249,7 @@ function createMypageService({ mypageRepository, now = () => new Date() }) {
     listMyPosts,
     listMyApplications,
     listMyComments,
+    listMyScraps,
     listFavorites,
     addFavorite,
     removeFavorite,
