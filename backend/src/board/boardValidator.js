@@ -5,6 +5,11 @@ const {
   POST_ID_PATTERN,
   POST_SORTS,
   TIME_SLOTS,
+  LIST_PARTY_TYPES,
+  LIST_PLAY_STYLES,
+  HEADCOUNT_RANGES,
+  SCHEDULE_DAYS,
+  CONTENT_CODE_PATTERN,
   DEFAULT_SORT,
   DEFAULT_PAGE_SIZE,
   MAX_PAGE_SIZE,
@@ -71,7 +76,7 @@ function parseRelatedQuery(query) {
 }
 
 /**
- * 공고 목록 쿼리(category, game, time, q, sort, tags, page, size, excludeClosed)를 검증·정규화합니다.
+ * 공고 목록 쿼리(category, game, time, type, detail, style, headcount, date, voice, q, sort, tags, page, size, excludeClosed)를 검증·정규화합니다.
  * @returns {{ category: string | null, q: string, sort: string, tags: string[], page: number, size: number, excludeClosed: boolean }}
  */
 function parseListQuery(query) {
@@ -86,6 +91,20 @@ function parseListQuery(query) {
 
   const time = query.time === undefined ? null : asString(query.time);
   if (time !== null && !Object.hasOwn(TIME_SLOTS, time)) fail('time', m.timeInvalid);
+
+  const optional = (key, allowed, message) => {
+    const value = query[key] === undefined ? null : asString(query[key]);
+    if (value !== null && !(Array.isArray(allowed) ? allowed.includes(value) : Object.hasOwn(allowed, value))) fail(key, message);
+    return value;
+  };
+  const type = optional('type', LIST_PARTY_TYPES, m.typeInvalid);
+  const detail = query.detail === undefined ? null : asString(query.detail);
+  if (detail !== null && !CONTENT_CODE_PATTERN.test(detail)) fail('detail', m.detailInvalid);
+  const style = optional('style', LIST_PLAY_STYLES, m.styleInvalid);
+  const headcount = optional('headcount', HEADCOUNT_RANGES, m.headcountInvalid);
+  const date = optional('date', SCHEDULE_DAYS, m.dateInvalid);
+  const voiceRaw = query.voice === undefined ? 'false' : asString(query.voice);
+  if (voiceRaw !== 'true' && voiceRaw !== 'false') fail('voice', m.voiceInvalid);
 
   const q = query.q === undefined ? '' : asString(query.q);
   if (Array.from(q).length > MAX_SEARCH_LENGTH) fail('q', m.searchInvalid);
@@ -106,7 +125,7 @@ function parseListQuery(query) {
   if (excludeClosedRaw !== 'true' && excludeClosedRaw !== 'false') fail('excludeClosed', m.excludeClosedInvalid);
 
   if (fields.length > 0) throw new ApiError(400, 'INVALID_INPUT', m.invalidInput, fields);
-  return { category, game, time, q, sort, tags, page, size, excludeClosed: excludeClosedRaw === 'true' };
+  return { category, game, time, type, detail, style, headcount, date, voice: voiceRaw === 'true', q, sort, tags, page, size, excludeClosed: excludeClosedRaw === 'true' };
 }
 
 module.exports = { parsePostId, parseListQuery, parseFeaturedQuery, parseRelatedQuery };

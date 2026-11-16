@@ -23,6 +23,13 @@ const MAX_SEARCH_LENGTH = 50;
 /** 출발 시간대(한국 시간 기준 시각 [시작, 끝)) */
 const TIME_SLOTS = Object.freeze({ dawn: [0, 6], morning: [6, 12], afternoon: [12, 18], evening: [18, 24] });
 const KST_OFFSET_HOURS = 9;
+/** 상세 필터: 모집 유형·플레이 스타일(post 작성 값과 같음), 모집 인원 구간 [최소, 최대], 출발 일자(한국 시간 기준) */
+const LIST_PARTY_TYPES = Object.freeze(['raid', 'dungeon', 'rank', 'normal']);
+const LIST_PLAY_STYLES = Object.freeze(['hard', 'casual', 'newbie', 'any']);
+const HEADCOUNT_RANGES = Object.freeze({ duo: [2, 2], small: [3, 4], mid: [5, 8], large: [9, 16] });
+/** 상세 분류(game_content.code) 형식 */
+const CONTENT_CODE_PATTERN = /^[a-z0-9_-]{1,30}$/;
+const SCHEDULE_DAYS = Object.freeze(['today', 'tomorrow', 'week', 'tbd']);
 const CATEGORY_PATTERN = /^[a-z0-9_-]{1,20}$/;
 
 /** GET /api/posts/popular · urgent (메인 화면, docs/API_SPEC.md 3절). 메인 카드 수(frontend homeData)에 맞춘 기본값 */
@@ -37,6 +44,12 @@ const boardMessages = Object.freeze({
   limitInvalid: `limit 는 1~${MAX_FEATURED_LIMIT} 사이의 정수여야 합니다.`,
   categoryInvalid: 'category 형식이 올바르지 않습니다.',
   gameInvalid: 'game 은 게임 코드(영문 소문자·숫자·_-, 20자 이하)여야 합니다.',
+  typeInvalid: `type 은 ${LIST_PARTY_TYPES.join(', ')} 중 하나여야 합니다.`,
+  styleInvalid: `style 은 ${LIST_PLAY_STYLES.join(', ')} 중 하나여야 합니다.`,
+  detailInvalid: 'detail 은 상세 분류 코드(영문 소문자·숫자·_-, 30자 이하)여야 합니다.',
+  headcountInvalid: `headcount 는 ${Object.keys(HEADCOUNT_RANGES).join(', ')} 중 하나여야 합니다.`,
+  dateInvalid: `date 는 ${SCHEDULE_DAYS.join(', ')} 중 하나여야 합니다.`,
+  voiceInvalid: 'voice 는 true 또는 false 여야 합니다.',
   timeInvalid: `time 은 ${Object.keys(TIME_SLOTS).join(', ')} 중 하나여야 합니다.`,
   sortInvalid: `sort 는 ${POST_SORTS.join(', ')} 중 하나여야 합니다.`,
   searchInvalid: `q 는 ${MAX_SEARCH_LENGTH}자 이하여야 합니다.`,
@@ -59,6 +72,11 @@ module.exports = {
   POST_SORTS,
   TIME_SLOTS,
   KST_OFFSET_HOURS,
+  LIST_PARTY_TYPES,
+  LIST_PLAY_STYLES,
+  HEADCOUNT_RANGES,
+  SCHEDULE_DAYS,
+  CONTENT_CODE_PATTERN,
   DEFAULT_SORT,
   DEFAULT_PAGE_SIZE,
   MAX_PAGE_SIZE,

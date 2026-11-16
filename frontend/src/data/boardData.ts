@@ -78,6 +78,34 @@ export const timeSlotOptions: readonly { readonly value: string; readonly label:
   { value: 'evening', label: '저녁 (18~24시)' },
 ];
 
+type Choice = readonly { readonly value: string; readonly label: string }[];
+
+/** 상세 필터 선택지 (value 는 GET /api/posts 의 type · style · headcount · date) */
+export const partyTypeOptions: Choice = [
+  { value: 'raid', label: '레이드' },
+  { value: 'dungeon', label: '던전' },
+  { value: 'rank', label: '랭크/경쟁' },
+  { value: 'normal', label: '일반' },
+];
+export const playStyleOptions: Choice = [
+  { value: 'hard', label: '⚡ 빡겜' },
+  { value: 'casual', label: '🍵 즐겜' },
+  { value: 'newbie', label: '🌱 초보 배려' },
+  { value: 'any', label: '🎲 상관없음' },
+];
+export const headcountOptions: Choice = [
+  { value: 'duo', label: '2인' },
+  { value: 'small', label: '3~4인' },
+  { value: 'mid', label: '5~8인' },
+  { value: 'large', label: '9인 이상' },
+];
+export const scheduleDayOptions: Choice = [
+  { value: 'today', label: '오늘' },
+  { value: 'tomorrow', label: '내일' },
+  { value: 'week', label: '7일 이내' },
+  { value: 'tbd', label: '일정 미정' },
+];
+
 export const boardTagFilters: readonly FilterChip[] = [
   { label: '#트라이', value: '트라이' },
   { label: '#레이드', value: '레이드' },
@@ -96,6 +124,17 @@ export const boardText = {
   gameFilterLabel: '게임명: ',
   timeFilterLabel: '시간: ',
   timeFilterAll: '전체 시간대',
+  typeFilterLabel: '유형: ',
+  typeFilterAll: '전체 유형',
+  detailFilterLabel: '상세분류: ',
+  detailFilterAll: '전체 상세분류',
+  styleFilterLabel: '스타일: ',
+  styleFilterAll: '전체 스타일',
+  headcountFilterLabel: '인원: ',
+  headcountFilterAll: '전체 인원',
+  dateFilterLabel: '일정: ',
+  dateFilterAll: '전체 일정',
+  voiceOnly: '음성 필수만',
   excludeClosed: '모집 마감 제외',
   categoryTitle: '카테고리',
   categoryAll: '전체보기',

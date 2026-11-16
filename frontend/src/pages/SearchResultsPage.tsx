@@ -62,6 +62,8 @@ export const SearchResultsPage: React.FC<SearchResultsPageProps> = () => {
             timeAllLabel={timeLabel ?? boardText.timeFilterAll}
             onTimeChange={filter.onTimeChange}
             timeActive={timeLabel !== null}
+            detail={filter.detail}
+            onDetailChange={filter.onDetailChange}
             tagFilters={searchTagFilters}
             activeTags={filter.tags}
             onToggleTag={filter.toggleTag}
