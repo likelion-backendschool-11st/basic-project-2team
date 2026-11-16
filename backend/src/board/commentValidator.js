@@ -127,7 +127,7 @@ function validateCreateReport(body) {
   const fail = (field, message) => fields.push({ field, message });
 
   const targetType = asString(source.targetType);
-  if (targetType !== REPORT_TARGET_TYPES.comment) fail('targetType', m.targetTypeInvalid);
+  if (!Object.values(REPORT_TARGET_TYPES).includes(targetType)) fail('targetType', m.targetTypeInvalid);
 
   const targetId = parseId(source.targetId);
   if (targetId === null) fail('targetId', m.targetIdInvalid);

@@ -50,7 +50,7 @@ const baseRow = () => ({
 
 /** DB 대신 메모리에 저장하는 가짜 repository */
 function createFakeRepository() {
-  const state = { posts: new Map(), tags: new Map(), scraps: new Set(), applications: new Map() };
+  const state = { posts: new Map(), tags: new Map(), scraps: new Set(), applications: new Map(), reports: new Set() };
   const isAlive = (row) => row && row.status !== 'DELETED';
   return {
     state,
@@ -71,6 +71,7 @@ function createFakeRepository() {
       return {
         scrapped: state.scraps.has(`${postId}:${memberId}`),
         applicationStatus: state.applications.get(`${postId}:${memberId}`) ?? null,
+        reported: state.reports.has(`${postId}:${memberId}`),
       };
     },
   };
@@ -95,6 +96,7 @@ describe('GET /api/posts/:postId', () => {
     repo.state.tags.clear();
     repo.state.scraps.clear();
     repo.state.applications.clear();
+    repo.state.reports.clear();
     repo.state.posts.set(1, baseRow());
     repo.state.tags.set(1, ['숙련', '디코필수']);
   });
@@ -169,14 +171,15 @@ describe('GET /api/posts/:postId', () => {
 
   it('작성자가 보면 viewer.isOwner 가 true 다', async () => {
     const { data } = await (await get(1, as(HOST_ID))).json();
-    assert.deepEqual(data.viewer, { isOwner: true, scrapped: false, applicationStatus: null });
+    assert.deepEqual(data.viewer, { isOwner: true, scrapped: false, applicationStatus: null, reported: false });
   });
 
-  it('로그인한 다른 회원은 스크랩 여부와 신청 상태를 함께 받는다', async () => {
+  it('로그인한 다른 회원은 스크랩 여부, 신청 상태, 신고 여부를 함께 받는다', async () => {
     repo.state.scraps.add(`1:${VIEWER_ID}`);
     repo.state.applications.set(`1:${VIEWER_ID}`, 'PENDING');
+    repo.state.reports.add(`1:${VIEWER_ID}`);
     const { data } = await (await get(1, as(VIEWER_ID))).json();
-    assert.deepEqual(data.viewer, { isOwner: false, scrapped: true, applicationStatus: 'PENDING' });
+    assert.deepEqual(data.viewer, { isOwner: false, scrapped: true, applicationStatus: 'PENDING', reported: true });
   });
 
   it('일정 미정 공고는 schedule null, scheduleTbd true', async () => {

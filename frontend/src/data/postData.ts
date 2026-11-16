@@ -39,6 +39,8 @@ export interface PostDetail {
   /** 로그인한 사용자 기준 (비로그인이면 false / null) */
   readonly scrapped: boolean;
   readonly applicationStatus: ApplicationStatus | null;
+  /** 내가 이 공고를 신고했는지 */
+  readonly reported: boolean;
 }
 
 /**
@@ -112,6 +114,10 @@ export const postText = {
   reopened: '모집을 다시 시작했습니다.',
   scrapAdded: '스크랩에 추가했습니다.',
   scrapRemoved: '스크랩을 해제했습니다.',
+  report: '신고',
+  reported: '신고됨',
+  reportTitle: '공고 신고',
+  reportedToast: '신고가 접수되었습니다. 운영팀이 검토 후 조치합니다.',
   recruiting: (c: number, m: number) => `모집중 ${c}/${m}`,
   almostFull: '마감 직전 (1자리 남음)',
   hostLabel: '방장',

@@ -414,7 +414,7 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
   "views": 129, "commentCount": 3, "scrapCount": 5,
   "tags": ["숙련", "디코필수"],
   "host": { "id": 3, "nickname": "빛나는오더", "avatarUrl": null, "level": 52, "mannerTemp": 99.8, "reviewCount": 184 },
-  "viewer": { "isOwner": false, "scrapped": true, "applicationStatus": "PENDING" },
+  "viewer": { "isOwner": false, "scrapped": true, "applicationStatus": "PENDING", "reported": false },
   "createdAt": "2026-11-12T11:30:00.000Z",
   "updatedAt": "2026-11-12T11:30:00.000Z"
 }
@@ -714,7 +714,7 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 | POST | `/api/reports` | 신고 `{ targetType: "USER"\|"NO_SHOW"\|"POST"\|"COMMENT", targetId, reason, detail? }` | 🔒 |
 
 - `reason`: `욕설 및 비하 발언` · `스팸 / 도배` · `부적절한 광고` · `개인정보 노출` · `기타`
-- ⚠️ 현재 구현은 **`COMMENT` 신고만** 받습니다. 다른 `targetType` 은 400 `INVALID_INPUT` 입니다 (USER · NO_SHOW · POST 는 추후 구현).
+- ⚠️ 현재 구현은 **`COMMENT` · `POST` 신고만** 받습니다. 다른 `targetType` 은 400 `INVALID_INPUT` 입니다 (USER · NO_SHOW 는 추후 구현).
 
 **댓글 신고**
 
@@ -726,6 +726,17 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 - 같은 사람이 같은 댓글을 두 번 신고할 수 없고(409), 본인 댓글은 신고할 수 없습니다(400).
 - 신고하면 댓글의 `report_count` 가 1 오르고, 서로 다른 신고자가 5명 이상이 되면 댓글이 `HIDDEN` 으로 자동 가려집니다 (REQ-REPORT-004).
 - 오류: 400 `INVALID_INPUT` · `CANNOT_REPORT_SELF`, 401 `UNAUTHORIZED`, 404 `COMMENT_NOT_FOUND`, 409 `ALREADY_REPORTED`.
+
+**공고 신고** (REQ-REPORT-003)
+
+```json
+{ "targetType": "POST", "targetId": 3, "reason": "부적절한 광고", "detail": "외부 사이트 홍보" }
+```
+
+- 응답 `201 { id }`. `report.target_member_id` 는 공고 작성자, `post_id` 는 그 공고입니다. 사유·`detail` 규칙은 댓글 신고와 같습니다.
+- 같은 사람이 같은 공고를 두 번 신고할 수 없고(409), 본인 공고는 신고할 수 없습니다(400). 댓글과 달리 자동 가림은 없고 관리자 신고 목록(`/api/admin/reports`)에서 처리합니다.
+- 공고 상세(`GET /api/posts/{postId}`)의 `viewer.reported` 로 내가 신고했는지 알 수 있습니다.
+- 오류: 400 `INVALID_INPUT` · `CANNOT_REPORT_SELF`, 401 `UNAUTHORIZED`, 404 `POST_NOT_FOUND`(없음·삭제됨), 409 `ALREADY_REPORTED`.
 
 ## 7. 리뷰 · 매너 평가 (Review)
 

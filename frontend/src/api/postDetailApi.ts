@@ -39,7 +39,7 @@ export interface PostDetailResponse {
     readonly mannerTemp: number;
     readonly reviewCount: number;
   };
-  readonly viewer: { readonly isOwner: boolean; readonly scrapped: boolean; readonly applicationStatus: ApplicationStatus | null } | null;
+  readonly viewer: { readonly isOwner: boolean; readonly scrapped: boolean; readonly applicationStatus: ApplicationStatus | null; readonly reported: boolean } | null;
   readonly createdAt: string;
   readonly updatedAt: string;
 }
@@ -148,5 +148,6 @@ export function toPostDetail(res: PostDetailResponse): PostDetail {
     scrapCount: res.scrapCount,
     scrapped: res.viewer?.scrapped ?? false,
     applicationStatus: res.viewer?.applicationStatus ?? null,
+    reported: res.viewer?.reported ?? false,
   };
 }

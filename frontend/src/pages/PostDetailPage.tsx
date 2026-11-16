@@ -116,7 +116,7 @@ const PostDetailView: React.FC<{ readonly postId: string }> = ({ postId }) => {
     <LoggedInLayout>
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_380px] gap-6 items-start">
         <div className="flex flex-col gap-5 min-w-0">
-          <PostHeader detail={detail} filled={post.filled} state={post.state} scrapped={post.scrapped} onScrap={post.toggleScrap} onShare={post.copyLink} onEdit={() => navigate(paths.postEdit(String(detail.id)))} onRemove={post.remove.open} />
+          <PostHeader detail={detail} filled={post.filled} state={post.state} scrapped={post.scrapped} reported={post.reported} onScrap={post.toggleScrap} onReport={post.askReport} onShare={post.copyLink} onEdit={() => navigate(paths.postEdit(String(detail.id)))} onRemove={post.remove.open} />
           {detail.isOwner && <ApplicantBanner count={post.applicants.length} names={post.applicants.map((a) => a.name)} onManage={post.applicantsDialog.open} />}
           <PostTiles tiles={detail.tiles} />
           <PostDescription detail={detail} />
@@ -153,6 +153,7 @@ const PostDetailView: React.FC<{ readonly postId: string }> = ({ postId }) => {
       <ConfirmDialog isOpen={post.closeRecruit.isOpen} title={postText.closeConfirm.title} description={postText.closeConfirm.description} confirmLabel={postText.closeConfirm.confirm} cancelLabel={postText.closeConfirm.cancel} icon="fa-circle-check" tone="brand" onConfirm={post.confirmClose} onCancel={post.closeRecruit.close} />
       <ConfirmDialog isOpen={activeThread.deleteDialog.isOpen} title={commentText.deleteDialog.title} description={commentText.deleteDialog.description} confirmLabel={commentText.deleteDialog.confirm} cancelLabel={commentText.deleteDialog.cancel} icon="fa-trash-can" onConfirm={activeThread.confirmDelete} onCancel={activeThread.deleteDialog.close} />
       <ReportDialog isOpen={activeThread.reportDialog.isOpen} onConfirm={activeThread.confirmReport} onClose={activeThread.reportDialog.close} />
+      <ReportDialog isOpen={post.reportDialog.isOpen} title={postText.reportTitle} onConfirm={post.confirmReport} onClose={post.reportDialog.close} />
       <ApplicantsDialog isOpen={post.applicantsDialog.isOpen} applicants={post.applicants} onResolve={post.resolveApplicant} onClose={post.applicantsDialog.close} />
       {poll.formDialog.isOpen && (
         <PollFormDialog editing={poll.formTarget} scheduleAt={detail.scheduleAt} busy={poll.busy} onSubmit={(input) => void poll.save(input)} onClose={poll.formDialog.close} />

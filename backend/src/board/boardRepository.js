@@ -71,15 +71,16 @@ function createBoardRepository(pool) {
     return rows.map((row) => row.name);
   }
 
-  /** 로그인한 사용자 기준: 스크랩 여부와 내 신청 상태 (신청한 적 없으면 null) */
+  /** 로그인한 사용자 기준: 스크랩 여부, 내 신청 상태 (신청한 적 없으면 null), 이 공고를 신고했는지 */
   async function findViewerState(postId, memberId) {
     const [rows] = await pool.query(
       `SELECT EXISTS (SELECT 1 FROM post_scrap WHERE post_id = ? AND member_id = ?) AS scrapped,
-              (SELECT status FROM post_application WHERE post_id = ? AND applicant_id = ? LIMIT 1) AS applicationStatus`,
-      [postId, memberId, postId, memberId],
+              (SELECT status FROM post_application WHERE post_id = ? AND applicant_id = ? LIMIT 1) AS applicationStatus,
+              EXISTS (SELECT 1 FROM report WHERE reporter_id = ? AND target_type = 'POST' AND target_id = ?) AS reported`,
+      [postId, memberId, postId, memberId, memberId, postId],
     );
     const row = rows[0];
-    return { scrapped: Boolean(row?.scrapped), applicationStatus: row?.applicationStatus ?? null };
+    return { scrapped: Boolean(row?.scrapped), applicationStatus: row?.applicationStatus ?? null, reported: Boolean(row?.reported) };
   }
 
   /**

@@ -31,8 +31,8 @@ const MEMBER_STATUS = Object.freeze({
   withdrawn: 'WITHDRAWN',
 });
 
-/** POST /api/reports (docs/API_SPEC.md 6절). 이번 범위는 댓글 신고만 처리합니다. */
-const REPORT_TARGET_TYPES = Object.freeze({ comment: 'COMMENT' });
+/** POST /api/reports (docs/API_SPEC.md 6절). 이번 범위는 댓글·공고 신고만 처리합니다. */
+const REPORT_TARGET_TYPES = Object.freeze({ comment: 'COMMENT', post: 'POST' });
 /** frontend/src/data/commentData.ts reportReasons. report.reason_code 에 이 문구 그대로 저장합니다 (관리자 화면이 그대로 표시). */
 const REPORT_REASONS = Object.freeze(['욕설 및 비하 발언', '스팸 / 도배', '부적절한 광고', '개인정보 노출', '기타']);
 const REPORT_DETAIL_MAX_LENGTH = 500;
@@ -59,12 +59,14 @@ const commentMessages = Object.freeze({
   partyOnly: '참가가 확정된 파티원만 볼 수 있는 댓글입니다.',
   notCommentAuthor: '본인이 작성한 댓글만 수정·삭제할 수 있습니다.',
   commentHidden: '관리자가 가린 댓글은 수정할 수 없습니다.',
-  targetTypeInvalid: `현재는 ${REPORT_TARGET_TYPES.comment} 신고만 접수할 수 있습니다.`,
+  targetTypeInvalid: `현재는 ${Object.values(REPORT_TARGET_TYPES).join(', ')} 신고만 접수할 수 있습니다.`,
   targetIdInvalid: 'targetId 는 1 이상의 정수여야 합니다.',
   reasonInvalid: `reason 은 ${REPORT_REASONS.join(', ')} 중 하나여야 합니다.`,
   detailTooLong: `상세 사유는 ${REPORT_DETAIL_MAX_LENGTH}자 이하로 입력해주세요.`,
   cannotReportSelf: '본인이 작성한 댓글은 신고할 수 없습니다.',
   alreadyReported: '이미 신고한 댓글입니다.',
+  cannotReportOwnPost: '본인이 작성한 공고는 신고할 수 없습니다.',
+  alreadyReportedPost: '이미 신고한 공고입니다.',
   notParentAuthor: '답글이 달린 댓글의 작성자만 답글을 채택할 수 있습니다.',
   notAReply: '답글만 채택할 수 있습니다.',
   cannotAcceptOwn: '본인이 작성한 답글은 채택할 수 없습니다.',

@@ -44,6 +44,10 @@ export const deletePost = (postId: string) => request<void>('DELETE', postUrl(po
 export const addScrap = (postId: string) => request<void>('POST', postUrl(postId, '/scrap'));
 export const removeScrap = (postId: string) => request<void>('DELETE', postUrl(postId, '/scrap'));
 
+/** POST /api/reports — 공고 신고 (docs/API_SPEC.md 6절). 사유 목록은 댓글 신고와 같습니다. */
+export const reportPost = (postId: string, reason: string, detail?: string) =>
+  request<{ readonly id: number }>('POST', '/api/reports', { targetType: 'POST', targetId: Number(postId), reason, ...(detail ? { detail } : {}) });
+
 /** 참가 신청 · 취소 (docs/API_SPEC.md 4절). role · message 는 선택이라 원클릭 신청은 빈 본문으로 보냅니다. */
 export const applyToPost = (postId: string) => request<{ readonly id: number; readonly status: string }>('POST', postUrl(postId, '/applications'), {});
 export const cancelApplication = (postId: string) => request<void>('DELETE', postUrl(postId, '/applications/me'));

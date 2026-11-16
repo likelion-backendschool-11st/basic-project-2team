@@ -4,12 +4,14 @@ import Modal from '../ui/Modal';
 
 interface ReportDialogProps {
   readonly isOpen: boolean;
+  /** 모달 제목 (기본값: 댓글 신고) */
+  readonly title?: string;
   /** 선택한 사유와 상세 내용(선택, 비어 있을 수 있음) */
   readonly onConfirm: (reason: string, detail: string) => void;
   readonly onClose: () => void;
 }
 
-export const ReportDialog: React.FC<ReportDialogProps> = ({ isOpen, onConfirm, onClose }) => {
+export const ReportDialog: React.FC<ReportDialogProps> = ({ isOpen, title, onConfirm, onClose }) => {
   const [reason, setReason] = useState<string | null>(null);
   const [detail, setDetail] = useState('');
   const d = commentText.reportDialog;
@@ -20,8 +22,8 @@ export const ReportDialog: React.FC<ReportDialogProps> = ({ isOpen, onConfirm, o
     reset();
   };
   return (
-    <Modal isOpen={isOpen} onClose={close} ariaLabel={d.title}>
-      <h2 className="text-lg font-bold text-white flex items-center gap-2"><i className="fa-solid fa-flag text-roseAccent" />{d.title}</h2>
+    <Modal isOpen={isOpen} onClose={close} ariaLabel={title ?? d.title}>
+      <h2 className="text-lg font-bold text-white flex items-center gap-2"><i className="fa-solid fa-flag text-roseAccent" />{title ?? d.title}</h2>
       <p className="text-sm text-fog-sub mt-2">{d.description}</p>
       <div className="mt-4 flex flex-col gap-2">
         {reportReasons.map((r) => (
