@@ -3,6 +3,7 @@ import { ROUTES } from './data/routes';
 import { adminRoutes } from './routes/adminRoutes';
 import { authRoutes } from './routes/authRoutes';
 import { boardRoutes } from './routes/boardRoutes';
+import { infoRoutes } from './routes/infoRoutes';
 import { mainRoutes } from './routes/mainRoutes';
 import { myPageRoutes } from './routes/myPageRoutes';
 
@@ -17,6 +18,7 @@ export default function App() {
     ...authRoutes,
     ...myPageRoutes,
     ...adminRoutes,
+    ...infoRoutes,
     { path: '*', element: <Navigate to={ROUTES.home} replace /> },
   ]);
 }
