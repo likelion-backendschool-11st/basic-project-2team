@@ -180,8 +180,6 @@ function createPartyService({ partyRepository, postEvents = NO_EVENTS, now = () 
         throw new ApiError(409, 'POST_NOT_PAUSABLE', m.pauseNotAllowed);
       case 'NO_MEMBERS':
         throw new ApiError(409, 'COMPLETE_NOT_ALLOWED', m.completeNoMembers);
-      case 'NOT_STARTED':
-        throw new ApiError(409, 'COMPLETE_NOT_ALLOWED', m.completeNotStarted);
       default:
         throw postNotFound();
     }

@@ -457,9 +457,9 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 
 - `OPEN` ↔ `CLOSED`(직접 마감·재개), `OPEN` ↔ `PAUSED`(일시 중단·재개), `COMPLETED`(진행 완료)로 바꿉니다. 같은 상태로 요청하면 그대로 `200` 입니다.
 - **`PAUSED`(모집 일시 중단)**: 새 신청만 막습니다(`POST .../applications` → 409 `POST_PAUSED`). 이미 받은 신청의 승인·거절은 할 수 있고, 마지막 자리를 승인해 정원이 차면 `CLOSED` 로 바뀝니다. 중단 알림은 보내지 않습니다. 일시 중단은 모집 중(`OPEN`)인 공고에서만 할 수 있고(마감 공고는 409 `POST_NOT_PAUSABLE`), 재개(`OPEN`)·마감(`CLOSED`)·완료(`COMPLETED`)로 바꿀 수 있습니다. 정원이 차서 마감된 공고에서 자리가 나도 `PAUSED` 는 자동으로 `OPEN` 이 되지 않습니다.
-- `COMPLETED` 는 승인된 파티원(탈퇴 회원 제외)이 있고 출발 시간이 지난 뒤에만 가능합니다(일정 미정이면 시간 조건 없음). 완료하면 되돌릴 수 없습니다.
+- `COMPLETED` 는 승인된 파티원(탈퇴 회원 제외)이 있으면 출발 시간과 상관없이 가능합니다. 완료하면 되돌릴 수 없습니다.
 - 완료하면 같은 트랜잭션에서 파티장과 승인된 파티원에게 활동 점수 `PARTY_COMPLETE` +20 을 지급하고(결정 사항 8-1) 이후 파티원끼리 별점 평가(7절)를 할 수 있습니다. 같은 상태로 다시 요청해도 점수는 한 번만 지급됩니다. 정원이 찬 공고는 `OPEN` 으로 다시 열 수 없습니다.
-- 오류: 400 `INVALID_INPUT`, 401, 403 `NOT_POST_AUTHOR`, 404 `POST_NOT_FOUND`, 409 `POST_COMPLETED` · `PARTY_FULL` · `POST_NOT_PAUSABLE` · `COMPLETE_NOT_ALLOWED`(파티원이 없거나 출발 전).
+- 오류: 400 `INVALID_INPUT`, 401, 403 `NOT_POST_AUTHOR`, 404 `POST_NOT_FOUND`, 409 `POST_COMPLETED` · `PARTY_FULL` · `POST_NOT_PAUSABLE` · `COMPLETE_NOT_ALLOWED`(파티원이 없음).
 - ⚠️ 출발 시간이 지나면 종료 처리(REQ-POST-007 후반)는 스케줄러가 필요해 아직 없습니다.
 
 **확정 파티원 (`GET /api/posts/{postId}/participants`)** — 파티장이 먼저, 이어서 수락된 순입니다.
@@ -729,7 +729,7 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 }
 ```
 
-- `canComplete`: 「활동 완료」 버튼을 보여줄지. 공고가 `OPEN`·`PAUSED`·`CLOSED` 이고 승인된 파티원(탈퇴 제외)이 1명 이상이며 출발 시간이 지났으면(일정 미정 포함) `true` → `PATCH /api/posts/{postId}/status` `{ status: "COMPLETED" }`.
+- `canComplete`: 「활동 완료」 버튼을 보여줄지. 공고가 `OPEN`·`PAUSED`·`CLOSED` 이고 승인된 파티원(탈퇴 제외)이 1명 이상이면(출발 시간과 무관) `true` → `PATCH /api/posts/{postId}/status` `{ status: "COMPLETED" }`.
 - `review`: 「별점 평가」 버튼용 진행 상황. 공고가 `COMPLETED` 일 때만 있고 아니면 `null`. `targetCount` 는 나를 뺀 파티원 수, `reviewedCount` 는 그중 내가 평가한 수 (같으면 평가 완료).
 
 **내가 신청한 공고 아이템 (`/me/applications`)**

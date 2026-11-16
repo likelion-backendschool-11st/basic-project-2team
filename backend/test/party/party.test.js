@@ -91,7 +91,6 @@ function createFakeRepository() {
       if (status === 'PAUSED' && post.status !== 'OPEN') return { result: 'NOT_PAUSABLE' };
       if (status === 'COMPLETED') {
         if (post.currentCount <= 1) return { result: 'NO_MEMBERS' };
-        if (post.scheduleAt && post.scheduleAt > now) return { result: 'NOT_STARTED' };
       }
       post.status = status;
       if (notice) {
@@ -377,7 +376,7 @@ describe('party application API', () => {
       assert.equal((await setStatus('COMPLETED')).status, 200);
     });
 
-    it('완료 처리는 파티원이 있고 출발 시간이 지난 뒤에만 가능하다 (일정 미정은 시간 조건 없음)', async () => {
+    it('완료 처리는 파티원이 있어야 가능하고 출발 시간과는 무관하다', async () => {
       const post = repo.state.posts.get(1);
       const reject = async (reason) => {
         const res = await setStatus('COMPLETED');
@@ -386,9 +385,7 @@ describe('party application API', () => {
         assert.equal(post.status, 'OPEN', reason);
       };
       await reject('파티원 없음(혼자)');
-      post.currentCount = 2; // 출발은 NOW 보다 12시간 뒤
-      await reject('출발 전');
-      post.scheduleAt = null;
+      post.currentCount = 2; // 출발은 NOW 보다 12시간 뒤여도 완료 가능
       assert.equal((await setStatus('COMPLETED')).status, 200);
     });
 
