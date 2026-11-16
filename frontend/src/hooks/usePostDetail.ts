@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ApiRequestError, errorMessageOf } from '../api/http';
+import { ApiRequestError, errorMessageOf, hasAccessToken } from '../api/http';
+import { promptLogin } from '../api/loginPrompt';
 import { addFavorite, getMemberProfile, removeFavorite } from '../api/mypageApi';
 import {
   addScrap,
@@ -13,6 +14,7 @@ import {
   getPendingApplications,
   getRelatedPosts,
   removeScrap,
+  reportPost,
 } from '../api/postApi';
 import { getPostDetail, toHostProfile, toPostDetail } from '../api/postDetailApi';
 import { postDetailText, postText, type HostProfile, type Participant, type PostDetail, type PostStatus, type RelatedPost } from '../data/postData';
@@ -68,6 +70,7 @@ export function usePostDetail(postId: string) {
   const disband = useModal(false);
   const leave = useModal(false);
   const closeRecruit = useModal(false);
+  const reportDialog = useModal(false);
   const reload = useCallback(() => setVersion((v) => v + 1), []);
 
   useEffect(() => {
@@ -192,6 +195,21 @@ export function usePostDetail(postId: string) {
     toast.show(postText.linkCopied);
   };
 
+  const reported = detail?.reported ?? false;
+  // 신고 창을 다 채운 뒤에 로그인 안내가 뜨지 않도록 창을 열기 전에 확인합니다.
+  const askReport = () => (hasAccessToken() ? reportDialog.open() : promptLogin());
+  const confirmReport = async (reason: string, detail = '') => {
+    reportDialog.close();
+    try {
+      await reportPost(postId, reason, detail.trim() || undefined);
+      toast.show(postText.reportedToast);
+      reload();
+    } catch (err) {
+      if (err instanceof ApiRequestError && err.code === 'ALREADY_REPORTED') reload();
+      toast.show(errorMessageOf(err, postText.actionFailed));
+    }
+  };
+
   const apply = () => run(() => applyToPost(postId), postText.applySuccess);
   // 수락(ACCEPTED)된 뒤에는 「파티 탈퇴」, 아직 대기(PENDING) 중이면 「신청 취소」로 구분합니다.
   const accepted = detail?.applicationStatus === 'ACCEPTED';
@@ -238,7 +256,7 @@ export function usePostDetail(postId: string) {
   return {
     detail, loading, error, related, refresh: reload,
     applied: accepted || detail?.applicationStatus === 'PENDING', accepted,
-    apply, scrapped, toggleScrap, copyLink,
+    apply, scrapped, toggleScrap, copyLink, reported, askReport, confirmReport, reportDialog,
     hostProfile, following, toggleFollow, state, togglePause: () => setStatus(state === 'open' ? 'PAUSED' : 'OPEN'),
     applicants, resolveApplicant, applicantsDialog, participants,
     filled, percent: detail ? Math.round((filled / detail.max) * 100) : 0, toast,

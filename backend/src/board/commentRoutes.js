@@ -23,7 +23,7 @@ function createCommentItemRouter(commentController, { requireAuth }) {
   return router;
 }
 
-/** /api/reports 아래에 마운트되는 신고 라우트 (docs/API_SPEC.md 6절). 현재는 댓글 신고만 처리합니다. */
+/** /api/reports 아래에 마운트되는 신고 라우트 (docs/API_SPEC.md 6절). 현재는 댓글·공고 신고만 처리합니다. */
 function createReportRouter(commentController, { requireAuth }) {
   const router = Router();
   router.post('/', requireAuth, commentController.report);

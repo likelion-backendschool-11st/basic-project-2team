@@ -127,8 +127,8 @@ function createFakeRepository() {
       return targets.length;
     },
     async createCommentReport({ reporterId, commentId, targetMemberId, postId, reasonCode, detail }) {
-      if (state.reports.some((r) => r.reporterId === reporterId && r.targetId === commentId)) return null;
-      state.reports.push({ id: state.reports.length + 1, reporterId, targetId: commentId, targetMemberId, postId, reasonCode, detail });
+      if (state.reports.some((r) => r.reporterId === reporterId && r.targetType === 'COMMENT' && r.targetId === commentId)) return null;
+      state.reports.push({ id: state.reports.length + 1, reporterId, targetType: 'COMMENT', targetId: commentId, targetMemberId, postId, reasonCode, detail });
       const c = state.comments.find((x) => x.id === commentId);
       if (c.status === 'VISIBLE' && c.reportCount + 1 >= 5) c.status = 'HIDDEN';
       c.reportCount += 1;
@@ -139,9 +139,16 @@ function createFakeRepository() {
       state.reports.push({ id: state.reports.length + 1, reporterId, targetType: 'MEMBER', targetId: targetMemberId, targetMemberId, postId: null, reasonCode, detail });
       return state.reports.length;
     },
+    async createPostReport({ reporterId, postId, targetMemberId, reasonCode, detail }) {
+      if (state.reports.some((r) => r.reporterId === reporterId && r.targetType === 'POST' && r.targetId === postId)) return null;
+      state.reports.push({ id: state.reports.length + 1, reporterId, targetType: 'POST', targetId: postId, targetMemberId, postId, reasonCode, detail });
+      return state.reports.length;
+    },
     async findReportedCommentIds(memberId, commentIds) {
       return new Set(
-        state.reports.filter((r) => r.reporterId === memberId && commentIds.includes(r.targetId)).map((r) => r.targetId),
+        state.reports
+          .filter((r) => r.reporterId === memberId && r.targetType === 'COMMENT' && commentIds.includes(r.targetId))
+          .map((r) => r.targetId),
       );
     },
   };
@@ -529,6 +536,7 @@ describe('댓글 API /api/posts/:postId/comments', () => {
       assert.deepEqual(repo.state.reports[0], {
         id: 1,
         reporterId: BOB,
+        targetType: 'COMMENT',
         targetId: id,
         targetMemberId: ALICE,
         postId: POST_ID,
@@ -576,8 +584,8 @@ describe('댓글 API /api/posts/:postId/comments', () => {
       assert.equal((await list()).body.data.items[0].hidden, true);
     });
 
-    it('입력이 틀리면 400 (COMMENT 외 대상, 목록에 없는 사유, 500자 넘는 상세), 없는 댓글은 404, 비로그인은 401', async () => {
-      const { status, body } = await report({ targetType: 'POST', targetId: 'x', reason: '그냥', detail: '가'.repeat(501) });
+    it('입력이 틀리면 400 (지원하지 않는 대상, 목록에 없는 사유, 500자 넘는 상세), 없는 댓글은 404, 비로그인은 401', async () => {
+      const { status, body } = await report({ targetType: 'USER', targetId: 'x', reason: '그냥', detail: '가'.repeat(501) });
       assert.equal(status, 400);
       assert.deepEqual(
         body.error.fields.map((f) => f.field),
@@ -587,6 +595,52 @@ describe('댓글 API /api/posts/:postId/comments', () => {
       assert.equal((await report(valid(1), null)).status, 401);
     });
   });
+  describe('공고 신고', () => {
+    const report = (body, memberId = BOB) => send('POST', '/api/reports', body, memberId);
+    const valid = (targetId = POST_ID) => ({ targetType: 'POST', targetId, reason: '부적절한 광고', detail: ' 외부 사이트 홍보 ' });
+
+    it('신고를 저장하고 201 { id }, 신고 대상 회원은 공고 작성자다', async () => {
+      const { status, body } = await report(valid());
+      assert.equal(status, 201);
+      assert.deepEqual(body.data, { id: 1 });
+      assert.deepEqual(repo.state.reports[0], {
+        id: 1,
+        reporterId: BOB,
+        targetType: 'POST',
+        targetId: POST_ID,
+        targetMemberId: HOST_ID,
+        postId: POST_ID,
+        reasonCode: '부적절한 광고',
+        detail: '외부 사이트 홍보',
+      });
+    });
+
+    it('같은 공고를 다시 신고하면 409 ALREADY_REPORTED, 본인 공고는 400 CANNOT_REPORT_SELF', async () => {
+      await report(valid());
+      const again = await report(valid());
+      assert.equal(again.status, 409);
+      assert.equal(again.body.error.code, 'ALREADY_REPORTED');
+
+      const self = await report(valid(), HOST_ID);
+      assert.equal(self.status, 400);
+      assert.equal(self.body.error.code, 'CANNOT_REPORT_SELF');
+      assert.equal(repo.state.reports.length, 1);
+    });
+
+    it('같은 id 의 댓글을 신고했어도 공고 신고는 따로 받는다', async () => {
+      const id = repo.seed({ authorId: ALICE, content: '댓글' });
+      assert.equal(id, POST_ID);
+      assert.equal((await report({ targetType: 'COMMENT', targetId: id, reason: '기타' })).status, 201);
+      assert.equal((await report(valid())).status, 201);
+    });
+
+    it('없거나 삭제된 공고는 404 POST_NOT_FOUND', async () => {
+      assert.equal((await report(valid(999))).body.error.code, 'POST_NOT_FOUND');
+      repo.state.posts.get(POST_ID).status = 'DELETED';
+      assert.equal((await report(valid())).body.error.code, 'POST_NOT_FOUND');
+    });
+  });
+
   describe('답글 채택', () => {
     const accept = (id, memberId = ALICE) => send('PUT', `/api/comments/${id}/accept`, undefined, memberId);
     const cancel = (id, memberId = ALICE) => send('DELETE', `/api/comments/${id}/accept`, undefined, memberId);

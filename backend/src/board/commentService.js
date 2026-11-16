@@ -281,11 +281,24 @@ function createCommentService({ commentRepository, postEvents = NO_EVENTS, now =
     commentsChanged(reply.postId);
   }
 
-  /**
-   * POST /api/reports — 댓글 신고. 같은 댓글은 한 번만, 본인 댓글은 신고할 수 없습니다.
-   * @param {number} memberId
-   * @param {object} body
-   */
+  /** 공고 신고 (REQ-REPORT-003). 같은 공고는 한 번만, 본인 공고는 신고할 수 없습니다. */
+  async function reportPost(memberId, input) {
+    const post = await commentRepository.findPost(input.targetId);
+    if (!post) throw postNotFound();
+    if (post.authorId === memberId) throw new ApiError(400, 'CANNOT_REPORT_SELF', commentMessages.cannotReportOwnPost);
+
+    const id = await commentRepository.createPostReport({
+      reporterId: memberId,
+      postId: post.id,
+      targetMemberId: post.authorId,
+      reasonCode: input.reason,
+      detail: input.detail,
+    });
+    if (id === null) throw new ApiError(409, 'ALREADY_REPORTED', commentMessages.alreadyReportedPost);
+    return { id };
+  }
+
+  /** 댓글 신고. 같은 댓글은 한 번만, 본인 댓글은 신고할 수 없습니다. */
   async function reportComment(memberId, input) {
     const comment = await loadComment(input.targetId);
     if (comment.authorId === memberId) {
@@ -315,10 +328,12 @@ function createCommentService({ commentRepository, postEvents = NO_EVENTS, now =
     return { id };
   }
 
-  /** POST /api/reports: targetType 에 따라 댓글 또는 회원 신고로 보냅니다. */
+  /** POST /api/reports: targetType 에 따라 댓글·회원·공고 신고로 보냅니다. */
   async function report(memberId, body) {
     const input = validateCreateReport(body);
-    return input.targetType === REPORT_TARGET_TYPES.member ? reportMember(memberId, input) : reportComment(memberId, input);
+    if (input.targetType === REPORT_TARGET_TYPES.member) return reportMember(memberId, input);
+    if (input.targetType === REPORT_TARGET_TYPES.post) return reportPost(memberId, input);
+    return reportComment(memberId, input);
   }
 
   return { listComments, createComment, updateComment, deleteComment, acceptComment, cancelAcceptance, report };

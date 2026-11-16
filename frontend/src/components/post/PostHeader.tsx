@@ -10,7 +10,9 @@ interface PostHeaderProps {
   readonly filled: number;
   readonly state: PartyState;
   readonly scrapped: boolean;
+  readonly reported: boolean;
   readonly onScrap: () => void;
+  readonly onReport: () => void;
   readonly onShare: () => void;
   readonly onEdit: () => void;
   readonly onRemove: () => void;
@@ -18,7 +20,7 @@ interface PostHeaderProps {
 
 const chip = 'px-2.5 py-1 rounded-md text-[11px] font-bold border';
 
-export const PostHeader: React.FC<PostHeaderProps> = ({ detail, filled, state, scrapped, onScrap, onShare, onEdit, onRemove }) => (
+export const PostHeader: React.FC<PostHeaderProps> = ({ detail, filled, state, scrapped, reported, onScrap, onReport, onShare, onEdit, onRemove }) => (
   <section className="rounded-2xl border border-night-borderLight bg-night-surface p-6">
     <div className="flex items-center justify-between gap-3 mb-4">
       <Link to={ROUTES.board} className="text-sm text-fog-sub hover:text-white flex items-center gap-2"><i className="fa-solid fa-arrow-left" />{postText.back}</Link>
@@ -31,6 +33,7 @@ export const PostHeader: React.FC<PostHeaderProps> = ({ detail, filled, state, s
         <div className="flex items-center gap-2 text-xs">
           <button type="button" onClick={onShare} className="px-3 py-2 rounded-lg border border-night-borderLight text-fog-headline hover:bg-white/5 flex items-center gap-1.5"><i className="fa-solid fa-share-nodes" />{postText.share}</button>
           <button type="button" aria-pressed={scrapped} onClick={onScrap} className={`px-3 py-2 rounded-lg border flex items-center gap-1.5 ${scrapped ? 'border-mercury bg-mercury/20 text-white' : 'border-night-borderLight text-fog-headline hover:bg-white/5'}`}><i className="fa-solid fa-bookmark" />{detail.scrapCount}</button>
+          <button type="button" disabled={reported} onClick={onReport} className="px-3 py-2 rounded-lg border border-night-borderLight text-fog-headline hover:border-roseAccent/40 hover:text-rose-300 disabled:opacity-50 disabled:pointer-events-none flex items-center gap-1.5"><i className="fa-solid fa-flag" />{reported ? postText.reported : postText.report}</button>
         </div>
       )}
     </div>
