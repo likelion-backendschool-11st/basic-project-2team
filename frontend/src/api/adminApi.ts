@@ -100,9 +100,9 @@ export interface AdminProfile {
   readonly role: string;
 }
 
-/** POST /api/admin/auth/login — 성공하면 관리자 토큰을 저장합니다. */
+/** POST /api/admin/auth/login — 성공하면 관리자 토큰을 저장합니다. 회원 로그인 여부와 상관없이 관리자 요청으로 보냅니다. */
 export async function adminLogin(userId: string, password: string) {
-  const data = await request<{ readonly accessToken: string; readonly admin: AdminProfile }>('POST', '/api/admin/auth/login', { userId, password });
+  const data = await adminRequest<{ readonly accessToken: string; readonly admin: AdminProfile }>('POST', '/auth/login', { userId, password });
   saveAdminToken(data.accessToken);
   return data.admin;
 }

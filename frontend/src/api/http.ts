@@ -88,12 +88,15 @@ export interface RequestOptions {
 
 const LOGIN_REQUIRED_MESSAGE = '로그인이 필요합니다.';
 
+/** 회원 로그인과 관계없는 요청: 로그인·가입·아이디/비밀번호 찾기(/api/auth/)와 관리자 API(/api/admin/, 관리자 토큰을 따로 씀) */
+const isMemberAuthExempt = (path: string) => path.startsWith('/api/auth/') || path.startsWith('/api/admin/');
+
 /**
- * 로그인이 필요한 요청인지. 조회(GET)는 대부분 비로그인도 쓸 수 있으므로 내 정보·알림 조회만 해당하고,
- * 그 밖의 쓰기 요청(POST·PUT·PATCH·DELETE)은 모두 로그인이 필요합니다. 로그인·가입·아이디/비밀번호 찾기(/api/auth/)는 제외합니다.
+ * 회원 로그인이 필요한 요청인지. 조회(GET)는 대부분 비로그인도 쓸 수 있으므로 내 정보·알림 조회만 해당하고,
+ * 그 밖의 쓰기 요청(POST·PUT·PATCH·DELETE)은 모두 로그인이 필요합니다.
  */
 const requiresLogin = (method: string, path: string) =>
-  !path.startsWith('/api/auth/') && (method !== 'GET' || /^\/api\/(members\/me|notifications)(?=[/?]|$)/.test(path));
+  !isMemberAuthExempt(path) && (method !== 'GET' || /^\/api\/(members\/me|notifications)(?=[/?]|$)/.test(path));
 
 /** 파일(Blob)은 그 형식 그대로, 나머지는 JSON 으로 보냅니다. */
 const send = async (method: string, path: string, body: unknown, token: string | null) => {
@@ -172,7 +175,7 @@ export async function request<T>(method: string, path: string, body?: unknown, {
   if (res.status === 204) return undefined as T;
   if (!res.ok || !json?.success) {
     // 로그인하지 않았거나 로그인이 풀려 권한이 없으면 어느 화면이든 같은 로그인 안내 모달을 띄웁니다 (로그인·재발급 같은 인증 API 와 관리자 API 는 제외).
-    if (res.status === 401 && tokenKey === ACCESS_TOKEN_KEY && !path.startsWith('/api/auth/')) promptLogin();
+    if (res.status === 401 && tokenKey === ACCESS_TOKEN_KEY && !isMemberAuthExempt(path)) promptLogin();
     const { code = 'UNKNOWN', message = '요청에 실패했습니다.', fields, ...details } = json?.error ?? {};
     throw new ApiRequestError(res.status, code, message, fields, details);
   }
