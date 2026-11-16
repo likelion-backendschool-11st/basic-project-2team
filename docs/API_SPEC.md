@@ -346,7 +346,7 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
   - `urgent`: 남은 자리가 2 이하이거나 출발이 24시간 이내인 공고를 출발이 가까운 순(일정 미정은 뒤) → 남은 자리가 적은 순으로 정렬 (기준은 `boardConstants.js` 의 `URGENT_*`)
 - **실시간 신호** (`GET /api/posts/{postId}/events`): 공고 상세 화면이 열려 있는 동안 연결해 두는 **SSE** 입니다(비로그인도 연결 가능, 없거나 삭제된 공고는 404 `POST_NOT_FOUND`). 서버는 변경이 DB 에 반영된 **뒤에** 신호만 보내고 내용은 담지 않으며(`data: {}`), 화면은 신호를 받으면 인증된 일반 API(`GET /api/posts/{postId}` 등)로 다시 조회합니다. 그래서 권한 검사는 기존 API 가 그대로 합니다.
   - `event: post` — 공고 본문·상태(`OPEN`/`PAUSED`/`CLOSED`/`COMPLETED`/삭제)·인원·신청자·파티원이 바뀜: 참가 신청·취소, 승인/거절, 모집 상태 변경, 공고 수정·삭제(작성자·관리자)
-  - `event: comments` — 댓글이 작성·수정·삭제·가림·복구됨
+  - `event: comments` — 댓글이 작성·수정·삭제·가림·복구·답글 채택·채택 취소됨
   - `event: poll` — 파티 의견 조율 투표가 생성·편집·투표·고정·확정됨 (5절)
   - 연결이 끊기면 `retry: 3000`(3초)에 따라 브라우저가 다시 연결하고, 25초마다 `: ping` 주석 줄을 보내 프록시가 유휴 연결을 끊지 않게 합니다. 끊겨 있던 동안의 신호는 다시 보내지 않으므로 화면은 **재연결 직후 한 번 다시 조회**해야 합니다. 프록시 버퍼링을 끄도록 `X-Accel-Buffering: no` 를 보냅니다.
   - 구독 목록은 서버 프로세스 메모리에 있습니다(`common/postEvents.js`). 서버를 여러 대로 늘리면 Redis 같은 공유 채널이 필요합니다.
@@ -537,6 +537,8 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 | POST | `/api/posts/{postId}/comments` | 댓글/대댓글 작성 `{ text, parentId?, secret }` | 🔒 |
 | PATCH | `/api/comments/{commentId}` | 댓글 수정 `{ text }` | 🔒 작성자 |
 | DELETE | `/api/comments/{commentId}` | 댓글 삭제 (대댓글 함께 삭제) | 🔒 작성자 |
+| PUT | `/api/comments/{replyId}/accept` | 답글 채택 (댓글당 하나, 이미 채택한 답글이 있으면 이 답글로 교체) | 🔒 댓글 작성자 |
+| DELETE | `/api/comments/{replyId}/accept` | 답글 채택 취소 → `204` | 🔒 댓글 작성자 |
 
 - 비밀 댓글은 댓글 작성자와 공고 작성자에게만 본문을 노출합니다. 대댓글이면 부모 댓글 작성자에게도 노출합니다.
 
@@ -556,14 +558,15 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
       "author": { "id": 9, "nickname": "홀리한빛", "avatarUrl": null },
       "isPostAuthor": false, "mine": false,
       "text": "극신속 홀나 1625입니다. 스펙 확인 부탁드려요!",
-      "secret": false, "hidden": false, "reported": false,
+      "secret": false, "hidden": false, "reported": false, "accepted": false,
       "createdAt": "2026-11-12T11:40:00.000Z",
+      "acceptedReplyId": 13,
       "replies": [
         {
           "id": 13, "parentId": 12,
           "author": { "id": 3, "nickname": "빛나는오더", "avatarUrl": null },
           "isPostAuthor": true, "mine": true,
-          "text": null, "secret": true, "hidden": false, "reported": false,
+          "text": null, "secret": true, "hidden": false, "reported": false, "accepted": true,
           "createdAt": "2026-11-12T11:45:00.000Z"
         }
       ]
@@ -576,6 +579,7 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 - `text` 는 비밀 댓글을 볼 수 없는 사용자에게 `null` 입니다. 탈퇴한 작성자는 `author.nickname` 이 `"탈퇴한 회원"`, `avatarUrl` 이 `null` 입니다.
 - `isPostAuthor`: 공고 작성자가 쓴 댓글 (화면의 "작성자" 배지), `mine`: 로그인한 사용자가 쓴 댓글 ("내 댓글" 배지, 비로그인이면 항상 `false`).
 - `reported`: 로그인한 사용자가 이미 신고한 댓글 ("신고됨" 표시, 비로그인이면 항상 `false`).
+- `accepted`: 채택된 답글이면 `true`(모든 댓글 아이템에 들어 있고, 댓글(루트)은 항상 `false`). `acceptedReplyId`: 루트 댓글에만 있으며 그 댓글에 달린 채택 답글의 id(없으면 `null`). 채택된 답글도 `replies` 안의 **등록순 위치 그대로** 두고 `accepted: true` 로만 표시합니다. 화면에서는 `acceptedReplyId` 로 같은 내용을 답글 목록 맨 위에 하이라이트 복사본으로 한 번 더 보여줍니다. 채택된 답글이 삭제되거나 관리자가 가리면 `acceptedReplyId` 는 `null` 입니다.
 - 댓글 작성자 프로필(팝오버)은 `author.id` 로 `GET /api/members/{memberId}` (8절) 를 호출합니다.
 
 **댓글 · 대댓글 작성 (`POST /api/posts/{postId}/comments`)** 🔒
@@ -594,6 +598,19 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 - 요청 `{ "text": "고친 내용" }` — 작성 규칙과 같음(1~500자). 응답 `200` — 수정된 댓글 (목록 아이템 형식, `replies` 없음).
 - 공고 작성자라도 다른 사람의 댓글은 고칠 수 없습니다. 관리자가 가린(`HIDDEN`) 댓글은 고칠 수 없습니다.
 - 오류: 400 `INVALID_INPUT`, 401 `UNAUTHORIZED`, 403 `NOT_COMMENT_AUTHOR` · `COMMENT_HIDDEN` · `ACCOUNT_SUSPENDED` · `ACCOUNT_BANNED`, 404 `COMMENT_NOT_FOUND`(없음, 삭제됨, 공고 삭제됨).
+
+**답글 채택 (`PUT /api/comments/{replyId}/accept`)** 🔒 댓글 작성자
+
+- Q&A 흐름: 댓글이 질문, 그 댓글에 달린 **답글**이 답변이고, **답글이 달린 댓글의 작성자**가 마음에 든 답글을 채택합니다. 경로의 `replyId` 는 채택할 답글(대댓글)의 id 입니다. 요청 본문 없음.
+- 응답 `200` `{ "commentId": 12, "acceptedReplyId": 13 }`. 채택해도 답글의 위치는 바뀌지 않습니다. 한 댓글에는 답글이 하나만 채택되며, 이미 채택한 답글이 있으면 이 답글로 바뀝니다. 채택 여부는 공고(`post`)의 `status` 와 무관합니다.
+- 채택할 수 없는 경우: 답글이 아닌 댓글, 댓글 작성자가 아닌 사람(공고 작성자라도 불가), 본인이 쓴 답글, 비밀 답글, 관리자가 가린 답글.
+- 채택하면 `event: comments` 를 보냅니다.
+- 오류: 400 `NOT_A_REPLY` · `CANNOT_ACCEPT_OWN` · `CANNOT_ACCEPT_SECRET` · `COMMENT_HIDDEN`, 401 `UNAUTHORIZED`, 403 `NOT_PARENT_AUTHOR`, 404 `COMMENT_NOT_FOUND`(없음, 삭제됨, 공고 삭제됨).
+
+**답글 채택 취소 (`DELETE /api/comments/{replyId}/accept`)** 🔒 댓글 작성자
+
+- 응답 `204`. 이 답글이 채택된 답글이면 채택을 없애고 `event: comments` 를 보냅니다. 채택된 답글이 아니면 아무 일도 없이 `204` 입니다.
+- 오류: 400 `NOT_A_REPLY`, 401 `UNAUTHORIZED`, 403 `NOT_PARENT_AUTHOR`, 404 `COMMENT_NOT_FOUND`.
 
 **댓글 삭제 (`DELETE /api/comments/{commentId}`)** 🔒 작성자
 

@@ -316,6 +316,7 @@ erDiagram
         bigint post_id FK
         bigint author_id FK
         bigint parent_id FK "NULL이면 루트 댓글"
+        bigint accepted_reply_id FK "채택된 답글, NULL 허용"
         varchar(500) content
         boolean is_secret "비밀 댓글"
         varchar(20) status "VISIBLE / HIDDEN / DELETED"
@@ -560,6 +561,7 @@ erDiagram
 | comment.post_id | post | 1:N | RESTRICT |
 | comment.author_id | member | 1:N | RESTRICT |
 | comment.parent_id | comment | 0..1:N | RESTRICT |
+| comment.accepted_reply_id | comment | 0..1:1 | SET NULL |
 | poll.post_id | post | 1:N | RESTRICT |
 | poll.author_id | member | 1:N | RESTRICT |
 | poll_option.poll_id | poll | 1:N | CASCADE |

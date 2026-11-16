@@ -23,6 +23,10 @@ export interface PostComment {
   readonly secret?: boolean;
   readonly edited?: boolean;
   readonly reported?: boolean;
+  /** 댓글 작성자가 채택한 답글 */
+  readonly accepted?: boolean;
+  /** 채택된 답글이 있는 댓글 (채택 완료 표시) */
+  readonly solved?: boolean;
 }
 
 export const COMMENT_PAGE_SIZE = 4;
@@ -41,6 +45,15 @@ export const commentText = {
   reply: '답글',
   report: '신고',
   reported: '신고됨',
+  accept: '채택',
+  cancelAccept: '채택 취소',
+  solvedBadge: '채택 완료',
+  pinnedTitle: '채택된 답글',
+  repliesClose: (n: number) => `답글 ${n}개 접기`,
+  repliesOpen: (n: number) => `답글 ${n}개 펼치기`,
+  acceptedBadge: '채택된 답글',
+  acceptedToast: '답글을 채택했습니다.',
+  cancelAcceptedToast: '채택을 취소했습니다.',
   edit: '수정',
   remove: '삭제',
   save: '수정 완료',

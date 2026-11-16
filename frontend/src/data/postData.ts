@@ -23,7 +23,8 @@ export interface PostDetail {
   readonly views: number;
   readonly postedAgo: string;
   readonly tiles: readonly { readonly icon: string; readonly label: string; readonly value: string; readonly note: string; readonly noteTone: 'good' | 'muted' }[];
-  readonly intro: readonly string[];
+  /** 공고 본문 (마크다운 원문) */
+  readonly intro: string;
   readonly steps: readonly string[];
   readonly pledgeTitle: string;
   readonly pledge: string;

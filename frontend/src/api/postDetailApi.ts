@@ -78,13 +78,6 @@ function departureNote(schedule: string | null, now = Date.now()) {
 const styleLabel = (style: string | null) =>
   styleChoices.find((s) => s.id === style)?.label ?? postDetailText.styleAny;
 
-/** 마크다운 본문을 빈 줄 기준 문단으로 나눕니다 (마크다운 렌더러 도입 전까지 원문 그대로 표시). */
-const toParagraphs = (body: string) =>
-  body
-    .split(/\n\s*\n/)
-    .map((p) => p.trim())
-    .filter(Boolean);
-
 /** API 응답 → 상세 화면용 PostDetail */
 export function toPostDetail(res: PostDetailResponse): PostDetail {
   const t = postDetailText;
@@ -121,7 +114,7 @@ export function toPostDetail(res: PostDetailResponse): PostDetail {
       },
       { icon: 'fa-regular fa-circle-check', label: t.tileSpec, value: res.requiredSpec ?? t.specNone, note: styleLabel(res.style), noteTone: 'muted' },
     ],
-    intro: toParagraphs(res.body),
+    intro: res.body,
     steps: [],
     pledgeTitle: t.pledgeTitle,
     pledge: t.pledge,
