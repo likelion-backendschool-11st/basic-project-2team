@@ -24,6 +24,13 @@ export interface NotificationPage {
 export const getNotifications = (page: number, size: number, unreadOnly: boolean) =>
   request<NotificationPage>('GET', `/api/notifications?page=${page}&size=${size}${unreadOnly ? '&unread=true' : ''}`);
 
+/** GET /api/notifications/unread-count — 안 읽은 알림 수 (헤더 배지용) */
+export const getUnreadCount = () => request<{ readonly count: number }>('GET', '/api/notifications/unread-count').then((res) => res.count);
+
+/** 알림을 읽거나 지운 뒤 보내는 이벤트. 헤더 배지가 이것을 받아 안 읽은 수를 다시 가져옵니다. */
+export const NOTIFICATIONS_CHANGE_EVENT = 'notifications-change';
+export const notifyNotificationsChanged = () => window.dispatchEvent(new Event(NOTIFICATIONS_CHANGE_EVENT));
+
 /** PATCH /api/notifications/{id}/read → 204 (이미 읽은 알림도 204) */
 export const markNotificationRead = (id: string) => request<void>('PATCH', `/api/notifications/${id}/read`);
 
