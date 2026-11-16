@@ -1,4 +1,6 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
+import { paths } from '../../data/routes';
 import type { HostProfile, PostDetail } from '../../data/postData';
 import { postText } from '../../data/postData';
 import { Avatar } from '../ui/Avatar';
@@ -20,7 +22,7 @@ export const HostCard: React.FC<HostCardProps> = ({ host, profile, following, on
     <div className="flex items-center gap-3">
       <Avatar url={host.avatarUrl} name={host.name} className="w-12 h-12 shrink-0 rounded-full bg-night-card flex items-center justify-center text-lg font-bold text-white" />
       <div className="min-w-0">
-        <div className="font-bold text-white text-lg break-words">{host.name}</div>
+        <Link to={paths.memberProfile(host.id)} className="font-bold text-white text-lg break-words hover:text-mercury-light hover:underline">{host.name}</Link>
         {profile?.gameLine && <div className="text-xs text-fog-muted break-words">{profile.gameLine}</div>}
       </div>
     </div>

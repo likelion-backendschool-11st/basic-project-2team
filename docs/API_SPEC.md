@@ -711,10 +711,12 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 
 | Method | URI | 설명 | 인증 |
 | --- | --- | --- | --- |
-| POST | `/api/reports` | 신고 `{ targetType: "USER"\|"NO_SHOW"\|"POST"\|"COMMENT", targetId, reason, detail? }` | 🔒 |
+| POST | `/api/reports` | 신고 `{ targetType: "MEMBER"\|"NO_SHOW"\|"POST"\|"COMMENT", targetId, reason, detail? }` | 🔒 |
 
 - `reason`: `욕설 및 비하 발언` · `스팸 / 도배` · `부적절한 광고` · `개인정보 노출` · `기타`
-- ⚠️ 현재 구현은 **`COMMENT` 신고만** 받습니다. 다른 `targetType` 은 400 `INVALID_INPUT` 입니다 (USER · NO_SHOW · POST 는 추후 구현).
+- ⚠️ 현재 구현은 **`COMMENT`(댓글) · `MEMBER`(회원) 신고만** 받습니다. 다른 `targetType` 은 400 `INVALID_INPUT` 입니다 (NO_SHOW · POST 는 추후 구현). 회원 신고의 `targetType` 은 DB·관리자 화면과 같은 `MEMBER` 입니다 (표의 `USER` 와 같은 뜻).
+
+**회원 신고 (`targetType: "MEMBER"`)** — `targetId` 는 신고할 회원 id, `reason`·`detail` 규칙은 댓글 신고와 같습니다. 응답 `201 { id }`. 본인은 신고할 수 없고(400 `CANNOT_REPORT_SELF`), 같은 회원을 두 번 신고할 수 없으며(409 `ALREADY_REPORTED`), 없거나 탈퇴한 회원은 404 `MEMBER_NOT_FOUND` 입니다. 관리자 신고 목록에는 유형 `MEMBER` 로 나옵니다.
 
 **댓글 신고**
 
