@@ -8,7 +8,8 @@ export type NotificationType =
   | 'POST_DELETED'
   | 'FAVORITE_AUTHOR_POST'
   | 'INTEREST_POST'
-  | 'SANCTION';
+  | 'SANCTION'
+  | 'NO_SHOW';
 
 export interface NotificationView {
   readonly id: string;
@@ -50,6 +51,7 @@ export const notificationTypes: Readonly<Record<NotificationType, { label: strin
   FAVORITE_AUTHOR_POST: { label: '즐겨찾기 새 공고', icon: 'fa-solid fa-star', tone: toneBrand },
   INTEREST_POST: { label: '관심 게임 새 공고', icon: 'fa-solid fa-gamepad', tone: toneOk },
   SANCTION: { label: '제재 안내', icon: 'fa-solid fa-triangle-exclamation', tone: toneDanger },
+  NO_SHOW: { label: '노쇼 확정', icon: 'fa-solid fa-user-slash', tone: toneDanger },
 };
 
 /** 알려지지 않은 유형(서버에 새 유형이 생겼을 때)의 기본 표시 */

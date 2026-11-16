@@ -45,4 +45,5 @@ export const toReviewMember = (target: ReviewTargetResponse): ReviewMember => ({
   game: target.game,
   className: target.characterName ?? '',
   role: target.isHost ? reviewText.hostRole : (target.role ?? reviewText.memberRole),
+  isHost: target.isHost,
 });

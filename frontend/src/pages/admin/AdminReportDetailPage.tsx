@@ -27,7 +27,7 @@ import {
 } from '../../data/adminData';
 import { paths, ROUTES } from '../../data/routes';
 import { useAdminId, useAdminNavigate, useAdminResource } from '../../hooks/useAdminDetail';
-import { canDeleteContent, useReportDecision } from '../../hooks/useReportDecision';
+import { isDecisionAllowed, useReportDecision } from '../../hooks/useReportDecision';
 
 const box = 'rounded-xl border border-night-borderLight bg-night-base';
 
@@ -107,7 +107,7 @@ export const AdminReportDetailPage: React.FC = () => {
                 <div className="text-xs font-semibold text-fog-sub mb-2">처리 결과 <span className="text-rose-300">*</span></div>
                 <div className="flex flex-col gap-2">
                   {decisions.map((d) => {
-                    const disabled = d.contentOnly === true && !canDeleteContent(report);
+                    const disabled = !isDecisionAllowed(d, report);
                     const active = form.decision === d.id;
                     return (
                       <label key={d.id} className={`flex items-start gap-3 rounded-xl border p-3 ${disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'} ${active ? 'border-mercury bg-mercury/10' : 'border-night-borderLight hover:border-night-hover'}`}>

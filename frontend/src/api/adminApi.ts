@@ -38,7 +38,7 @@ export const isAdminAuthError = (err: unknown) =>
 
 export type ReportStatus = 'PENDING' | 'IN_PROGRESS' | 'DONE' | 'REJECTED';
 export type ReportType = 'MEMBER' | 'NO_SHOW' | 'POST' | 'COMMENT';
-export type ReportAction = 'WARN' | 'SUSPEND' | 'BAN' | 'DELETE_CONTENT' | 'DISMISS';
+export type ReportAction = 'WARN' | 'SUSPEND' | 'BAN' | 'DELETE_CONTENT' | 'CONFIRM_NO_SHOW' | 'DISMISS';
 export type PostStatus = 'OPEN' | 'PAUSED' | 'CLOSED' | 'COMPLETED' | 'DELETED';
 export type MemberStatus = 'ACTIVE' | 'WARNED' | 'SUSPENDED' | 'BANNED' | 'WITHDRAWN';
 export type SanctionType = 'WARNING' | 'SUSPEND' | 'BAN';

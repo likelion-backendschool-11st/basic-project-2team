@@ -20,6 +20,7 @@ const {
   sanctionMemberStatus,
   memberStatusSeverity,
   postStatus,
+  applicationStatus,
   commentStatus,
   COMMENT_REPORTED,
   actionType,
@@ -350,7 +351,8 @@ function createAdminService({ adminRepository, tokenProvider, postEvents = NO_EV
 
   /**
    * PATCH /api/admin/reports/{reportId}
-   * DONE 이면 action 에 따라 제재(WARN/SUSPEND/BAN) 또는 대상 공고·댓글 삭제(DELETE_CONTENT) 까지 한 트랜잭션으로 처리합니다.
+   * DONE 이면 action 에 따라 제재(WARN/SUSPEND/BAN), 대상 공고·댓글 삭제(DELETE_CONTENT) 또는 노쇼 확정(CONFIRM_NO_SHOW) 까지
+   * 한 트랜잭션으로 처리합니다.
    */
   async function processReport(reportId, body, { admin, ip }) {
     const input = validateReportUpdate(body);
@@ -378,6 +380,8 @@ function createAdminService({ adminRepository, tokenProvider, postEvents = NO_EV
         Object.assign(detail, { targetLabel: result.member.nickname, sanctionId: result.sanctionId, days: input.days });
       } else if (input.action === reportAction.deleteContent) {
         detail.targetLabel = await deleteReportedContent(tx, report, input.memo ?? report.reasonCode, admin, current, events);
+      } else if (input.action === reportAction.confirmNoShow) {
+        detail.targetLabel = await confirmNoShow(tx, report, events);
       }
 
       const closed = closedReportStatuses.includes(input.status);
@@ -418,6 +422,35 @@ function createAdminService({ adminRepository, tokenProvider, postEvents = NO_EV
       return `댓글 #${comment.id}`;
     }
     throw new ApiError(400, 'INVALID_REPORT_ACTION', adminMessages.deleteContentNotAllowed);
+  }
+
+  /**
+   * 노쇼 확정: 신청을 NO_SHOW 로 바꾸고 매너 온도를 내린 뒤 본인에게 알립니다 (REQ-REPORT-002).
+   * 같은 노쇼를 여러 명이 신고했으면 처음 확정할 때만 반영하고, 이후 신고는 상태만 처리합니다.
+   * @returns 이력에 남길 대상 이름 (공고 제목)
+   */
+  async function confirmNoShow(tx, report, events) {
+    if (report.targetType !== reportTargetType.noShow) {
+      throw new ApiError(400, 'INVALID_REPORT_ACTION', adminMessages.confirmNoShowNotAllowed);
+    }
+    const application = await tx.lockApplication(report.targetId);
+    if (!application) throw notFound('APPLICATION_NOT_FOUND', adminMessages.applicationNotFound);
+    const post = await tx.lockPost(application.postId);
+    if (application.status === applicationStatus.noShow) return post.title;
+    if (application.status !== applicationStatus.accepted) {
+      throw conflict('NO_SHOW_NOT_APPLICABLE', adminMessages.noShowNotApplicable);
+    }
+
+    await tx.markNoShow({ applicationId: application.id, postId: post.id });
+    const mannerTemp = await tx.applyNoShowPenalty(application.applicantId);
+    events.push([post.id, POST_EVENT.post]);
+    await tx.insertNotification({
+      memberId: application.applicantId,
+      type: notificationType.noShow,
+      message: truncate(adminMessages.noShowNotice(post.title, mannerTemp), NOTIFICATION_MAX_LENGTH),
+      postId: post.id,
+    });
+    return post.title;
   }
 
   // ───────── 공고
