@@ -25,6 +25,7 @@ function createFakeRepository() {
       admins: [],
       members: [],
       posts: [],
+      applications: [],
       comments: [],
       reports: [],
       sanctions: [],
@@ -129,6 +130,19 @@ function createFakeRepository() {
     },
     async deletePost({ id, adminId, reason, now }) {
       Object.assign(byId(state.posts, id), { status: 'DELETED', deletedAt: now, deletedBy: adminId, deleteReason: reason });
+    },
+    async lockApplication(id) {
+      return snapshot(byId(state.applications, id));
+    },
+    async markNoShow({ applicationId, postId }) {
+      byId(state.applications, applicationId).status = 'NO_SHOW';
+      const p = byId(state.posts, postId);
+      p.currentCount = Math.max(1, p.currentCount - 1);
+    },
+    async applyNoShowPenalty(memberId) {
+      const m = byId(state.members, memberId);
+      m.mannerTemp = String(Math.max(0, Math.round(Number(m.mannerTemp) * 10) - 20) / 10);
+      return Number(m.mannerTemp);
     },
     async listMembers({ status, offset, limit }) {
       return pageOf(
@@ -362,6 +376,56 @@ describe('admin API', () => {
       assert.equal(res.status, 200);
       assert.equal(repo.state.posts[0].status, 'DELETED');
       assert.equal(repo.state.notifications[0].type, 'POST_DELETED');
+    });
+
+    describe('노쇼 확정 (CONFIRM_NO_SHOW)', () => {
+      /** 신고자(10)가 파티원 비매너(11)를 공고 100 에서 노쇼로 신고 — 신청 300 */
+      const noShowReport = (id, reporterId = 10) => ({
+        id, reporterId, targetType: 'NO_SHOW', targetId: 300, targetMemberId: 11, postId: 100, reasonCode: '연락 없이 불참', status: 'PENDING', createdAt: NOW,
+      });
+      beforeEach(() => {
+        repo.state.posts[0].currentCount = 3;
+        repo.state.applications.push({ id: 300, postId: 100, applicantId: 11, status: 'ACCEPTED' });
+        repo.state.reports.push(noShowReport(4), noShowReport(5, 12));
+      });
+      const confirm = (id = 4) => request('PATCH', `/reports/${id}`, { body: { status: 'DONE', action: 'CONFIRM_NO_SHOW', memo: '노쇼 확인' } });
+
+      it('신청을 NO_SHOW 로 바꾸고 인원 −1, 매너 온도 −2.0℃, 본인 알림·이력·신호를 남긴다', async () => {
+        const res = await confirm();
+        assert.equal(res.status, 200);
+        assert.equal(repo.state.applications[0].status, 'NO_SHOW');
+        assert.equal(repo.state.posts[0].currentCount, 2);
+        assert.equal(repo.state.members.find((m) => m.id === 11).mannerTemp, '18.1');
+        assert.deepEqual(repo.state.notifications, [
+          { memberId: 11, type: 'NO_SHOW', message: '"광고 공고" 파티 노쇼가 확인되어 매너 온도가 18.1℃ 가 되었습니다.', postId: 100 },
+        ]);
+        assert.equal(repo.state.reports.find((r) => r.id === 4).action, 'CONFIRM_NO_SHOW');
+        assert.equal(repo.state.logs.at(-1).detail.targetLabel, '광고 공고');
+        assert.deepEqual(events.log, [[100, 'post']]);
+      });
+
+      it('같은 노쇼의 다른 신고를 확정해도 감점·알림은 한 번만', async () => {
+        await confirm(4);
+        assert.equal((await confirm(5)).status, 200);
+        assert.equal(repo.state.members.find((m) => m.id === 11).mannerTemp, '18.1');
+        assert.equal(repo.state.notifications.length, 1);
+        assert.equal(repo.state.reports.find((r) => r.id === 5).status, 'DONE');
+      });
+
+      it('그 사이 신청이 취소됐으면 409 NO_SHOW_NOT_APPLICABLE, 노쇼가 아닌 신고에는 400', async () => {
+        repo.state.applications[0].status = 'CANCELED';
+        const { body } = await json(await confirm());
+        assert.equal(body.error.code, 'NO_SHOW_NOT_APPLICABLE');
+        assert.equal(repo.state.reports.find((r) => r.id === 4).status, 'PENDING');
+
+        const wrong = await json(await request('PATCH', '/reports/1', { body: { status: 'DONE', action: 'CONFIRM_NO_SHOW' } }));
+        assert.equal(wrong.body.error.code, 'INVALID_REPORT_ACTION');
+      });
+
+      it('노쇼 신고에 경고 등 일반 제재도 할 수 있고, 이때 신청 상태는 그대로다', async () => {
+        assert.equal((await request('PATCH', '/reports/4', { body: { status: 'DONE', action: 'WARN', memo: '1차' } })).status, 200);
+        assert.equal(repo.state.applications[0].status, 'ACCEPTED');
+      });
     });
 
     it('회원 신고에 DELETE_CONTENT 는 400, 실패하면 아무것도 바뀌지 않는다', async () => {

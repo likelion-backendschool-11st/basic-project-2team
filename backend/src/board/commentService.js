@@ -2,7 +2,7 @@
 
 const { ApiError } = require('../common/ApiError');
 const { POST_EVENT, NO_EVENTS } = require('../common/postEvents');
-const { boardMessages } = require('./boardConstants');
+const { POST_STATUS, boardMessages } = require('./boardConstants');
 const { COMMENT_CHANNELS, COMMENT_STATUS, MEMBER_STATUS, REPORT_TARGET_TYPES, commentMessages } = require('./commentConstants');
 const {
   parseCommentListQuery,
@@ -298,6 +298,35 @@ function createCommentService({ commentRepository, postEvents = NO_EVENTS, now =
     return { id };
   }
 
+  /**
+   * 노쇼 신고 (REQ-REPORT-002). 그 파티의 확정 인원(파티장 + 승인된 파티원)이 승인된 다른 파티원을 신고합니다.
+   * 출발 시간이 지났거나 활동 완료된 파티만 받고, 관리자가 확정하면 신청이 NO_SHOW 로 바뀝니다.
+   */
+  async function reportNoShow(memberId, input) {
+    const target = await commentRepository.findNoShowTarget(input.postId, input.targetId);
+    if (!target) throw postNotFound();
+    if (input.targetId === memberId) throw new ApiError(400, 'CANNOT_REPORT_SELF', commentMessages.cannotReportSelfMember);
+
+    const party = await commentRepository.findPartyMembers(target.postId);
+    if (!party.some((row) => row.memberId === memberId)) throw new ApiError(403, 'NOT_PARTY_MEMBER', commentMessages.notPartyMember);
+    if (target.application?.status !== 'ACCEPTED') {
+      throw new ApiError(404, 'NO_SHOW_TARGET_NOT_FOUND', commentMessages.noShowTargetNotFound);
+    }
+    const started = target.scheduleAt !== null && new Date(target.scheduleAt) <= now();
+    if (target.status !== POST_STATUS.completed && !started) throw new ApiError(409, 'NO_SHOW_TOO_EARLY', commentMessages.noShowTooEarly);
+
+    const id = await commentRepository.createNoShowReport({
+      reporterId: memberId,
+      applicationId: target.application.id,
+      targetMemberId: input.targetId,
+      postId: target.postId,
+      reasonCode: input.reason,
+      detail: input.detail,
+    });
+    if (id === null) throw new ApiError(409, 'ALREADY_REPORTED', commentMessages.alreadyReportedNoShow);
+    return { id };
+  }
+
   /** 댓글 신고. 같은 댓글은 한 번만, 본인 댓글은 신고할 수 없습니다. */
   async function reportComment(memberId, input) {
     const comment = await loadComment(input.targetId);
@@ -328,11 +357,12 @@ function createCommentService({ commentRepository, postEvents = NO_EVENTS, now =
     return { id };
   }
 
-  /** POST /api/reports: targetType 에 따라 댓글·회원·공고 신고로 보냅니다. */
+  /** POST /api/reports: targetType 에 따라 댓글·회원·공고·노쇼 신고로 보냅니다. */
   async function report(memberId, body) {
     const input = validateCreateReport(body);
     if (input.targetType === REPORT_TARGET_TYPES.member) return reportMember(memberId, input);
     if (input.targetType === REPORT_TARGET_TYPES.post) return reportPost(memberId, input);
+    if (input.targetType === REPORT_TARGET_TYPES.noShow) return reportNoShow(memberId, input);
     return reportComment(memberId, input);
   }
 

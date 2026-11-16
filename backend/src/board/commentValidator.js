@@ -10,6 +10,7 @@ const {
   MAX_COMMENT_PAGE_SIZE,
   REPORT_TARGET_TYPES,
   REPORT_REASONS,
+  NO_SHOW_REPORT_REASONS,
   REPORT_DETAIL_MAX_LENGTH,
   COMMENT_CHANNELS,
   DEFAULT_COMMENT_CHANNEL,
@@ -118,8 +119,9 @@ function validateUpdateComment(body) {
 }
 
 /**
- * 신고 요청 본문 `{ targetType, targetId, reason, detail? }` 을 검증·정규화합니다.
- * @returns {{ targetType: string, targetId: number, reason: string, detail: string | null }}
+ * 신고 요청 본문 `{ targetType, targetId, reason, detail?, postId? }` 을 검증·정규화합니다.
+ * NO_SHOW 는 targetId 가 신고할 파티원의 회원 id 이고, 어느 파티인지 postId 가 필요하며 사유 목록이 따로 있습니다.
+ * @returns {{ targetType: string, targetId: number, reason: string, detail: string | null, postId: number | null }}
  */
 function validateCreateReport(body) {
   const source = asObject(body);
@@ -132,14 +134,20 @@ function validateCreateReport(body) {
   const targetId = parseId(source.targetId);
   if (targetId === null) fail('targetId', m.targetIdInvalid);
 
+  const noShow = targetType === REPORT_TARGET_TYPES.noShow;
+  const postId = noShow ? parseId(source.postId) : null;
+  if (noShow && postId === null) fail('postId', m.postIdInvalid);
+
   const reason = asString(source.reason);
-  if (!REPORT_REASONS.includes(reason)) fail('reason', m.reasonInvalid);
+  if (noShow ? !NO_SHOW_REPORT_REASONS.includes(reason) : !REPORT_REASONS.includes(reason)) {
+    fail('reason', noShow ? m.noShowReasonInvalid : m.reasonInvalid);
+  }
 
   const detail = asString(source.detail);
   if (charLength(detail) > REPORT_DETAIL_MAX_LENGTH) fail('detail', m.detailTooLong);
 
   if (fields.length > 0) throw new ApiError(400, 'INVALID_INPUT', m.invalidInput, fields);
-  return { targetType, targetId, reason, detail: detail || null };
+  return { targetType, targetId, reason, detail: detail || null, postId };
 }
 
 module.exports = {

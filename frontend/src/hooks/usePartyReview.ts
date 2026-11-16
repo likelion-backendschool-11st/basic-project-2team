@@ -65,6 +65,7 @@ export function usePartyReview(notify: (message: string) => void, onFinished: ()
 
   return {
     isOpen: session !== null,
+    postId: session?.postId ?? null,
     members: session?.members ?? [],
     tags: session?.tags ?? [],
     open,

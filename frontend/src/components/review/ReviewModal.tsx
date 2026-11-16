@@ -1,6 +1,7 @@
 import React from 'react';
 import { reviewDefaults, reviewMembers, reviewTags, reviewText } from '../../data/reviewData';
 import type { ReviewMember, ReviewTag } from '../../data/reviewData';
+import type { NoShowTarget } from '../../hooks/useNoShowReport';
 import { useReviewForm, type SubmittedReview } from '../../hooks/useReviewForm';
 import ReviewSheet from './ReviewSheet';
 import ReviewConfirmDialog from './ReviewConfirmDialog';
@@ -19,6 +20,8 @@ interface ReviewModalProps {
   readonly errorMessage?: (err: unknown) => string;
   /** 마지막 파티원까지 평가를 마쳤을 때 (없으면 onClose) */
   readonly onComplete?: () => void;
+  /** 노쇼 신고 (파티장이 아닌 파티원에게만 버튼이 보임) */
+  readonly noShow?: { readonly isReported: (memberId: number) => boolean; readonly onReport: (target: NoShowTarget) => void };
 }
 
 type ReviewModalBodyProps = Omit<ReviewModalProps, 'isOpen'>;
@@ -33,6 +36,7 @@ const ReviewModalBody: React.FC<ReviewModalBodyProps> = ({
   onSubmitted,
   errorMessage,
   onComplete = onClose,
+  noShow,
 }) => {
   const form = useReviewForm({
     members,
@@ -98,6 +102,8 @@ const ReviewModalBody: React.FC<ReviewModalBodyProps> = ({
           error={form.error}
           onSubmit={form.requestSubmit}
           onClose={close}
+          onReportNoShow={noShow && !m.isHost ? () => noShow.onReport({ memberId: Number(m.id), name: m.name }) : undefined}
+          noShowReported={noShow?.isReported(Number(m.id))}
         />
       </div>
     </div>

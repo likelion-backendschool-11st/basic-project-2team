@@ -48,6 +48,10 @@ export const removeScrap = (postId: string) => request<void>('DELETE', postUrl(p
 export const reportPost = (postId: string, reason: string, detail?: string) =>
   request<{ readonly id: number }>('POST', '/api/reports', { targetType: 'POST', targetId: Number(postId), reason, ...(detail ? { detail } : {}) });
 
+/** POST /api/reports — 노쇼 신고. 같은 파티의 확정 인원만, 출발 시간이 지났거나 활동 완료된 파티에서만 받습니다. */
+export const reportNoShow = (postId: number, memberId: number, reason: string, detail?: string) =>
+  request<{ readonly id: number }>('POST', '/api/reports', { targetType: 'NO_SHOW', postId, targetId: memberId, reason, ...(detail ? { detail } : {}) });
+
 /** 참가 신청 · 취소 (docs/API_SPEC.md 4절). role · message 는 선택이라 원클릭 신청은 빈 본문으로 보냅니다. */
 export const applyToPost = (postId: string) => request<{ readonly id: number; readonly status: string }>('POST', postUrl(postId, '/applications'), {});
 export const cancelApplication = (postId: string) => request<void>('DELETE', postUrl(postId, '/applications/me'));
