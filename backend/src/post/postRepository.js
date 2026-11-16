@@ -11,6 +11,7 @@ const {
   POST_STATUS_COMPLETED,
   NOTICE_TARGET_STATUSES,
 } = require('./postConstants');
+const { awardDailyLimitedPoints, revokeActivityPoints } = require('../common/activityPoint');
 
 function createPostRepository(pool) {
   /** 게임 코드 → { id, categoryCode }. 없거나 비활성이면 null */
@@ -75,6 +76,9 @@ function createPostRepository(pool) {
       const postId = result.insertId;
 
       await attachTags(connection, postId, tags);
+
+      // 공고 작성 +10 (하루 3회까지, docs/03-db-design.md 결정 사항 8-1)
+      await awardDailyLimitedPoints(connection, { memberId: post.authorId, actionType: 'POST_CREATE', refId: postId });
 
       // 등록한 글의 임시저장은 더 이어 쓸 일이 없으므로 같은 트랜잭션에서 지웁니다.
       await connection.query('DELETE FROM post_draft WHERE member_id = ?', [post.authorId]);
@@ -194,6 +198,8 @@ function createPostRepository(pool) {
       );
       if (result.affectedRows > 0) {
         await connection.query('DELETE FROM post_scrap WHERE post_id = ?', [postId]);
+        // 이 공고로 받은 작성 점수를 회수합니다 (결정 사항 8-2).
+        await revokeActivityPoints(connection, 'POST_CREATE', [postId]);
         if (notice) await notifyApplicants(connection, { postId, linkPostId: null, notice });
       }
       await connection.commit();

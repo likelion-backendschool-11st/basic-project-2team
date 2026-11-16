@@ -29,6 +29,7 @@ function createFakeRepository() {
       reports: [],
       sanctions: [],
       notifications: [],
+      revokedPoints: [],
       logs: [],
     });
   reset();
@@ -182,6 +183,9 @@ function createFakeRepository() {
     async decrementCommentCount(postId) {
       const p = byId(state.posts, postId);
       p.commentCount = Math.max(0, p.commentCount - 1);
+    },
+    async revokePoints(actionType, refIds) {
+      state.revokedPoints.push([actionType, ...refIds]);
     },
     /** 실제 트랜잭션처럼, 실패하면 상태를 되돌립니다. */
     async withTransaction(fn) {
@@ -415,6 +419,7 @@ describe('admin API', () => {
       assert.equal((await request('DELETE', '/posts/100', { body: {} })).status, 400);
       assert.equal((await request('DELETE', '/posts/100', { body: { reason: '허위 공고' } })).status, 204);
       assert.equal(repo.state.posts[0].deleteReason, '허위 공고');
+      assert.deepEqual(repo.state.revokedPoints, [['POST_CREATE', 100]]);
       assert.equal(repo.state.logs.at(-1).detail.targetLabel, '광고 공고');
       const again = await json(await request('DELETE', '/posts/100', { body: { reason: '허위 공고' } }));
       assert.equal(again.body.error.code, 'POST_ALREADY_DELETED');
@@ -542,8 +547,10 @@ describe('admin API', () => {
       const same = await json(await request('PATCH', '/comments/200', { body: { status: 'HIDDEN', reason: '욕설' } }));
       assert.equal(same.body.error.code, 'COMMENT_STATUS_UNCHANGED');
       assert.equal((await request('PATCH', '/comments/200', { body: { status: 'VISIBLE', reason: '오신고' } })).status, 200);
+      assert.deepEqual(repo.state.revokedPoints, [], '가림·복구는 점수를 회수하지 않는다');
       assert.equal((await request('PATCH', '/comments/200', { body: { status: 'DELETED', reason: '욕설' } })).status, 200);
       assert.equal(repo.state.posts[0].commentCount, 0);
+      assert.deepEqual(repo.state.revokedPoints, [['COMMENT_CREATE', 200]]);
 
       const after = await json(await request('PATCH', '/comments/200', { body: { status: 'VISIBLE', reason: 'x' } }));
       assert.equal(after.body.error.code, 'COMMENT_ALREADY_DELETED');
