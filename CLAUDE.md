@@ -43,7 +43,7 @@
 | 언어 | TypeScript ~5.6 (`strict: true`, `noUnusedLocals`, `noUnusedParameters`) |
 | 프레임워크 | React 18.3 |
 | 빌드 도구 | Vite 5.4 (`@vitejs/plugin-react`) |
-| 라우팅 | react-router-dom 6.30 — **`HashRouter`** 사용 (`/#/board` 형태) |
+| 라우팅 | react-router-dom 6.30 — **`BrowserRouter`** 사용 (`/board` 형태, 배포 시 모든 경로를 `index.html` 로 되돌리는 rewrite 필요 — `frontend/vercel.json`) |
 | 스타일 | Tailwind CSS 3.4 (+ `@tailwindcss/forms`, `@tailwindcss/container-queries`), PostCSS, Autoprefixer |
 | 아이콘 | Font Awesome Free 7 (`fa-solid fa-...`, `fa-brands fa-...` 클래스) |
 | 린트 | ESLint 9 (flat config) + typescript-eslint + react-hooks + react-refresh |
@@ -59,7 +59,7 @@ npm run preview   # 빌드 결과 미리보기
 npm run lint      # ESLint 검사
 ```
 
-- `vite.config.ts`의 `base: './'` 와 `postbuild` 스크립트 덕분에 `dist/index.html`을 서버 없이 파일로 바로 열 수 있습니다. 이 동작을 깨뜨리지 않도록 주의하세요.
+- `BrowserRouter` 를 쓰므로 `dist/index.html` 을 파일로 직접 열 수 없습니다. `npm run preview` 나 정적 서버(모든 경로를 `index.html` 로 되돌리도록 설정)로 확인합니다.
 - 작업을 마치면 최소한 `npm run build` 와 `npm run lint` 가 통과하는지 확인합니다.
 
 ### 백엔드
@@ -86,7 +86,7 @@ frontend/
 ├── tailwind.config.js      # 디자인 토큰 (night / mercury / fog 팔레트)
 ├── vite.config.ts
 └── src/
-    ├── main.tsx            # 엔트리 (HashRouter, Font Awesome, index.css)
+    ├── main.tsx            # 엔트리 (BrowserRouter, Font Awesome, index.css)
     ├── App.tsx             # 도메인별 라우트 묶음 조립 (보통 수정하지 않음)
     ├── routes/             # 도메인별 라우트 정의 (mainRoutes · boardRoutes · authRoutes · myPageRoutes · adminRoutes)
     ├── index.css           # Tailwind 레이어, 전역 스타일
