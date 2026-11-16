@@ -5,6 +5,8 @@ const {
   MEMBER_ID_PATTERN,
   DEFAULT_PAGE_SIZE,
   MAX_PAGE_SIZE,
+  DEFAULT_HISTORY_DAYS,
+  MAX_HISTORY_DAYS,
   APPLICATION_STATUSES,
   mypageMessages: m,
 } = require('./mypageConstants');
@@ -68,4 +70,11 @@ function parseApplicationQuery(query) {
   return { status, page, size };
 }
 
-module.exports = { parseMemberId, parsePageQuery, parseApplicationQuery };
+/** 매너 온도 변화 쿼리 (days, 기본 30). @returns {{ days: number }} */
+function parseHistoryQuery(query) {
+  const days = parseInteger(query.days, DEFAULT_HISTORY_DAYS);
+  throwIfInvalid(days === null || days < 1 || days > MAX_HISTORY_DAYS ? [{ field: 'days', message: m.daysInvalid }] : []);
+  return { days };
+}
+
+module.exports = { parseMemberId, parsePageQuery, parseApplicationQuery, parseHistoryQuery };

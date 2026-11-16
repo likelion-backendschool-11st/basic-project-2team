@@ -145,6 +145,16 @@ export const profileText = {
 /** 다른 회원의 프로필 페이지 (/members/:memberId) */
 export const memberProfileText = {
   back: '뒤로가기',
+  postsTitle: '작성한 공고',
+  postsEmpty: '작성한 공고가 없습니다.',
+  postsMore: '더 보기',
+  chartTitle: '매너 온도 변화',
+  chartRanges: [
+    { days: 7, label: '최근 7일' },
+    { days: 30, label: '최근 30일' },
+  ],
+  chartLoadFailed: '매너 온도 변화를 불러오지 못했습니다.',
+  chartNote: '받은 평가를 날짜별로 반영한 하루 끝 온도입니다.',
   gamesTitle: '게이머 프로필',
   gamesEmpty: '등록한 게임이 없습니다.',
   mainBadge: '대표',
