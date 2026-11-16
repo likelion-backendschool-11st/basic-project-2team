@@ -7,7 +7,7 @@ const { parseId, parseListQuery } = require('./notificationValidator');
 const toIso = (value) => (value ? new Date(value).toISOString() : null);
 
 /**
- * 알림함 조회·읽음 처리 비즈니스 로직 (docs/API_SPEC.md 4절).
+ * 알림함 조회·읽음 처리·삭제 비즈니스 로직 (docs/API_SPEC.md 4절).
  * @param {{ notificationRepository: ReturnType<typeof import('./notificationRepository').createNotificationRepository> }} deps
  */
 function createNotificationService({ notificationRepository }) {
@@ -53,7 +53,15 @@ function createNotificationService({ notificationRepository }) {
     await notificationRepository.markAllRead(memberId);
   }
 
-  return { list, unreadCount, markRead, markAllRead };
+  /** DELETE /api/notifications/:id — 읽음 처리와 같은 이유로 남의 알림은 404 */
+  async function remove(memberId, rawId) {
+    const id = parseId(rawId);
+    if (id === null || !(await notificationRepository.remove(memberId, id))) {
+      throw new ApiError(404, 'NOTIFICATION_NOT_FOUND', m.notFound);
+    }
+  }
+
+  return { list, unreadCount, markRead, markAllRead, remove };
 }
 
 module.exports = { createNotificationService };

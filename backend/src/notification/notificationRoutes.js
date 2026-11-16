@@ -11,6 +11,7 @@ function createNotificationRouter(notificationController, { requireAuth }) {
   router.get('/unread-count', notificationController.unreadCount);
   router.patch('/read-all', notificationController.markAllRead);
   router.patch('/:notificationId/read', notificationController.markRead);
+  router.delete('/:notificationId', notificationController.remove);
   return router;
 }
 

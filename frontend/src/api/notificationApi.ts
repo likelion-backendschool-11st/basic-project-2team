@@ -24,6 +24,15 @@ export interface NotificationPage {
 export const getNotifications = (page: number, size: number, unreadOnly: boolean) =>
   request<NotificationPage>('GET', `/api/notifications?page=${page}&size=${size}${unreadOnly ? '&unread=true' : ''}`);
 
+/** PATCH /api/notifications/{id}/read → 204 (이미 읽은 알림도 204) */
+export const markNotificationRead = (id: string) => request<void>('PATCH', `/api/notifications/${id}/read`);
+
+/** DELETE /api/notifications/{id} → 204 (복구 불가) */
+export const deleteNotification = (id: string) => request<void>('DELETE', `/api/notifications/${id}`);
+
+/** PATCH /api/notifications/read-all → 204 */
+export const markAllNotificationsRead = () => request<void>('PATCH', '/api/notifications/read-all');
+
 const MINUTE = 60_000;
 
 /** 지난 시각 → `방금 전` · `N분 전` · `N시간 전` · `N일 전` */

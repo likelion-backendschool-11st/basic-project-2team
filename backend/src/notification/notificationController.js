@@ -24,7 +24,12 @@ function createNotificationController(notificationService) {
     return res.status(204).end();
   }
 
-  return { list, unreadCount, markRead, markAllRead };
+  async function remove(req, res) {
+    await notificationService.remove(memberId(req), req.params.notificationId);
+    return res.status(204).end();
+  }
+
+  return { list, unreadCount, markRead, markAllRead, remove };
 }
 
 module.exports = { createNotificationController };
