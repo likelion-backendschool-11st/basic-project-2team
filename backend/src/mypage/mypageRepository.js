@@ -27,7 +27,7 @@ const REVIEW_PROGRESS_COLUMNS = `(SELECT COUNT(*) FROM member host
 
 /**
  * 마이페이지·회원 프로필 조회용 테이블 접근:
- * member · member_game_profile · game · post · post_application · comment · review · review_tag_map · review_tag · favorite_member
+ * member · member_game_profile · game · post · post_application · post_scrap · comment · review · review_tag_map · review_tag · favorite_member
  * @param {import('mysql2/promise').Pool} pool
  */
 function createMypageRepository(pool) {
@@ -169,6 +169,27 @@ function createMypageRepository(pool) {
     return { rows, totalCount: Number(totalCount) };
   }
 
+  /** 내가 스크랩한 공고 한 페이지와 전체 건수 (최근 스크랩순). 삭제된 공고는 제외 */
+  async function findMyScrapPage({ memberId, limit, offset }) {
+    const condition = `ps.member_id = ? AND ${ALIVE_POST}`;
+    const [[{ totalCount }]] = await pool.query(
+      `SELECT COUNT(*) AS totalCount FROM post_scrap ps JOIN post p ON p.id = ps.post_id WHERE ${condition}`,
+      [memberId],
+    );
+    const [rows] = await pool.query(
+      `SELECT ${POST_COLUMNS}, ps.created_at AS scrappedAt, m.nickname AS hostNickname, m.status AS hostStatus
+         FROM post_scrap ps
+         JOIN post p ON p.id = ps.post_id
+         JOIN game g ON g.id = p.game_id
+         JOIN member m ON m.id = p.author_id
+        WHERE ${condition}
+        ORDER BY ps.created_at DESC, ps.post_id DESC
+        LIMIT ? OFFSET ?`,
+      [memberId, limit, offset],
+    );
+    return { rows, totalCount: Number(totalCount) };
+  }
+
   /** 즐겨찾는 유저 (최근 추가순, 탈퇴 회원 제외) + 대표 게임 */
   async function findFavorites(memberId) {
     const [rows] = await pool.query(
@@ -220,6 +241,7 @@ function createMypageRepository(pool) {
     findMyPostPage,
     findMyApplicationPage,
     findMyCommentPage,
+    findMyScrapPage,
     findFavorites,
     isFavorite,
     addFavorite,

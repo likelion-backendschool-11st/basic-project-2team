@@ -18,6 +18,9 @@ interface ActivitySectionProps {
   /** 별점 평가 창을 여는 중이면 버튼을 잠급니다. */
   readonly actionDisabled?: boolean;
   readonly onPostAction: (post: ActivityPost) => void;
+  /** 스크랩 탭의 「스크랩 해제」 */
+  readonly onUnscrap: (post: ActivityPost) => void;
+  readonly unscrapDisabled?: boolean;
   readonly pager: {
     readonly page: number;
     readonly pages: readonly number[];
@@ -30,7 +33,7 @@ interface ActivitySectionProps {
   };
 }
 
-/** 내 공고 | 참여한 파티 | 댓글 section with table + pagination. */
+/** 내 공고 | 참여한 파티 | 댓글 | 스크랩 section with table + pagination. */
 export const ActivitySection: React.FC<ActivitySectionProps> = ({
   tab,
   isActive,
@@ -42,6 +45,8 @@ export const ActivitySection: React.FC<ActivitySectionProps> = ({
   error,
   actionDisabled,
   onPostAction,
+  onUnscrap,
+  unscrapDisabled,
   pager,
 }) => {
   const isComments = tab === 'comments';
@@ -83,7 +88,7 @@ export const ActivitySection: React.FC<ActivitySectionProps> = ({
           ) : (
             <>
               <div className="col-span-5">{cols.title}</div>
-              <div className="col-span-2 text-center">{cols.date}</div>
+              <div className="col-span-2 text-center">{tab === 'scraps' ? cols.scrapDate : cols.date}</div>
               <div className="col-span-2 text-right sm:text-center">{cols.status}</div>
             </>
           )}
@@ -93,7 +98,15 @@ export const ActivitySection: React.FC<ActivitySectionProps> = ({
           (isComments
             ? comments.map((c, i) => <ActivityCommentRow key={c.id} comment={c} isLast={i === comments.length - 1} />)
             : posts.map((p, i) => (
-                <ActivityPostRow key={p.id} post={p} isLast={i === posts.length - 1} actionDisabled={actionDisabled} onAction={onPostAction} />
+                <ActivityPostRow
+                  key={p.id}
+                  post={p}
+                  isLast={i === posts.length - 1}
+                  actionDisabled={actionDisabled}
+                  onAction={onPostAction}
+                  onUnscrap={onUnscrap}
+                  unscrapDisabled={unscrapDisabled}
+                />
               )))}
       </div>
 

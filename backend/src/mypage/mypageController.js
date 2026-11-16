@@ -35,6 +35,10 @@ function createMypageController(mypageService) {
     return sendSuccess(res, 200, await mypageService.listMyComments(req.auth.memberId, req.query));
   }
 
+  async function listMyScraps(req, res) {
+    return sendSuccess(res, 200, await mypageService.listMyScraps(req.auth.memberId, req.query));
+  }
+
   async function listFavorites(req, res) {
     return sendSuccess(res, 200, await mypageService.listFavorites(req.auth.memberId));
   }
@@ -55,6 +59,7 @@ function createMypageController(mypageService) {
     listMyPosts,
     listMyApplications,
     listMyComments,
+    listMyScraps,
     listFavorites,
     addFavorite,
     removeFavorite,

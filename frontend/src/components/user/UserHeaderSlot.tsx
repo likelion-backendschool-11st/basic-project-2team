@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import type { LoginUser } from '../../api/authApi';
+import { formatTemperature } from '../../api/mypageApi';
 import { userMenuText } from '../../data/userData';
 import { useUserMenu } from '../../hooks/useUserMenu';
 
@@ -35,7 +36,7 @@ export const UserHeaderSlot: React.FC<UserHeaderSlotProps> = ({ user }) => {
           </div>
           <span className="text-[10px] text-fog-muted">
             {userMenuText.mannerPrefix}
-            {Math.round(user.mannerTemp)}°C
+            {formatTemperature(user.mannerTemp)}
           </span>
         </div>
       </Link>

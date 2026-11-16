@@ -49,6 +49,8 @@ export const MyPage: React.FC<MyPageProps> = () => {
               error={activity.error}
               actionDisabled={review.opening}
               onPostAction={page.onPostAction}
+              onUnscrap={page.unscrap.run}
+              unscrapDisabled={page.unscrap.pending}
               pager={activity.pager}
             />
             <FavoriteUsersSection users={favorites.users} loading={favorites.loading} onRemove={(u) => void favorites.remove(u)} />

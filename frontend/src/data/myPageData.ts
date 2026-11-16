@@ -1,7 +1,7 @@
 import { ROUTES } from './routes';
 
 export type GameAccent = 'amber' | 'blue' | 'rose';
-export type ActivityTab = 'posts' | 'parties' | 'comments';
+export type ActivityTab = 'posts' | 'parties' | 'comments' | 'scraps';
 
 /**
  * 목록 「상태 / 조치」 칸에 보여줄 것.
@@ -76,6 +76,8 @@ export interface ActivityPost {
   readonly date: string;
   readonly action: ActivityAction;
   readonly to: string;
+  /** 스크랩 탭 행이면 「스크랩 해제」 버튼을 함께 보여줍니다. */
+  readonly scrapped?: boolean;
 }
 
 export interface ActivityComment {
@@ -157,22 +159,26 @@ export const activityText = {
     { id: 'posts', label: '내 공고' },
     { id: 'parties', label: '참여한 파티' },
     { id: 'comments', label: '댓글' },
+    { id: 'scraps', label: '스크랩' },
   ] as readonly { readonly id: ActivityTab; readonly label: string; readonly badge?: string }[],
   hint: '활동이 끝난 파티는 활동 완료 처리 후 파티원에게 별점을 남겨주세요.',
   titles: {
     posts: '내가 모집한 공고',
     parties: '내가 참여한 파티',
     comments: '내가 작성한 댓글',
+    scraps: '내가 스크랩한 공고',
   } as Record<ActivityTab, string>,
   countLabel: {
     posts: (n: number) => `총 ${n}건 등록됨`,
     parties: (n: number) => `총 ${n}건 참여함`,
     comments: (n: number) => `총 ${n}건 작성됨`,
+    scraps: (n: number) => `총 ${n}건 스크랩함`,
   } as Record<ActivityTab, (n: number) => string>,
   empty: {
     posts: '아직 작성한 공고가 없습니다.',
     parties: '아직 참여한 파티가 없습니다.',
     comments: '아직 작성한 댓글이 없습니다.',
+    scraps: '아직 스크랩한 공고가 없습니다. 관심 있는 공고를 스크랩해 두면 여기서 모아볼 수 있어요.',
   } as Record<ActivityTab, string>,
   loading: '불러오는 중입니다…',
   loadFailed: '목록을 불러오지 못했습니다.',
@@ -181,6 +187,7 @@ export const activityText = {
     game: '게임',
     title: '글 제목 또는 파티 내용',
     date: '작성일',
+    scrapDate: '스크랩일',
     status: '상태 / 조치',
     comment: '댓글 내용',
   },
@@ -197,6 +204,9 @@ export const activityText = {
   hostPrefix: '파티장 ',
   hiddenComment: '[가려진 댓글] ',
   secretComment: '[비밀] ',
+  unscrap: '스크랩 해제',
+  unscrapped: '스크랩을 해제했습니다.',
+  unscrapFailed: '스크랩 해제에 실패했습니다.',
   rangeSuffix: '개',
   pageSize: 5,
   prevLabel: '<',

@@ -9,7 +9,7 @@ interface ActivityTabsProps {
 
 /** 게시글 | 댓글 tab switcher. */
 export const ActivityTabs: React.FC<ActivityTabsProps> = ({ tabs, isActive, onSelect }) => (
-  <div className="flex items-center gap-2" role="tablist">
+  <div className="flex flex-wrap items-center gap-2" role="tablist">
     {tabs.map((t) => {
       const active = isActive(t.id);
       return (

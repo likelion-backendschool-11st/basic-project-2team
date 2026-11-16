@@ -336,7 +336,7 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
   - `GET /api/posts/{postId}?view=false` 로 조회하면 조회수를 올리지 않아, 신호를 받아 다시 조회할 때 쓸 수 있습니다.
 - **관련 공고** (`GET /api/posts/{postId}/related?limit=`): 응답은 목록 아이템(`GET /api/posts` 의 `items[]`)과 같은 모양의 **배열**이며 비로그인도 쓸 수 있고 **조회수는 올리지 않습니다**. 기준 공고와 **같은 게임**의, 모집 중(`OPEN`)이고 아직 출발하지 않은(일정 미정 포함) **다른 공고**를 같은 상세 분류 → 겹치는 태그가 많은 순 → 최신순으로 돌려줍니다. `limit` 기본 4, 1~20(그 밖은 400 `INVALID_INPUT`). 없으면 빈 배열, 기준 공고가 없거나 삭제됐거나 `postId` 형식이 틀리면 404 `POST_NOT_FOUND`.
 - **공고 수정** (`PUT /api/posts/{postId}`) 🔒 작성자(일정·게임·상세 분류가 바뀌면 신청자에게 알림 — 알림 전송 표 참고): 요청 본문은 공고 작성(`POST /api/posts`)과 같고 모든 필드를 다시 보냅니다(태그는 보낸 것으로 교체). 응답 `200 { id }`. 작성과 같은 규칙으로 검증하되, **기존 일정을 그대로 보내면 이미 지난 일정이어도 허용**하고 새로 지정하는 과거 일정은 400 입니다. 모집 인원은 파티장 포함 **확정 인원보다 줄일 수 없고**(400 `INVALID_INPUT`, `fields[headcount]`), 모집 중인 공고의 인원을 확정 인원과 같게 줄이면 `CLOSED` 로 바뀝니다. 마감(`CLOSED`) 공고는 수정할 수 있고 상태는 그대로이며, 모집 중으로 되돌리려면 `PATCH .../status` 를 씁니다. 오류: 401 `UNAUTHORIZED`, 403 `NOT_POST_AUTHOR`, 404 `POST_NOT_FOUND`(없음·삭제됨·`postId` 형식 오류) · `GAME_NOT_FOUND` · `GAME_CONTENT_NOT_FOUND`, 409 `POST_NOT_EDITABLE`(완료된 공고).
-- **스크랩** (`POST /api/posts/{postId}/scrap`, `DELETE /api/posts/{postId}/scrap`) 🔒: 둘 다 응답 `204` 이고 **멱등**입니다(이미 스크랩했거나 스크랩하지 않았어도 성공). 내 스크랩만 다루며 내 공고도 스크랩할 수 있습니다. 상세(`GET /api/posts/{postId}`)의 `viewer.scrapped` 에 반영됩니다. 오류: 401 `UNAUTHORIZED`, 404 `POST_NOT_FOUND`(없음·삭제됨·`postId` 형식 오류). 공고가 삭제되면 그 공고의 스크랩도 함께 지워집니다.
+- **스크랩** (`POST /api/posts/{postId}/scrap`, `DELETE /api/posts/{postId}/scrap`) 🔒: 둘 다 응답 `204` 이고 **멱등**입니다(이미 스크랩했거나 스크랩하지 않았어도 성공). 내 스크랩만 다루며 내 공고도 스크랩할 수 있습니다. 상세(`GET /api/posts/{postId}`)의 `viewer.scrapped` 에 반영되고, 목록은 마이페이지 `GET /api/members/me/scraps` 로 봅니다. 오류: 401 `UNAUTHORIZED`, 404 `POST_NOT_FOUND`(없음·삭제됨·`postId` 형식 오류). 공고가 삭제되면 그 공고의 스크랩도 함께 지워집니다.
 - **공고 삭제** (`DELETE /api/posts/{postId}`) 🔒 작성자: 응답 `204`. 소프트 삭제(`status = DELETED`, `deleted_at`)라 신청·댓글·리뷰는 보존하고, 그 공고의 스크랩은 삭제합니다. 삭제된 공고는 목록·상세·카테고리 공고 수에서 빠지고, 대기 중·수락된 신청자에게 알림을 보냅니다. 오류: 401 `UNAUTHORIZED`, 403 `NOT_POST_AUTHOR`, 404 `POST_NOT_FOUND`(없음, 이미 삭제됨, `postId` 가 1 이상의 정수가 아님). 활동 점수 회수(`POST_REVOKE`)는 점수 지급이 구현될 때 함께 합니다.
 - **모집 상태 변경** (`PATCH /api/posts/{postId}/status`) 🔒 작성자: 규칙·응답·오류는 4절 「모집 상태 변경」을 보세요(`backend/src/party`).
 - **임시저장** (`POST /api/posts/drafts`, `GET /api/posts/drafts/latest`): 회원당 1개이며 새로 저장하면 덮어씁니다. 요청 본문은 작성 폼 값 `{ title, body, partyName, game, type, detail, headcount, style, tbd, date, time, voice }` 중 보낸 것만 저장하고(미완성·빈 값 허용, 알 수 없는 필드는 버림), 타입이 틀리거나 너무 긴 값은 400 `INVALID_INPUT`(필드별) 입니다. 두 API 모두 `{ draft, savedAt }` 를 돌려주며, 저장한 적이 없으면 `GET` 은 `data: null` 입니다. 공고를 등록하면 그 회원의 임시저장은 삭제됩니다.
@@ -662,6 +662,7 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 | GET | `/api/members/me/posts?page=&size=` | 내가 쓴 공고 | 🔒 |
 | GET | `/api/members/me/applications?status=&page=&size=` | 내가 신청한 공고 (신청 상태 포함) | 🔒 |
 | GET | `/api/members/me/comments?page=&size=` | 내가 쓴 댓글 | 🔒 |
+| GET | `/api/members/me/scraps?page=&size=` | 내가 스크랩한 공고 | 🔒 |
 | GET | `/api/members/me/favorites` | 즐겨찾는 유저 목록 | 🔒 |
 | POST / DELETE | `/api/members/me/favorites/{memberId}` | 즐겨찾기 추가 / 해제 → `204` | 🔒 |
 | GET | `/api/members/{memberId}` | 회원 프로필 (로그인하면 `viewer` 포함) | |
@@ -758,6 +759,18 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
   "id": 5, "postId": 7, "postTitle": "[에키드나] 바로 출발", "game": "lostark", "gameName": "로스트아크",
   "content": "서폿 자리 남았으면 신청합니다!", "secret": false, "reply": false, "status": "VISIBLE",
   "createdAt": "2026-11-11T00:00:00.000Z"
+}
+```
+
+**내가 스크랩한 공고 아이템 (`/me/scraps`)**
+
+- 최근 스크랩순. 내 신청 아이템의 `post` 와 같은 형태(`host` 포함)에 `scrappedAt`(스크랩한 일시)을 더했습니다. 스크랩 해제는 `DELETE /api/posts/{postId}/scrap`.
+
+```json
+{
+  "id": 7, "category": "mmorpg", "game": "lostark", "gameName": "로스트아크", "type": "raid", "title": "[카멘] 숙련 서폿 구해요",
+  "current": 3, "max": 8, "schedule": "2026-11-15T12:00:00.000Z", "scheduleTbd": false, "status": "OPEN",
+  "host": "빛나는오더", "scrappedAt": "2026-11-14T00:00:00.000Z"
 }
 ```
 
