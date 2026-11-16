@@ -91,13 +91,6 @@ export function toHostProfile(res: MemberProfileResponse): HostProfile {
   return { gameLine: gameLine || null, bio: bio || null };
 }
 
-/** 마크다운 본문을 빈 줄 기준 문단으로 나눕니다 (마크다운 렌더러 도입 전까지 원문 그대로 표시). */
-const toParagraphs = (body: string) =>
-  body
-    .split(/\n\s*\n/)
-    .map((p) => p.trim())
-    .filter(Boolean);
-
 /** API 응답 → 상세 화면용 PostDetail */
 export function toPostDetail(res: PostDetailResponse): PostDetail {
   const t = postDetailText;
