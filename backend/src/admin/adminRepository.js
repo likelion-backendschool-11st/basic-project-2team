@@ -1,6 +1,6 @@
 'use strict';
 
-const { reportStatus, postStatus, commentStatus, COMMENT_REPORTED } = require('./adminConstants');
+const { reportStatus, postStatus, commentStatus, notificationType, COMMENT_REPORTED } = require('./adminConstants');
 const { revokeActivityPoints } = require('../common/activityPoint');
 
 /** LIKE 검색어의 %, _ 를 글자 그대로 찾도록 이스케이프합니다. */
@@ -301,6 +301,8 @@ function createAdminRepository(pool) {
         'UPDATE post SET status = ?, deleted_at = ?, deleted_by_admin_id = ?, delete_reason = ? WHERE id = ?',
         [postStatus.deleted, now, adminId, reason, id],
       );
+      // 삭제된 공고로는 수락할 수 없으니 아직 남은 파티 초대 알림을 지웁니다.
+      await db.query('DELETE FROM notification WHERE post_id = ? AND type = ?', [id, notificationType.partyInvite]);
     }
 
     // ───────── 회원

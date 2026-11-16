@@ -93,7 +93,8 @@ export const CommentSection: React.FC<CommentSectionProps> = ({ thread: t, owner
                   onAccept={() => t.accept(item.id)}
                   onCancelAccept={() => t.cancelAccept(item.id)}
                   onTogglePopover={() => t.setPopoverFor(t.popoverFor === item.id ? null : item.id)}
-                  onPopoverAction={t.toast.show}
+                  // 공대장만 남을 초대할 수 있습니다 (탈퇴 등으로 작성자를 모르면 버튼 없음).
+                  onInvite={ownerView && !item.mine && item.authorId ? () => t.invite(item.authorId) : undefined}
                   renderReply={render}
                 />
               );

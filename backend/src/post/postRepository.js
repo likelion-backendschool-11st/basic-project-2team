@@ -10,6 +10,7 @@ const {
   POST_STATUS_CLOSED,
   POST_STATUS_COMPLETED,
   NOTICE_TARGET_STATUSES,
+  NOTIFICATION_TYPE,
 } = require('./postConstants');
 const { awardDailyLimitedPoints, revokeActivityPoints } = require('../common/activityPoint');
 
@@ -219,7 +220,7 @@ function createPostRepository(pool) {
   }
 
   /**
-   * 공고를 소프트 삭제(status = DELETED, deleted_at)하고 스크랩을 정리합니다. 신청·댓글·리뷰는 그대로 둡니다.
+   * 공고를 소프트 삭제(status = DELETED, deleted_at)하고 스크랩과 남은 파티 초대 알림을 정리합니다. 신청·댓글·리뷰는 그대로 둡니다.
    * notice 가 있으면 같은 트랜잭션에서 대기 중·수락된 신청자에게 알립니다(공고가 사라졌으니 post_id 는 비움).
    * @returns {Promise<boolean>} 삭제했으면 true, 그 사이 이미 삭제됐으면 false
    */
@@ -234,6 +235,8 @@ function createPostRepository(pool) {
       );
       if (result.affectedRows > 0) {
         await connection.query('DELETE FROM post_scrap WHERE post_id = ?', [postId]);
+        // 해산(삭제)된 공고로는 수락할 수 없으니 아직 남은 파티 초대 알림을 지웁니다.
+        await connection.query('DELETE FROM notification WHERE post_id = ? AND type = ?', [postId, NOTIFICATION_TYPE.partyInvite]);
         // 이 공고로 받은 작성 점수를 회수합니다 (결정 사항 8-2).
         await revokeActivityPoints(connection, 'POST_CREATE', [postId]);
         if (notice) await notifyApplicants(connection, { postId, linkPostId: null, notice });

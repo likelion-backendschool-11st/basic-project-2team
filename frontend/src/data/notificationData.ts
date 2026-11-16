@@ -8,7 +8,11 @@ export type NotificationType =
   | 'POST_DELETED'
   | 'FAVORITE_AUTHOR_POST'
   | 'INTEREST_POST'
-  | 'SANCTION';
+  | 'SANCTION'
+  | 'PARTY_INVITE'
+  | 'INVITE_ACCEPTED'
+  | 'POLL_CONFIRMED'
+  | 'POLL_REMINDER';
 
 export interface NotificationView {
   readonly id: string;
@@ -21,6 +25,8 @@ export interface NotificationView {
   readonly read: boolean;
   /** 연결된 공고. 없거나 삭제됐으면 null */
   readonly postId: number | null;
+  /** 파티 초대 알림만: 이미 수락해 파티원이 됐는지. 초대가 아니거나 공고가 지워졌으면 null */
+  readonly invite: { readonly joined: boolean } | null;
 }
 
 export const NOTIFICATION_PAGE_SIZE = 20;
@@ -50,6 +56,10 @@ export const notificationTypes: Readonly<Record<NotificationType, { label: strin
   FAVORITE_AUTHOR_POST: { label: '즐겨찾기 새 공고', icon: 'fa-solid fa-star', tone: toneBrand },
   INTEREST_POST: { label: '관심 게임 새 공고', icon: 'fa-solid fa-gamepad', tone: toneOk },
   SANCTION: { label: '제재 안내', icon: 'fa-solid fa-triangle-exclamation', tone: toneDanger },
+  PARTY_INVITE: { label: '파티 초대', icon: 'fa-solid fa-envelope-open-text', tone: toneBrand },
+  INVITE_ACCEPTED: { label: '초대 수락', icon: 'fa-solid fa-handshake', tone: toneOk },
+  POLL_CONFIRMED: { label: '투표 결과', icon: 'fa-solid fa-flag-checkered', tone: toneOk },
+  POLL_REMINDER: { label: '투표 독려', icon: 'fa-solid fa-check-to-slot', tone: toneWarn },
 };
 
 /** 알려지지 않은 유형(서버에 새 유형이 생겼을 때)의 기본 표시 */
@@ -92,6 +102,10 @@ export const notificationText = {
   settingsRemove: '삭제',
   settingsLimit: (max: number) => `최대 ${max}개까지 설정할 수 있습니다.`,
   settingsSwitchLabel: (name: string) => `${name} 알림`,
+  inviteAccept: '파티 참여 수락',
+  inviteAccepting: '수락 중...',
+  inviteJoined: '참여 중 · 공고 보기',
+  inviteAcceptFailed: '파티 초대를 수락하지 못했습니다. 잠시 후 다시 시도해주세요.',
   prevPage: '이전 페이지',
   nextPage: '다음 페이지',
 } as const;

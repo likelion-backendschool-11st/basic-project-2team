@@ -37,7 +37,7 @@ const POST_STATUS_CLOSED = 'CLOSED';
 const POST_STATUS_COMPLETED = 'COMPLETED';
 
 /** notification.type — 파티 모듈(NOTIFICATION_TYPE)·관리자 삭제 알림과 같은 값입니다. */
-const NOTIFICATION_TYPE = Object.freeze({ postUpdated: 'POST_UPDATED', postDeleted: 'POST_DELETED', favoriteAuthorPosted: 'FAVORITE_AUTHOR_POST', interestPost: 'INTEREST_POST' });
+const NOTIFICATION_TYPE = Object.freeze({ postUpdated: 'POST_UPDATED', postDeleted: 'POST_DELETED', favoriteAuthorPosted: 'FAVORITE_AUTHOR_POST', interestPost: 'INTEREST_POST', partyInvite: 'PARTY_INVITE' });
 /** 공고 제목이 길면 이 글자 수에서 줄임표로 잘라 알림 문구(VARCHAR 200)에 넣습니다. */
 const NOTICE_TITLE_MAX = 40;
 /** 공고 수정·삭제를 알리는 대상: 대기 중·수락된 신청자 */

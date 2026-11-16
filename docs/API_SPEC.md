@@ -449,6 +449,8 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 | GET | `/api/posts/{postId}/applications` | 신청자 목록 | 🔒 작성자 |
 | PATCH | `/api/posts/{postId}/applications/{applicationId}` | 승인/거절 `{ status: "ACCEPTED" \| "REJECTED" }` | 🔒 작성자 |
 | GET | `/api/posts/{postId}/participants` | 확정 파티원 목록 (`Participant[]`) | |
+| POST | `/api/posts/{postId}/invitations` | 파티 초대 `{ memberId }` → 받은 회원에게 `PARTY_INVITE` 알림 | 🔒 작성자 |
+| POST | `/api/posts/{postId}/invitations/accept` | 받은 초대 수락 → 바로 파티원(`ACCEPTED`) | 🔒 |
 
 구현: `backend/src/party/` (`/api/posts` 에 마운트). 모두 🔒 이며 `participants` 만 비로그인도 조회할 수 있습니다. `postId`·`applicationId` 가 1 이상의 정수가 아니거나 삭제된 공고면 404 입니다.
 
@@ -485,6 +487,21 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 - 오류: 400 `INVALID_INPUT`, 401, 403 `NOT_POST_AUTHOR`, 404 `POST_NOT_FOUND`, 409 `POST_COMPLETED` · `PARTY_FULL` · `POST_NOT_PAUSABLE` · `COMPLETE_NOT_ALLOWED`(파티원이 없음).
 - ⚠️ 출발 시간이 지나면 종료 처리(REQ-POST-007 후반)는 스케줄러가 필요해 아직 없습니다.
 
+**파티 초대 (`POST /api/posts/{postId}/invitations`)** — 공대장이 댓글 작성자 프로필 카드의 「파티 초대하기」로 보냅니다. 본문 `{ "memberId": 2 }` → `201` `{ "postId": 7, "memberId": 2 }`
+
+- 초대장은 따로 테이블을 두지 않고 받은 회원의 **`PARTY_INVITE` 알림 행**이 대신합니다. 알림이 남아 있는 동안 같은 회원을 다시 초대하면 409 `ALREADY_INVITED`, 받은 회원이 알림을 지우면 다시 초대할 수 있습니다.
+- 공고가 **해산(삭제 — 작성자 `DELETE` · 관리자 삭제)되거나 완료(`COMPLETED`)되면** 같은 트랜잭션에서 그 공고의 남은 초대 알림(`PARTY_INVITE`)을 모두 지웁니다(더는 수락할 수 없으므로).
+- 초대(또는 신청)로 들어왔다가 **파티를 나간**(`CANCELED`) 회원은 다시 초대할 수 있습니다. 참가를 취소하면 같은 트랜잭션에서 남은 초대 알림을 지우고, 옛 초대가 남아 있더라도 나간 회원이면 지우고 새 초대를 보냅니다.
+- 모집 중·일시 중단 공고만, 정원이 남아 있을 때만 보낼 수 있습니다.
+- 오류: 400 `INVALID_INPUT`(`memberId` 가 1 이상의 정수가 아님), 401, 403 `NOT_POST_AUTHOR` · `CANNOT_INVITE_SELF`, 404 `POST_NOT_FOUND` · `MEMBER_NOT_FOUND`(없음·탈퇴), 409 `ALREADY_MEMBER` · `ALREADY_INVITED` · `INVITEE_UNAVAILABLE`(정지·영구 정지) · `POST_CLOSED` · `PARTY_FULL`.
+
+**초대 수락 (`POST /api/posts/{postId}/invitations/accept`)** — 본문 없음 → `200` `{ "postId": 7, "status": "ACCEPTED", "current": 3, "max": 4, "postStatus": "OPEN", "alreadyMember": false }`
+
+- 공대장 승인 없이 바로 파티원이 됩니다. 신청 이력(대기·거절·취소·노쇼)이 있으면 같은 행을 `ACCEPTED` 로 바꾸고, 없으면 새로 만듭니다. 승인과 같이 공고 행을 잠그고 정원을 확인하며, 마지막 자리면 공고를 마감(`CLOSED`)하고 대기 중인 신청자에게 `POST_UPDATED` 를 보냅니다.
+- 같은 트랜잭션에서 받은 **초대 알림(`PARTY_INVITE`)을 삭제**하고 공대장에게 `INVITE_ACCEPTED` 알림을 보냅니다. 그래서 수락한 초대를 다시 수락하면 404 `INVITATION_NOT_FOUND` 입니다.
+- 초대가 남아 있는데 이미 파티원이면(대기 중인 신청이 그사이 승인된 경우) 초대 알림만 지우고 `200` (`alreadyMember: true`) 입니다.
+- 오류: 401 `UNAUTHORIZED`, 403 `CANNOT_APPLY_OWN_POST` · `ACCOUNT_BANNED` · `ACCOUNT_SUSPENDED`, 404 `POST_NOT_FOUND` · `INVITATION_NOT_FOUND`(초대 알림이 없음), 409 `POST_CLOSED` · `PARTY_FULL`.
+
 **확정 파티원 (`GET /api/posts/{postId}/participants`)** — 파티장이 먼저, 이어서 수락된 순입니다.
 
 ```json
@@ -500,6 +517,8 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 | 신청 승인/거절 | 신청자 | `APPLICATION_RESULT` |
 | 수락된 파티원의 신청 취소 (대기 중 취소는 알리지 않음) | 파티장 | `APPLICATION_CANCELED` |
 | 승인으로 정원이 차서 자동 마감 | 아직 대기 중인 신청자 | `POST_UPDATED` |
+| 공대장이 파티 초대 | 초대받은 회원 | `PARTY_INVITE` |
+| 초대 수락 (수락으로 정원이 차면 위 자동 마감 알림도) | 파티장 | `INVITE_ACCEPTED` |
 | 작성자가 마감(`CLOSED`)·완료(`COMPLETED`) 처리 (재개는 알리지 않음) | 대기 중·수락된 신청자 | `POST_UPDATED` |
 | 작성자가 공고 수정(`PUT`)에서 **일정 · 게임 · 상세 분류를 바꿈** (제목·본문·태그만 고치면 알리지 않음) | 대기 중·수락된 신청자 | `POST_UPDATED` |
 | 작성자가 공고 삭제(`DELETE`) | 대기 중·수락된 신청자 | `POST_DELETED` (공고가 사라지므로 `postId` 는 `null`) |
@@ -508,12 +527,20 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 
 ### 알림함 (Notification)
 
-구현: `backend/src/notification/` (`/api/notifications` 에 마운트). 모두 🔒 이며 **내 알림만** 다룹니다(관리자가 보낸 `SANCTION` · `POST_DELETED` 포함). 실시간 푸시 없이 프론트가 폴링합니다.
+구현: `backend/src/notification/` (`/api/notifications` 에 마운트). 모두 🔒 이며 **내 알림만** 다룹니다(관리자가 보낸 `SANCTION` · `POST_DELETED` 포함). 헤더 배지는 10초 폴링에 더해, 실시간 신호를 보내는 알림(아래)은 바로 반영합니다.
+
+**실시간 알림 신호 (`GET /api/notifications/stream`)** — 로그인한 회원 전용 SSE 입니다. `Authorization` 헤더가 필요해 브라우저는 `EventSource` 대신 `fetch` 스트림으로 받습니다(토큰을 URL 에 넣지 않으려고).
+
+- 연결하면 `: connected` 주석 줄, 이후 25초마다 `: ping` 을 보냅니다. 내 알림함이 바뀌면 `event: notifications` + `data: {}` 가 옵니다(내용 없음 — 받으면 `unread-count`·목록을 다시 조회).
+- 신호를 보내는 경우: 파티 초대(받은 회원), 초대 수락(공대장 · 수락한 회원), 참가 신청·재신청(공대장), 참가 취소(공대장 · 취소한 회원). 그 밖의 알림은 폴링으로 반영됩니다.
+- 허브는 프로세스 메모리(`common/memberEvents.js`)라 서버를 여러 대로 늘리거나 서버리스(Vercel)에서는 신호가 닿지 않을 수 있고, 그때는 폴링만으로 동작합니다. 서버 전체 연결이 2000개를 넘으면 503 `TOO_MANY_CONNECTIONS`.
+- 오류: 401 `UNAUTHORIZED` · `TOKEN_EXPIRED`(프론트가 재발급 후 다시 연결), 503 `TOO_MANY_CONNECTIONS`.
 
 | Method | URI | 설명 |
 | --- | --- | --- |
 | GET | `/api/notifications?page=&size=&unread=` | 내 알림 목록(최신순). `size` 기본 20 · 최대 50, `unread=true` 면 안 읽은 알림만 |
 | GET | `/api/notifications/unread-count` | 안 읽은 알림 수 `{ count }` (헤더 배지 폴링용) |
+| GET | `/api/notifications/stream` | 내 알림 변경 신호(SSE, `text/event-stream`). 아래 「실시간 알림 신호」 참고 |
 | PATCH | `/api/notifications/{notificationId}/read` | 알림 하나를 읽음 처리 → `204` (이미 읽은 알림도 `204`) |
 | PATCH | `/api/notifications/read-all` | 내 안 읽은 알림을 모두 읽음 처리 → `204` |
 | DELETE | `/api/notifications/{notificationId}` | 알림 하나를 삭제 → `204` (복구 불가. 없는 알림·이미 지운 알림은 `404`) |
@@ -524,11 +551,15 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 
 ```json
 {
-  "items": [{ "id": 12, "type": "APPLICATION_RESULT", "message": "'카멘 하드 숙련팟' 공고 참가 신청이 수락되었습니다.", "postId": 7, "read": false, "createdAt": "2026-11-13T05:00:00.000Z" }],
+  "items": [
+    { "id": 13, "type": "PARTY_INVITE", "message": "빛나는오더님이 '카멘 하드 숙련팟' 파티에 초대했습니다.", "postId": 7, "read": false, "createdAt": "2026-11-13T06:00:00.000Z", "invite": { "joined": false } },
+    { "id": 12, "type": "APPLICATION_RESULT", "message": "'카멘 하드 숙련팟' 공고 참가 신청이 수락되었습니다.", "postId": 7, "read": false, "createdAt": "2026-11-13T05:00:00.000Z", "invite": null }
+  ],
   "page": 1, "size": 20, "totalCount": 1, "totalPages": 1, "unreadCount": 1
 }
 ```
 
+- `invite` 는 `PARTY_INVITE` 알림에만 붙고(그 외·공고가 삭제된 초대는 `null`), `joined` 는 받은 회원이 그 공고에 `ACCEPTED` 인지입니다. 프론트는 `false` 면 「파티 참여 수락」(→ `POST /api/posts/{postId}/invitations/accept` 후 목록에서 빼고 공고로 이동), `true` 면 「참여 중 · 공고 보기」 버튼을 보여줍니다(수락하면 알림이 지워지므로 `true` 는 다른 경로로 이미 파티원이 된 경우뿐).
 - `postId` 는 연결된 공고가 없거나 공고가 삭제돼 연결이 끊어지면 `null` 입니다. `unreadCount` 는 `unread` 필터와 상관없이 내 전체 안 읽은 알림 수입니다.
 - **관심 알림 설정**(REQ-NOTI-001): 회원당 최대 20개, 같은 대상(게임 + 상세 분류)은 한 번만 등록합니다. 오류: 400 `INVALID_INPUT`(`game` · `detail` · `enabled`), 404 `GAME_NOT_FOUND` · `GAME_CONTENT_NOT_FOUND` · `SUBSCRIPTION_NOT_FOUND`(없음, 남의 설정, 형식이 틀린 id), 409 `SUBSCRIPTION_EXISTS` · `SUBSCRIPTION_LIMIT`.
 - 오류: 400 `INVALID_INPUT`(`page` · `size` · `unread`), 401 `UNAUTHORIZED`, 404 `NOTIFICATION_NOT_FOUND`(없음, 남의 알림, 형식이 틀린 id — 남의 알림은 존재 여부를 알리지 않으려고 404).

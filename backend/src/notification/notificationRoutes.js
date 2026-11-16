@@ -9,6 +9,7 @@ function createNotificationRouter(notificationController, { requireAuth }) {
   router.get('/', notificationController.list);
   // 고정 경로는 /:notificationId 보다 먼저 둡니다.
   router.get('/unread-count', notificationController.unreadCount);
+  router.get('/stream', notificationController.stream);
   router.patch('/read-all', notificationController.markAllRead);
   router.get('/subscriptions', notificationController.listSubscriptions);
   router.post('/subscriptions', notificationController.addSubscription);

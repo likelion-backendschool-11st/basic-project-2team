@@ -9,9 +9,12 @@ function createNotificationRepository(pool) {
   async function findPage({ memberId, unreadOnly, limit, offset }) {
     const where = `member_id = ?${unreadOnly ? ' AND is_read = FALSE' : ''}`;
     const [[{ totalCount }]] = await pool.query(`SELECT COUNT(*) AS totalCount FROM notification WHERE ${where}`, [memberId]);
+    // 파티 초대 알림에는 받은 사람의 그 공고 신청 상태를 붙입니다(ACCEPTED 면 이미 수락한 초대).
     const [rows] = await pool.query(
-      `SELECT id, type, message, post_id AS postId, is_read AS isRead, created_at AS createdAt
-         FROM notification WHERE ${where} ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?`,
+      `SELECT n.id, n.type, n.message, n.post_id AS postId, n.is_read AS isRead, n.created_at AS createdAt, pa.status AS applicationStatus
+         FROM notification n
+         LEFT JOIN post_application pa ON n.type = 'PARTY_INVITE' AND pa.post_id = n.post_id AND pa.applicant_id = n.member_id
+        WHERE n.member_id = ?${unreadOnly ? ' AND n.is_read = FALSE' : ''} ORDER BY n.created_at DESC, n.id DESC LIMIT ? OFFSET ?`,
       [memberId, limit, offset],
     );
     return { rows, totalCount };

@@ -31,6 +31,8 @@ const NOTIFICATION_TYPE = Object.freeze({
   applicationResult: 'APPLICATION_RESULT',
   applicationCanceled: 'APPLICATION_CANCELED',
   postUpdated: 'POST_UPDATED',
+  partyInvite: 'PARTY_INVITE',
+  inviteAccepted: 'INVITE_ACCEPTED',
 });
 /** notification.message VARCHAR(200). 공고 제목이 길면 잘라서 넣습니다. */
 const NOTIFICATION_TITLE_MAX = 40;
@@ -60,6 +62,13 @@ const partyMessages = Object.freeze({
   alreadyDecided: '이미 처리된 신청입니다.',
   cancelNotAllowed: '완료된 파티에서는 신청을 취소할 수 없습니다.',
   withdrawnMember: '탈퇴한 회원',
+  inviteeInvalid: 'memberId 는 1 이상의 정수여야 합니다.',
+  memberNotFound: '존재하지 않는 회원입니다.',
+  cannotInviteSelf: '본인은 초대할 수 없습니다.',
+  alreadyMember: '이미 이 파티의 파티원입니다.',
+  alreadyInvited: '이미 초대를 보낸 회원입니다. 초대 알림이 남아 있는 동안은 다시 보낼 수 없습니다.',
+  inviteeUnavailable: '정지되었거나 탈퇴한 회원은 초대할 수 없습니다.',
+  invitationNotFound: '받은 파티 초대가 없습니다. 초대 알림을 지웠다면 공대장에게 다시 요청해 주세요.',
   /** 알림함 문구. title 은 공고 제목(잘린 것), nickname 은 신청자 닉네임 */
   notice: Object.freeze({
     applicationReceived: (nickname, title) => `${nickname}님이 '${title}' 공고에 참가를 신청했습니다.`,
@@ -68,6 +77,8 @@ const partyMessages = Object.freeze({
     rejected: (title) => `'${title}' 공고 참가 신청이 거절되었습니다.`,
     closed: (title) => `'${title}' 공고의 모집이 마감되었습니다.`,
     completed: (title) => `'${title}' 파티가 완료 처리되었습니다.`,
+    invited: (hostNickname, title) => `${hostNickname}님이 '${title}' 파티에 초대했습니다.`,
+    inviteAccepted: (nickname, title) => `${nickname}님이 '${title}' 파티 초대를 수락해 파티원이 되었습니다.`,
   }),
 });
 

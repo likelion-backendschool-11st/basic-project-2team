@@ -112,6 +112,23 @@ const send = async (method: string, path: string, body: unknown, token: string |
   }
 };
 
+/**
+ * 로그인한 회원 전용 SSE 스트림을 fetch 로 엽니다. EventSource 는 Authorization 헤더를 보낼 수 없어(토큰을 URL 에 넣어야 해서) 쓰지 않습니다.
+ * Access Token 이 만료(401 TOKEN_EXPIRED)됐으면 한 번 재발급받아 다시 엽니다. 로그인 안내 모달은 띄우지 않습니다(배경 연결).
+ * @returns 응답(본문이 스트림). 로그인하지 않았으면 null
+ */
+export async function openAuthorizedStream(path: string, signal: AbortSignal): Promise<Response | null> {
+  const open = (token: string) =>
+    fetch(`${API_BASE_URL}${path}`, { headers: { Accept: 'text/event-stream', Authorization: `Bearer ${token}` }, cache: 'no-store', signal });
+  const token = readToken(ACCESS_TOKEN_KEY);
+  if (!token) return null;
+  const res = await open(token);
+  if (res.status !== 401) return res;
+  const expired = (await readEnvelope<unknown>(res))?.error?.code === 'TOKEN_EXPIRED';
+  const next = expired && (await refreshOnce()) ? readToken(ACCESS_TOKEN_KEY) : null;
+  return next ? open(next) : res;
+}
+
 const readEnvelope = async <T,>(res: Response) =>
   res.status === 204 ? null : ((await res.json().catch(() => null)) as ApiEnvelope<T> | null);
 

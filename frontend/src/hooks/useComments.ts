@@ -12,6 +12,7 @@ import {
 } from '../api/commentApi';
 import { ApiRequestError } from '../api/http';
 import { getMemberProfile, type MemberProfileResponse } from '../api/mypageApi';
+import { inviteToParty } from '../api/postApi';
 import { COMMENT_PAGE_SIZE, commentText, type CommentChannel, type CommentSort, type PostComment } from '../data/commentData';
 import { useModal } from './useModal';
 import { usePagination } from './usePagination';
@@ -232,8 +233,20 @@ export function useComments(postId: string, initialTotal: number, { channel = 'p
     }
   };
 
+  /** 공대장: 댓글 작성자를 이 공고 파티에 초대합니다. 결과는 토스트로 알립니다. */
+  const invite = async (memberId: number) => {
+    try {
+      await inviteToParty(postId, memberId);
+      toast.show(commentText.popover.invited);
+      return true;
+    } catch (err) {
+      toast.show(errorMessage(err, commentText.popover.inviteFailed));
+      return false;
+    }
+  };
+
   return {
-    channel,
+    channel, invite,
     comments, accept, cancelAccept, refresh: reload, total: channel === 'party' ? channelCount + totalDelta : Math.max(0, initialTotal + totalDelta), visible, repliesOf, sort, setSort, paging, loading, error,
     replyTo, setReplyTo, editing, setEditing, popoverFor, setPopoverFor, profileOf,
     add, saveEdit, askDelete, confirmDelete, askReport, confirmReport, deleteDialog, reportDialog, toast,

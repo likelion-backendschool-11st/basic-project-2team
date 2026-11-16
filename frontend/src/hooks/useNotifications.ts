@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { errorMessageOf, hasAccessToken } from '../api/http';
+import { acceptPartyInvite } from '../api/postApi';
 import { deleteNotification, getNotifications, markAllNotificationsRead, markNotificationRead, notifyNotificationsChanged, toNotificationView, UNREAD_COUNT_CHANGED_EVENT } from '../api/notificationApi';
 import { NOTIFICATION_PAGE_SIZE, notificationText, type NotificationView } from '../data/notificationData';
 import { paths } from '../data/routes';
@@ -20,6 +21,8 @@ export function useNotifications() {
   const [reloadKey, setReloadKey] = useState(0);
   const [actionError, setActionError] = useState<string | null>(null);
   const [markingAll, setMarkingAll] = useState(false);
+  /** 수락 요청 중인 초대 알림 id */
+  const [accepting, setAccepting] = useState<string | null>(null);
   const loggedIn = hasAccessToken();
   const navigate = useNavigate();
   const reload = useCallback(() => setReloadKey((k) => k + 1), []);
@@ -90,6 +93,31 @@ export function useNotifications() {
     if (item.postId !== null) navigate(paths.postDetail(String(item.postId)));
   };
 
+  /**
+   * 파티 초대 수락: 서버에서 파티원(ACCEPTED)이 되면 서버가 초대 알림을 지우므로 목록에서도 빼고, 초대받은 공고 상세로 이동합니다.
+   * 이미 수락한 초대(joined)는 요청 없이 공고로만 이동합니다.
+   */
+  const acceptInvite = async (item: NotificationView) => {
+    if (item.postId === null || accepting) return;
+    if (item.invite?.joined) {
+      open(item);
+      return;
+    }
+    setActionError(null);
+    setAccepting(item.id);
+    try {
+      await acceptPartyInvite(String(item.postId));
+      setItems((prev) => prev.filter((n) => n.id !== item.id));
+      if (!item.read) setUnreadCount((c) => Math.max(0, c - 1));
+      notifyNotificationsChanged(); // 초대 알림이 지워졌으므로 헤더 배지도 다시 셉니다.
+      navigate(paths.postDetail(String(item.postId)));
+    } catch (err) {
+      setActionError(errorMessageOf(err, notificationText.inviteAcceptFailed));
+    } finally {
+      setAccepting(null);
+    }
+  };
+
   /** 알림 삭제(복구 불가). 화면에서 바로 빼고, 끝나면 목록을 다시 불러와 다음 알림으로 빈자리를 채웁니다. */
   const remove = (item: NotificationView) => {
     setActionError(null);
@@ -135,6 +163,8 @@ export function useNotifications() {
     actionError,
     markingAll,
     open,
+    acceptInvite,
+    accepting,
     markRead,
     remove,
     markAllRead,
