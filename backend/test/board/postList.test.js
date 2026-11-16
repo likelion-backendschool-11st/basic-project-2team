@@ -104,6 +104,12 @@ describe('GET /api/posts (목록)', () => {
       category: null,
       game: null,
       time: null,
+      type: null,
+      detail: null,
+      style: null,
+      headcount: null,
+      date: null,
+      voice: false,
       q: '',
       sort: 'recent',
       tags: [],
@@ -114,11 +120,17 @@ describe('GET /api/posts (목록)', () => {
   });
 
   it('category·game·time·q·sort·tags·page·size·excludeClosed 를 조건으로 넘긴다', async () => {
-    await get('?category=fps&q=%20카멘%20&sort=urgent&tags=숙련,%23디코필수&tags=숙련&page=3&size=5&excludeClosed=true&game=valorant&time=evening');
+    await get('?category=fps&q=%20카멘%20&sort=urgent&tags=숙련,%23디코필수&tags=숙련&page=3&size=5&excludeClosed=true&game=valorant&time=evening&type=raid&detail=kamen&style=hard&headcount=small&date=week&voice=true');
     assert.deepEqual(repo.state.lastFilter, {
       category: 'fps',
       game: 'valorant',
       time: 'evening',
+      type: 'raid',
+      detail: 'kamen',
+      style: 'hard',
+      headcount: 'small',
+      date: 'week',
+      voice: true,
       q: '카멘',
       sort: 'urgent',
       tags: ['숙련', '디코필수'],
@@ -137,11 +149,11 @@ describe('GET /api/posts (목록)', () => {
   });
 
   it('잘못된 쿼리는 필드별 오류와 함께 400', async () => {
-    const res = await get('?category=A%20B&sort=best&page=0&size=51&excludeClosed=maybe&game=A%20B&time=noon&tags=1,2,3,4,5,6&q=' + 'a'.repeat(51));
+    const res = await get('?category=A%20B&sort=best&page=0&size=51&excludeClosed=maybe&game=A%20B&time=noon&type=x&detail=A%20B&style=x&headcount=x&date=x&voice=x&tags=1,2,3,4,5,6&q=' + 'a'.repeat(51));
     assert.equal(res.status, 400);
     const { error } = await res.json();
     assert.equal(error.code, 'INVALID_INPUT');
-    assert.deepEqual(error.fields.map((f) => f.field).sort(), ['category', 'excludeClosed', 'game', 'page', 'q', 'size', 'sort', 'tags', 'time']);
+    assert.deepEqual(error.fields.map((f) => f.field).sort(), ['category', 'date', 'detail', 'excludeClosed', 'game', 'headcount', 'page', 'q', 'size', 'sort', 'style', 'tags', 'time', 'type', 'voice']);
     assert.equal(repo.state.lastFilter, null);
   });
 

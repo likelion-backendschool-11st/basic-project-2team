@@ -53,6 +53,8 @@ export const BoardPage: React.FC<BoardPageProps> = () => {
             time={filter.time}
             timeAllLabel={boardText.timeFilterAll}
             onTimeChange={filter.onTimeChange}
+            detail={filter.detail}
+            onDetailChange={filter.onDetailChange}
             tagFilters={boardTagFilters}
             activeTags={filter.tags}
             onToggleTag={filter.toggleTag}

@@ -339,6 +339,7 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 - `category`: `mmorpg` · `fps` · `aos` · `steam` · `etc` (생략 시 전체)
 - `game`: 게임 코드(예: `lostark`, 생략 시 전체 게임)
 - `time`: 출발 시간대 `dawn`(00~06시) · `morning`(06~12) · `afternoon`(12~18) · `evening`(18~24), 한국 시간 기준(생략 시 전체). 일정 미정 공고는 어느 시간대에도 포함되지 않습니다.
+- 상세 필터(모두 선택, 생략 시 전체, 여러 개를 주면 모두 만족하는 공고만): `type` = `raid` · `dungeon` · `rank` · `normal`(모집 유형), `detail` = 상세 분류 코드(`game_content.code`, 예: `kamen` — 직접 입력한 상세 분류 공고는 걸러집니다), `style` = `hard` · `casual` · `newbie` · `any`(플레이 스타일), `headcount` = `duo`(2인) · `small`(3~4) · `mid`(5~8) · `large`(9 이상)(모집 정원 기준), `date` = `today` · `tomorrow` · `week`(오늘부터 7일 이내) · `tbd`(일정 미정), 한국 시간 기준 출발 일자, `voice=true` 이면 음성 필수 공고만. 값이 틀리면 400 `INVALID_INPUT`(필드별).
 - `sort`: `recent`(기본) · `views` · `urgent`
 - `q`: 검색어(50자 이하). 제목 · 파티명 · 게임명 · 태그 중 하나라도 포함하는 공고만 조회합니다 (`%`·`_` 는 문자 그대로 검색).
 - `tags`: 쉼표로 구분한 태그(최대 5개, `#` 는 있어도 됨). 지정한 태그를 **모두** 가진 공고만 조회합니다.

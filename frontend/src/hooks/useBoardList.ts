@@ -29,8 +29,8 @@ export function useBoardList(categoryId: BoardCategoryId, filter: ReturnType<typ
 
   const q = useDebouncedValue(filter.text, SEARCH_DEBOUNCE_MS);
   const tagsKey = filter.tags.join(',');
-  const pg = usePagination(total, BOARD_PAGE_SIZE, `${categoryId}|${q}|${tagsKey}|${filter.excludeClosed}|${filter.game}|${filter.time}|${filter.sort}`);
-  const { excludeClosed, sort, game, time } = filter;
+  const pg = usePagination(total, BOARD_PAGE_SIZE, `${categoryId}|${q}|${tagsKey}|${filter.excludeClosed}|${filter.game}|${filter.time}|${Object.values(filter.detail).join(',')}|${filter.sort}`);
+  const { excludeClosed, sort, game, time, detail } = filter;
   const page = pg.page;
 
   useEffect(() => {
@@ -40,6 +40,12 @@ export function useBoardList(categoryId: BoardCategoryId, filter: ReturnType<typ
       category: categoryId === 'all' ? undefined : categoryId,
       game: game || undefined,
       time: time || undefined,
+      type: detail.type || undefined,
+      detail: detail.detail || undefined,
+      style: detail.style || undefined,
+      headcount: detail.headcount || undefined,
+      date: detail.date || undefined,
+      voice: detail.voice,
       q,
       sort,
       tags: tagsKey ? tagsKey.split(',') : [],
@@ -62,7 +68,7 @@ export function useBoardList(categoryId: BoardCategoryId, filter: ReturnType<typ
     return () => {
       cancelled = true;
     };
-  }, [categoryId, q, tagsKey, excludeClosed, game, time, sort, page]);
+  }, [categoryId, q, tagsKey, excludeClosed, game, time, detail, sort, page]);
 
   return { posts, total, loading, error, pagination: pg };
 }

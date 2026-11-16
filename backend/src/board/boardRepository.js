@@ -1,6 +1,6 @@
 'use strict';
 
-const { POST_STATUS, URGENT_REMAINING_SEATS, URGENT_WITHIN_HOURS, TIME_SLOTS, KST_OFFSET_HOURS } = require('./boardConstants');
+const { POST_STATUS, URGENT_REMAINING_SEATS, URGENT_WITHIN_HOURS, TIME_SLOTS, HEADCOUNT_RANGES, KST_OFFSET_HOURS } = require('./boardConstants');
 
 /** 삭제되지 않은 공고만 대상으로 하는 조건 (소프트 삭제: deleted_at / status = DELETED) */
 const ALIVE_POST = `p.deleted_at IS NULL AND p.status <> '${POST_STATUS.deleted}'`;
@@ -86,7 +86,7 @@ function createBoardRepository(pool) {
    * 공고 목록 한 페이지와 전체 건수. 삭제된 공고는 제외하고, tags 는 모두 가진 공고만(AND) 남깁니다.
    * @param {{ category: string | null, q: string, sort: string, tags: string[], excludeClosed: boolean, limit: number, offset: number }} filter
    */
-  async function findPostPage({ category, game = null, time = null, q, sort, tags, excludeClosed, limit, offset }) {
+  async function findPostPage({ category, game = null, time = null, type = null, detail = null, style = null, headcount = null, date = null, voice = false, q, sort, tags, excludeClosed, limit, offset }) {
     const where = [ALIVE_POST];
     const params = [];
     if (category) {
@@ -101,6 +101,36 @@ function createBoardRepository(pool) {
       // 일정 미정(NULL)은 어느 시간대에도 속하지 않습니다. DB 는 UTC, 시간대는 한국 시간 기준입니다.
       where.push(`HOUR(DATE_ADD(p.schedule_at, INTERVAL ${KST_OFFSET_HOURS} HOUR)) >= ? AND HOUR(DATE_ADD(p.schedule_at, INTERVAL ${KST_OFFSET_HOURS} HOUR)) < ?`);
       params.push(...TIME_SLOTS[time]);
+    }
+    if (type) {
+      where.push('p.party_type = ?');
+      params.push(type);
+    }
+    if (detail) {
+      where.push('EXISTS (SELECT 1 FROM game_content gc WHERE gc.id = p.game_content_id AND gc.code = ?)');
+      params.push(detail);
+    }
+    if (style) {
+      where.push('p.play_style = ?');
+      params.push(style);
+    }
+    if (headcount) {
+      where.push('p.headcount BETWEEN ? AND ?');
+      params.push(...HEADCOUNT_RANGES[headcount]);
+    }
+    if (voice) where.push('p.voice_required = TRUE');
+    if (date) {
+      // 출발 일자는 한국 시간 기준. 일정 미정(NULL)은 tbd 에서만 보입니다.
+      const day = `DATE(DATE_ADD(p.schedule_at, INTERVAL ${KST_OFFSET_HOURS} HOUR))`;
+      const today = `DATE(DATE_ADD(UTC_TIMESTAMP(), INTERVAL ${KST_OFFSET_HOURS} HOUR))`;
+      where.push(
+        {
+          today: `${day} = ${today}`,
+          tomorrow: `${day} = ${today} + INTERVAL 1 DAY`,
+          week: `${day} BETWEEN ${today} AND ${today} + INTERVAL 6 DAY`,
+          tbd: 'p.schedule_at IS NULL',
+        }[date],
+      );
     }
     if (q) {
       // ponytail: LIKE 전체 탐색. 공고가 많아지면 FULLTEXT(ftx_post_title_party_name)로 교체

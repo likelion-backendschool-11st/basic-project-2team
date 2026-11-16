@@ -37,6 +37,14 @@ export interface PostListParams {
   readonly game?: string;
   /** 출발 시간대 dawn|morning|afternoon|evening (생략하면 전체) */
   readonly time?: string;
+  /** 상세 필터 (생략하면 전체): 모집 유형, 플레이 스타일, 모집 인원 구간, 출발 일자, 음성 필수 */
+  readonly type?: string;
+  /** 상세 분류 코드 (게임·모집 유형을 고른 뒤) */
+  readonly detail?: string;
+  readonly style?: string;
+  readonly headcount?: string;
+  readonly date?: string;
+  readonly voice?: boolean;
   readonly q: string;
   readonly sort: SortKey;
   readonly tags: readonly string[];
@@ -61,6 +69,12 @@ export function getPosts(params: PostListParams) {
   if (params.category) query.set('category', params.category);
   if (params.game) query.set('game', params.game);
   if (params.time) query.set('time', params.time);
+  if (params.type) query.set('type', params.type);
+  if (params.detail) query.set('detail', params.detail);
+  if (params.style) query.set('style', params.style);
+  if (params.headcount) query.set('headcount', params.headcount);
+  if (params.date) query.set('date', params.date);
+  if (params.voice) query.set('voice', 'true');
   if (params.q.trim()) query.set('q', params.q.trim());
   if (params.tags.length > 0) query.set('tags', params.tags.join(','));
   return request<PostPage>('GET', `/api/posts?${query}`);
