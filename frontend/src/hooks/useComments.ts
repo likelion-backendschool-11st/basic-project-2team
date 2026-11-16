@@ -11,6 +11,7 @@ import {
   type RootCommentResponse,
 } from '../api/commentApi';
 import { ApiRequestError } from '../api/http';
+import { useProfanityNotice } from './useProfanityNotice';
 import { getMemberProfile, type MemberProfileResponse } from '../api/mypageApi';
 import { COMMENT_PAGE_SIZE, commentText, type CommentChannel, type CommentSort, type PostComment } from '../data/commentData';
 import { useModal } from './useModal';
@@ -77,6 +78,7 @@ export function useComments(postId: string, initialTotal: number, { channel = 'p
   const deleteDialog = useModal(false);
   const reportDialog = useModal(false);
   const toast = useToast();
+  const profanity = useProfanityNotice();
 
   const paging = usePagination(rootTotal, COMMENT_PAGE_SIZE, `${postId}${sort}`);
   const page = paging.page;
@@ -147,7 +149,7 @@ export function useComments(postId: string, initialTotal: number, { channel = 'p
     try {
       await createComment(postId, { text: body, secret: opts.secret ?? false, channel, ...(opts.parentId ? { parentId: Number(opts.parentId) } : {}) });
     } catch (err) {
-      toast.show(errorMessage(err, commentText.loadFailed));
+      if (!profanity.catches(err)) toast.show(errorMessage(err, commentText.loadFailed));
       return false;
     }
     setReplyTo(null);
@@ -173,7 +175,7 @@ export function useComments(postId: string, initialTotal: number, { channel = 'p
       toast.show(commentText.updated);
       reload(); // 채택된 답글을 고치면 채택이 풀리므로 목록을 다시 불러옵니다.
     } catch (err) {
-      toast.show(errorMessage(err, commentText.loadFailed));
+      if (!profanity.catches(err)) toast.show(errorMessage(err, commentText.loadFailed));
     }
   };
 
@@ -236,6 +238,6 @@ export function useComments(postId: string, initialTotal: number, { channel = 'p
     channel,
     comments, accept, cancelAccept, refresh: reload, total: channel === 'party' ? channelCount + totalDelta : Math.max(0, initialTotal + totalDelta), visible, repliesOf, sort, setSort, paging, loading, error,
     replyTo, setReplyTo, editing, setEditing, popoverFor, setPopoverFor, profileOf,
-    add, saveEdit, askDelete, confirmDelete, askReport, confirmReport, deleteDialog, reportDialog, toast,
+    add, saveEdit, askDelete, confirmDelete, askReport, confirmReport, deleteDialog, reportDialog, toast, profanity,
   };
 }

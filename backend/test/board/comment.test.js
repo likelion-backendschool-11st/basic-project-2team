@@ -228,6 +228,7 @@ describe('댓글 API /api/posts/:postId/comments', () => {
     it('욕설이 들어 있으면 400 (text 필드), 저장하지 않는다', async () => {
       const { status, body } = await write({ text: '개새끼들 ㅋㅋ' });
       assert.equal(status, 400);
+      assert.equal(body.error.code, 'PROFANITY_DETECTED');
       assert.deepEqual(body.error.fields.map((f) => f.field), ['text']);
       assert.equal(repo.state.comments.length, 0);
     });
