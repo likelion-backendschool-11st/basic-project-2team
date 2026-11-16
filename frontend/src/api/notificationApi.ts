@@ -29,6 +29,9 @@ export const getUnreadCount = () => request<{ readonly count: number }>('GET', '
 
 /** 알림을 읽거나 지운 뒤 보내는 이벤트. 헤더 배지가 이것을 받아 안 읽은 수를 다시 가져옵니다. */
 export const NOTIFICATIONS_CHANGE_EVENT = 'notifications-change';
+/** 헤더가 안 읽은 알림 수가 달라진 것을 알아챘을 때 보내는 이벤트(새 알림 도착, 다른 탭·기기에서 읽음). 열려 있는 알림 목록이 받아 다시 불러옵니다. */
+export const UNREAD_COUNT_CHANGED_EVENT = 'notifications-unread-count-changed';
+
 export const notifyNotificationsChanged = () => window.dispatchEvent(new Event(NOTIFICATIONS_CHANGE_EVENT));
 
 /** PATCH /api/notifications/{id}/read → 204 (이미 읽은 알림도 204) */
