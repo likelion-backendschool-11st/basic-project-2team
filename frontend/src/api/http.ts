@@ -86,6 +86,15 @@ export interface RequestOptions {
   readonly tokenKey?: string;
 }
 
+const LOGIN_REQUIRED_MESSAGE = '로그인이 필요합니다.';
+
+/**
+ * 로그인이 필요한 요청인지. 조회(GET)는 대부분 비로그인도 쓸 수 있으므로 내 정보·알림 조회만 해당하고,
+ * 그 밖의 쓰기 요청(POST·PUT·PATCH·DELETE)은 모두 로그인이 필요합니다. 로그인·가입·아이디/비밀번호 찾기(/api/auth/)는 제외합니다.
+ */
+const requiresLogin = (method: string, path: string) =>
+  !path.startsWith('/api/auth/') && (method !== 'GET' || /^\/api\/(members\/me|notifications)(?=[/?]|$)/.test(path));
+
 /** 파일(Blob)은 그 형식 그대로, 나머지는 JSON 으로 보냅니다. */
 const send = async (method: string, path: string, body: unknown, token: string | null) => {
   const isFile = body instanceof Blob;
@@ -146,6 +155,11 @@ const refreshOnce = () => (refreshInFlight ??= refreshAccessToken().finally(() =
  */
 export async function request<T>(method: string, path: string, body?: unknown, { tokenKey = ACCESS_TOKEN_KEY }: RequestOptions = {}): Promise<T> {
   const token = readToken(tokenKey);
+  // 로그인해야 하는 요청인데 토큰이 없으면 서버에 보내 401 을 받기 전에 여기서 막고 로그인 안내 모달을 띄웁니다.
+  if (tokenKey === ACCESS_TOKEN_KEY && !token && requiresLogin(method, path)) {
+    promptLogin();
+    throw new ApiRequestError(401, 'LOGIN_REQUIRED', LOGIN_REQUIRED_MESSAGE);
+  }
   let res = await send(method, path, body, token);
   let json = await readEnvelope<T>(res);
 
