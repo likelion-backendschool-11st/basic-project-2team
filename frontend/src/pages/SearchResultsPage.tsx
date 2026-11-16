@@ -14,6 +14,7 @@ import { useSearchResults } from '../hooks/useSearchResults';
 import { useBoardCategory } from '../hooks/useBoardCategory';
 import { useBoardFilterState } from '../hooks/useBoardFilter';
 import { useBoardList } from '../hooks/useBoardList';
+import { useBoardGameOptions } from '../hooks/useBoardGameOptions';
 
 interface SearchResultsPageProps {
   readonly className?: string;
@@ -26,6 +27,7 @@ export const SearchResultsPage: React.FC<SearchResultsPageProps> = () => {
   const filter = useBoardFilterState();
   const { categories } = useBoardCategory();
   const { posts, total, loading, error, pagination: pg } = useBoardList('all', { ...filter, text: search.q });
+  const gameOptions = useBoardGameOptions();
   const timeLabel = searchText.timeFilterFor(search.q);
 
   const reset = () => {
@@ -52,8 +54,13 @@ export const SearchResultsPage: React.FC<SearchResultsPageProps> = () => {
             onReset={reset}
           />
           <FilterChipsRow
-            gameValue={searchText.gameFilterAll}
-            timeValue={timeLabel ?? boardText.timeFilterAll}
+            game={filter.game}
+            gameOptions={gameOptions}
+            gameAllLabel={searchText.gameFilterAll}
+            onGameChange={filter.onGameChange}
+            time={filter.time}
+            timeAllLabel={timeLabel ?? boardText.timeFilterAll}
+            onTimeChange={filter.onTimeChange}
             timeActive={timeLabel !== null}
             tagFilters={searchTagFilters}
             activeTags={filter.tags}

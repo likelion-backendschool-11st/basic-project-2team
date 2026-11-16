@@ -4,6 +4,7 @@ const { ApiError } = require('../common/ApiError');
 const {
   POST_ID_PATTERN,
   POST_SORTS,
+  TIME_SLOTS,
   DEFAULT_SORT,
   DEFAULT_PAGE_SIZE,
   MAX_PAGE_SIZE,
@@ -70,7 +71,7 @@ function parseRelatedQuery(query) {
 }
 
 /**
- * 공고 목록 쿼리(category, q, sort, tags, page, size, excludeClosed)를 검증·정규화합니다.
+ * 공고 목록 쿼리(category, game, time, q, sort, tags, page, size, excludeClosed)를 검증·정규화합니다.
  * @returns {{ category: string | null, q: string, sort: string, tags: string[], page: number, size: number, excludeClosed: boolean }}
  */
 function parseListQuery(query) {
@@ -79,6 +80,12 @@ function parseListQuery(query) {
 
   const category = query.category === undefined ? null : asString(query.category);
   if (category !== null && !CATEGORY_PATTERN.test(category)) fail('category', m.categoryInvalid);
+
+  const game = query.game === undefined ? null : asString(query.game);
+  if (game !== null && !CATEGORY_PATTERN.test(game)) fail('game', m.gameInvalid);
+
+  const time = query.time === undefined ? null : asString(query.time);
+  if (time !== null && !Object.hasOwn(TIME_SLOTS, time)) fail('time', m.timeInvalid);
 
   const q = query.q === undefined ? '' : asString(query.q);
   if (Array.from(q).length > MAX_SEARCH_LENGTH) fail('q', m.searchInvalid);
@@ -99,7 +106,7 @@ function parseListQuery(query) {
   if (excludeClosedRaw !== 'true' && excludeClosedRaw !== 'false') fail('excludeClosed', m.excludeClosedInvalid);
 
   if (fields.length > 0) throw new ApiError(400, 'INVALID_INPUT', m.invalidInput, fields);
-  return { category, q, sort, tags, page, size, excludeClosed: excludeClosedRaw === 'true' };
+  return { category, game, time, q, sort, tags, page, size, excludeClosed: excludeClosedRaw === 'true' };
 }
 
 module.exports = { parsePostId, parseListQuery, parseFeaturedQuery, parseRelatedQuery };

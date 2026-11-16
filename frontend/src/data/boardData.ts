@@ -70,6 +70,14 @@ export const sortOptions: readonly SortOption[] = [
   { value: 'urgent', label: '마감임박순' },
 ];
 
+/** 출발 시간대 필터 (value 는 GET /api/posts 의 time, 한국 시간 기준) */
+export const timeSlotOptions: readonly { readonly value: string; readonly label: string }[] = [
+  { value: 'dawn', label: '새벽 (00~06시)' },
+  { value: 'morning', label: '오전 (06~12시)' },
+  { value: 'afternoon', label: '오후 (12~18시)' },
+  { value: 'evening', label: '저녁 (18~24시)' },
+];
+
 export const boardTagFilters: readonly FilterChip[] = [
   { label: '#트라이', value: '트라이' },
   { label: '#레이드', value: '레이드' },
