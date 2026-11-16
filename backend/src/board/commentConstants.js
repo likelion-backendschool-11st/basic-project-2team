@@ -31,10 +31,12 @@ const MEMBER_STATUS = Object.freeze({
   withdrawn: 'WITHDRAWN',
 });
 
-/** POST /api/reports (docs/API_SPEC.md 6절). 이번 범위는 댓글·회원·공고 신고를 처리합니다. */
-const REPORT_TARGET_TYPES = Object.freeze({ comment: 'COMMENT', member: 'MEMBER', post: 'POST' });
+/** POST /api/reports (docs/API_SPEC.md 6절) */
+const REPORT_TARGET_TYPES = Object.freeze({ comment: 'COMMENT', member: 'MEMBER', post: 'POST', noShow: 'NO_SHOW' });
 /** frontend/src/data/commentData.ts reportReasons. report.reason_code 에 이 문구 그대로 저장합니다 (관리자 화면이 그대로 표시). */
 const REPORT_REASONS = Object.freeze(['욕설 및 비하 발언', '스팸 / 도배', '부적절한 광고', '개인정보 노출', '기타']);
+/** 노쇼 신고 사유 (frontend/src/data/postData.ts noShowReasons) */
+const NO_SHOW_REPORT_REASONS = Object.freeze(['연락 없이 불참', '약속 시간 지각', '시작 후 무단 이탈', '기타']);
 const REPORT_DETAIL_MAX_LENGTH = 500;
 /** 서로 다른 신고자 수가 이 값 이상이면 댓글을 HIDDEN 으로 자동 가림 (REQ-REPORT-004, docs/03-db-design.md 2.10) */
 const COMMENT_HIDE_REPORT_COUNT = 5;
@@ -42,6 +44,7 @@ const COMMENT_HIDE_REPORT_COUNT = 5;
 const commentMessages = Object.freeze({
   invalidInput: '입력값을 확인해주세요.',
   textRequired: '댓글 내용을 입력해주세요.',
+  profanity: '댓글에 부적절한 표현이 포함되어 있습니다. 바른 표현으로 수정해주세요.',
   textTooLong: `댓글은 ${COMMENT_MAX_LENGTH}자 이하로 입력해주세요.`,
   secretInvalid: 'secret 은 true/false 여야 합니다.',
   parentIdInvalid: 'parentId 는 1 이상의 정수여야 합니다.',
@@ -62,6 +65,8 @@ const commentMessages = Object.freeze({
   targetTypeInvalid: `현재는 ${Object.values(REPORT_TARGET_TYPES).join(', ')} 신고만 접수할 수 있습니다.`,
   targetIdInvalid: 'targetId 는 1 이상의 정수여야 합니다.',
   reasonInvalid: `reason 은 ${REPORT_REASONS.join(', ')} 중 하나여야 합니다.`,
+  noShowReasonInvalid: `reason 은 ${NO_SHOW_REPORT_REASONS.join(', ')} 중 하나여야 합니다.`,
+  postIdInvalid: 'postId 는 1 이상의 정수여야 합니다.',
   detailTooLong: `상세 사유는 ${REPORT_DETAIL_MAX_LENGTH}자 이하로 입력해주세요.`,
   cannotReportSelf: '본인이 작성한 댓글은 신고할 수 없습니다.',
   alreadyReported: '이미 신고한 댓글입니다.',
@@ -70,6 +75,10 @@ const commentMessages = Object.freeze({
   alreadyReportedMember: '이미 신고한 회원입니다.',
   cannotReportOwnPost: '본인이 작성한 공고는 신고할 수 없습니다.',
   alreadyReportedPost: '이미 신고한 공고입니다.',
+  notPartyMember: '참가가 확정된 파티원만 노쇼를 신고할 수 있습니다.',
+  noShowTargetNotFound: '이 파티에서 승인된 파티원만 노쇼로 신고할 수 있습니다.',
+  noShowTooEarly: '출발 시간이 지나거나 활동이 완료된 뒤에 노쇼를 신고할 수 있습니다.',
+  alreadyReportedNoShow: '이미 노쇼로 신고한 파티원입니다.',
   notParentAuthor: '답글이 달린 댓글의 작성자만 답글을 채택할 수 있습니다.',
   notAReply: '답글만 채택할 수 있습니다.',
   cannotAcceptOwn: '본인이 작성한 답글은 채택할 수 없습니다.',
@@ -89,6 +98,7 @@ module.exports = {
   MEMBER_STATUS,
   REPORT_TARGET_TYPES,
   REPORT_REASONS,
+  NO_SHOW_REPORT_REASONS,
   REPORT_DETAIL_MAX_LENGTH,
   COMMENT_HIDE_REPORT_COUNT,
   commentMessages,

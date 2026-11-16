@@ -27,7 +27,7 @@ const members = () =>
 
 /** DB 대신 메모리에 저장하는 가짜 repository */
 function createFakeRepository() {
-  const state = { posts: new Map(), members: new Map(), comments: [], reports: [], party: [], seconds: 0 };
+  const state = { posts: new Map(), members: new Map(), comments: [], reports: [], party: [], applications: [], seconds: 0 };
   const alive = (c) => c.status !== 'DELETED';
   const withAuthor = (c) => {
     const m = state.members.get(c.authorId);
@@ -144,6 +144,17 @@ function createFakeRepository() {
       state.reports.push({ id: state.reports.length + 1, reporterId, targetType: 'POST', targetId: postId, targetMemberId, postId, reasonCode, detail });
       return state.reports.length;
     },
+    async findNoShowTarget(postId, memberId) {
+      const post = state.posts.get(postId);
+      if (!post || post.status === 'DELETED') return null;
+      const a = state.applications.find((x) => x.postId === postId && x.applicantId === memberId);
+      return { postId, authorId: post.authorId, status: post.status, scheduleAt: post.scheduleAt ?? null, application: a ? { id: a.id, status: a.status } : null };
+    },
+    async createNoShowReport({ reporterId, applicationId, targetMemberId, postId, reasonCode, detail }) {
+      if (state.reports.some((r) => r.reporterId === reporterId && r.targetType === 'NO_SHOW' && r.targetId === applicationId)) return null;
+      state.reports.push({ id: state.reports.length + 1, reporterId, targetType: 'NO_SHOW', targetId: applicationId, targetMemberId, postId, reasonCode, detail });
+      return state.reports.length;
+    },
     async findReportedCommentIds(memberId, commentIds) {
       return new Set(
         state.reports
@@ -177,6 +188,7 @@ describe('댓글 API /api/posts/:postId/comments', () => {
     repo.state.posts = new Map([[POST_ID, { id: POST_ID, authorId: HOST_ID, status: 'OPEN', commentCount: 0 }]]);
     repo.state.members = members();
     repo.state.party = [];
+    repo.state.applications = [];
   });
 
   const as = (memberId) => ({ Authorization: `Bearer ${tokens.createAccessToken(memberId)}` });
@@ -213,6 +225,13 @@ describe('댓글 API /api/posts/:postId/comments', () => {
   });
 
   describe('댓글 달기', () => {
+    it('욕설이 들어 있으면 400 (text 필드), 저장하지 않는다', async () => {
+      const { status, body } = await write({ text: '개새끼들 ㅋㅋ' });
+      assert.equal(status, 400);
+      assert.deepEqual(body.error.fields.map((f) => f.field), ['text']);
+      assert.equal(repo.state.comments.length, 0);
+    });
+
     it('댓글을 저장하고 201 과 작성된 댓글을 돌려준다', async () => {
       const { status, body } = await write({ text: '  극신속 홀나 1625입니다.  ' });
       assert.equal(status, 201);
@@ -442,6 +461,13 @@ describe('댓글 API /api/posts/:postId/comments', () => {
   };
 
   describe('댓글 수정', () => {
+    it('수정 내용에 욕설이 있으면 400, 기존 내용은 그대로', async () => {
+      const id = repo.seed({ authorId: ALICE, content: '처음 내용' });
+      const { status } = await send('PATCH', `/api/comments/${id}`, { text: '시.발 고침' });
+      assert.equal(status, 400);
+      assert.equal(repo.state.comments[0].content, '처음 내용');
+    });
+
     it('본인 댓글을 고치고 수정된 댓글을 돌려준다', async () => {
       const id = repo.seed({ authorId: ALICE, content: '처음 내용' });
       const { status, body } = await send('PATCH', `/api/comments/${id}`, { text: '  고친 내용 ' });
@@ -638,6 +664,71 @@ describe('댓글 API /api/posts/:postId/comments', () => {
       assert.equal((await report(valid(999))).body.error.code, 'POST_NOT_FOUND');
       repo.state.posts.get(POST_ID).status = 'DELETED';
       assert.equal((await report(valid())).body.error.code, 'POST_NOT_FOUND');
+    });
+  });
+
+  describe('노쇼 신고', () => {
+    const report = (body, memberId = BOB) => send('POST', '/api/reports', body, memberId);
+    const valid = (targetId = ALICE, postId = POST_ID) => ({ targetType: 'NO_SHOW', postId, targetId, reason: '연락 없이 불참', detail: ' 30분 기다림 ' });
+    /** 앨리스·밥이 승인된 파티원이고 출발 시간이 지난 파티 */
+    const startedParty = () => {
+      Object.assign(repo.state.posts.get(POST_ID), { scheduleAt: new Date(NOW.getTime() - 3_600_000) });
+      for (const [id, memberId] of [[31, ALICE], [32, BOB]]) {
+        repo.state.applications.push({ id, postId: POST_ID, applicantId: memberId, status: 'ACCEPTED' });
+        repo.state.party.push({ memberId, isHost: false, role: null, mannerTemp: 36.5 });
+      }
+    };
+
+    it('파티원이 다른 파티원을 신고하면 201, target_id 는 신청 행 id 다', async () => {
+      startedParty();
+      const { status, body } = await report(valid());
+      assert.equal(status, 201);
+      assert.deepEqual(body.data, { id: 1 });
+      assert.deepEqual(repo.state.reports[0], {
+        id: 1,
+        reporterId: BOB,
+        targetType: 'NO_SHOW',
+        targetId: 31,
+        targetMemberId: ALICE,
+        postId: POST_ID,
+        reasonCode: '연락 없이 불참',
+        detail: '30분 기다림',
+      });
+      assert.equal((await report(valid(), HOST_ID)).status, 201);
+    });
+
+    it('같은 파티원을 다시 신고하면 409 ALREADY_REPORTED, 본인은 400 CANNOT_REPORT_SELF', async () => {
+      startedParty();
+      await report(valid());
+      assert.equal((await report(valid())).body.error.code, 'ALREADY_REPORTED');
+      assert.equal((await report(valid(BOB))).body.error.code, 'CANNOT_REPORT_SELF');
+    });
+
+    it('파티원이 아니면 403 NOT_PARTY_MEMBER, 승인된 파티원이 아닌 대상(파티장·대기 중 신청자)은 404', async () => {
+      startedParty();
+      repo.state.members.set(11, { nickname: '구경꾼', status: 'ACTIVE', suspendedUntil: null });
+      assert.equal((await report(valid(), 11)).body.error.code, 'NOT_PARTY_MEMBER');
+      assert.equal((await report(valid(HOST_ID))).body.error.code, 'NO_SHOW_TARGET_NOT_FOUND');
+      repo.state.applications.push({ id: 33, postId: POST_ID, applicantId: 12, status: 'PENDING' });
+      assert.equal((await report(valid(12))).body.error.code, 'NO_SHOW_TARGET_NOT_FOUND');
+    });
+
+    it('출발 전이거나 일정 미정이면 409 NO_SHOW_TOO_EARLY, 활동 완료된 파티는 일정과 상관없이 받는다', async () => {
+      startedParty();
+      const post = repo.state.posts.get(POST_ID);
+      post.scheduleAt = new Date(NOW.getTime() + 3_600_000);
+      assert.equal((await report(valid())).body.error.code, 'NO_SHOW_TOO_EARLY');
+      post.scheduleAt = null;
+      assert.equal((await report(valid())).body.error.code, 'NO_SHOW_TOO_EARLY');
+      post.status = 'COMPLETED';
+      assert.equal((await report(valid())).status, 201);
+    });
+
+    it('postId 가 없거나 노쇼 사유가 아니면 400, 없는 공고는 404', async () => {
+      const { status, body } = await report({ targetType: 'NO_SHOW', targetId: ALICE, reason: '욕설 및 비하 발언' });
+      assert.equal(status, 400);
+      assert.deepEqual(body.error.fields.map((f) => f.field), ['postId', 'reason']);
+      assert.equal((await report(valid(ALICE, 999))).body.error.code, 'POST_NOT_FOUND');
     });
   });
 

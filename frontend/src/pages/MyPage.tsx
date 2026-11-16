@@ -4,6 +4,7 @@ import AccountMenu from '../components/mypage/AccountMenu';
 import ProfileSummaryCard from '../components/mypage/ProfileSummaryCard';
 import ActivitySection from '../components/mypage/ActivitySection';
 import FavoriteUsersSection from '../components/mypage/FavoriteUsersSection';
+import NoShowReportDialog from '../components/post/NoShowReportDialog';
 import ReviewModal from '../components/review/ReviewModal';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import Toast from '../components/ui/Toast';
@@ -77,7 +78,9 @@ export const MyPage: React.FC<MyPageProps> = () => {
         initialValues={reviewEmptyDefaults}
         onSubmitted={review.submit}
         errorMessage={review.errorMessage}
+        noShow={{ isReported: page.noShowReport.isReported, onReport: page.noShowReport.ask }}
       />
+      <NoShowReportDialog report={page.noShowReport} />
       <Toast message={page.toast.message} />
     </LoggedInLayout>
   );

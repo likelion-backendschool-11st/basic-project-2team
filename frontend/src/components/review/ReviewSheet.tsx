@@ -32,6 +32,9 @@ interface ReviewSheetProps {
   readonly error?: string | null;
   readonly onSubmit: () => void;
   readonly onClose: () => void;
+  /** 이 파티원 노쇼 신고 (파티장이면 넘기지 않음) */
+  readonly onReportNoShow?: () => void;
+  readonly noShowReported?: boolean;
 }
 
 /** ①–⑥ Main party-member rating & review sheet. */
@@ -67,6 +70,13 @@ export const ReviewSheet: React.FC<ReviewSheetProps> = (p) => (
     </div>
     <div className="p-5 overflow-y-auto max-h-[82vh] space-y-5">
       <MemberSwitcher member={p.member} index={p.memberIndex} total={p.total} onPrev={p.onPrevMember} onNext={p.onNextMember} />
+      {p.onReportNoShow && (
+        <div className="flex justify-end -mt-3">
+          <button type="button" disabled={p.noShowReported} onClick={p.onReportNoShow} className="text-[11px] text-slate-400 hover:text-rose-300 disabled:opacity-50 disabled:pointer-events-none flex items-center gap-1">
+            <i className="fa-solid fa-user-slash" />{p.noShowReported ? reviewText.noShowReported : reviewText.noShowReport}
+          </button>
+        </div>
+      )}
       <StarRating
         max={p.maxRating}
         rating={p.rating}

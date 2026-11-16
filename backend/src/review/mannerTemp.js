@@ -13,6 +13,8 @@ const INITIAL_MANNER_TEMP = INITIAL_TENTHS / 10;
 
 /** 별점별 증감 (0.1℃ 단위): 5점 +0.5 / 4점 +0.2 / 3점 0 / 2점 −0.5 / 1점 −1.0 */
 const RATING_DELTA_TENTHS = Object.freeze({ 5: 5, 4: 2, 3: 0, 2: -5, 1: -10 });
+/** 관리자가 노쇼를 확정할 때마다 −2.0℃ (별점 1점보다 무겁게) */
+const NO_SHOW_DELTA_TENTHS = -20;
 
 /**
  * 현재 매너 온도에 리뷰 별점을 순서대로 반영합니다. 한 건 반영할 때마다 범위를 보정하므로
@@ -29,4 +31,17 @@ function applyRatings(current, ratings) {
   return tenths / 10;
 }
 
-module.exports = { INITIAL_MANNER_TEMP, RATING_DELTA_TENTHS, applyRatings };
+/**
+ * 현재 매너 온도에 노쇼 count 건을 반영합니다. 한 건마다 범위를 보정합니다.
+ * 재계산은 별점을 모두 반영한 뒤 노쇼를 반영하므로, 실제 순서와 달라도 0.0℃·99.9℃ 경계에 닿지 않았다면 결과가 같습니다.
+ * @param {number | string} current
+ * @param {number} count
+ * @returns {number} 소수 첫째 자리 매너 온도
+ */
+function applyNoShows(current, count) {
+  let tenths = Math.round(Number(current) * 10);
+  for (let i = 0; i < count; i += 1) tenths = Math.max(MIN_TENTHS, tenths + NO_SHOW_DELTA_TENTHS);
+  return tenths / 10;
+}
+
+module.exports = { INITIAL_MANNER_TEMP, RATING_DELTA_TENTHS, NO_SHOW_DELTA_TENTHS, applyRatings, applyNoShows };

@@ -75,6 +75,15 @@ describe('POST /api/posts', () => {
       body: JSON.stringify(body),
     });
 
+  it('제목·내용·파티명·직접 입력 상세 분류에 욕설이 있으면 필드별로 400, 저장하지 않는다', async () => {
+    const res = await post({ ...validBody(), title: '[카멘] 시발 서폿 구함', body: '개새끼 오지마', partyName: '병신팟', detail: undefined, customDetail: 'ㅅㅂ 레이드' });
+    assert.equal(res.status, 400);
+    const { error } = await res.json();
+    assert.equal(error.code, 'INVALID_INPUT');
+    assert.deepEqual(error.fields.map((f) => f.field).sort(), ['body', 'customDetail', 'partyName', 'title']);
+    assert.equal(repo.state.posts.length, 0);
+  });
+
   it('공고를 저장하고 201 과 id 를 돌려준다', async () => {
     const res = await post(validBody());
     assert.equal(res.status, 201);

@@ -6,6 +6,8 @@ export interface ReviewMember {
   readonly game: string;
   readonly className: string;
   readonly role: string;
+  /** 파티장이면 true (노쇼 신고 대상이 아님) */
+  readonly isHost?: boolean;
 }
 
 export interface ReviewTag {
@@ -76,6 +78,8 @@ export const reviewText = {
   submitting: '등록 중…',
   hostRole: '파티장',
   memberRole: '파티원',
+  noShowReport: '이 파티원이 오지 않았나요? 노쇼 신고',
+  noShowReported: '노쇼 신고 완료',
   loadFailed: '평가할 파티원을 불러오지 못했습니다.',
   submitFailed: '평가를 등록하지 못했습니다.',
   allReviewed: '이미 모든 파티원을 평가했습니다.',

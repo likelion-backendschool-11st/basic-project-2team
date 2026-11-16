@@ -2,7 +2,7 @@
 
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
-const { applyRatings, INITIAL_MANNER_TEMP } = require('../../src/review/mannerTemp');
+const { applyRatings, applyNoShows, INITIAL_MANNER_TEMP } = require('../../src/review/mannerTemp');
 const { levelForPoints } = require('../../src/common/activityPoint');
 
 describe('매너 온도 계산 (applyRatings)', () => {
@@ -43,5 +43,17 @@ describe('레벨 계산 (levelForPoints)', () => {
   it('최대 Lv.99', () => {
     assert.equal(levelForPoints(25 * 99 * 98), 99);
     assert.equal(levelForPoints(10_000_000), 99);
+  });
+});
+
+describe('노쇼 감점 (applyNoShows)', () => {
+  it('1건당 −2.0℃, 0건이면 그대로', () => {
+    assert.equal(applyNoShows(36.5, 1), 34.5);
+    assert.equal(applyNoShows(36.5, 2), 32.5);
+    assert.equal(applyNoShows('36.5', 0), 36.5);
+  });
+
+  it('0.0℃ 아래로 내려가지 않는다', () => {
+    assert.equal(applyNoShows(1.5, 1), 0);
   });
 });
