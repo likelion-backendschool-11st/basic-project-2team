@@ -119,6 +119,7 @@ const actionType = Object.freeze({
   commentRestore: 'COMMENT_RESTORE',
   commentDelete: 'COMMENT_DELETE',
   memberSanction: 'MEMBER_SANCTION',
+  sanctionRelease: 'SANCTION_RELEASE',
   memberView: 'MEMBER_VIEW',
 });
 const commentActionTypes = Object.freeze({
@@ -135,7 +136,7 @@ const historyKinds = Object.freeze({
   REPORT: [actionType.reportProcess],
   POST_DELETE: [actionType.postDelete],
   COMMENT: [actionType.commentHide, actionType.commentRestore, actionType.commentDelete],
-  SANCTION: [actionType.memberSanction],
+  SANCTION: [actionType.memberSanction, actionType.sanctionRelease],
   LOGIN: [actionType.login],
 });
 /** 처리 이력 목록에 보여 줄 action_type 전체 (kind 미지정 시) */
@@ -187,12 +188,16 @@ const adminMessages = Object.freeze({
   memberNotFound: '존재하지 않는 회원입니다.',
   memberWithdrawn: '탈퇴한 회원은 제재할 수 없습니다.',
   memberAlreadyBanned: '이미 영구 정지된 회원입니다.',
+  sanctionNotFound: '존재하지 않는 제재입니다.',
+  sanctionAlreadyReleased: '이미 해제된 제재입니다.',
+  releaseWithdrawn: '탈퇴한 회원의 제재는 해제할 수 없습니다.',
   commentNotFound: '존재하지 않는 댓글입니다.',
   commentAlreadyDeleted: '이미 삭제된 댓글은 상태를 바꿀 수 없습니다.',
   commentStatusUnchanged: '이미 같은 상태인 댓글입니다.',
   /** 회원 알림함 문구 (notification.message, VARCHAR(200)) */
   postDeletedNotice: (title, reason) => `관리자에 의해 공고 "${title}" 이(가) 삭제되었습니다. 사유: ${reason}`,
   sanctionNotice: (label, reason) => `${label} 조치를 받았습니다. 사유: ${reason}`,
+  releaseNotice: (label, reason) => `${label} 조치가 해제되었습니다. 사유: ${reason}`,
   sanctionLabel: (type, days) =>
     ({ WARNING: '경고', SUSPEND: `이용 정지 (${days}일)`, BAN: '영구 정지' })[type],
 });

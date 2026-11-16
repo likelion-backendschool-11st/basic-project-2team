@@ -79,7 +79,7 @@ export const AdminReportDetailPage: React.FC = () => {
             <div className="text-xs text-fog-muted mt-5 mb-2">{t.pastSanctions}</div>
             {report.sanctions.length === 0 ? <p className="text-xs text-fog-sub">{t.noSanctions}</p> : (
               <ul className="text-xs text-fog-sub space-y-1">
-                {report.sanctions.map((s) => <li key={s.id}>● {sanctionTypeLabel[s.type]} {sanctionPeriod(s.type, s.startsAt, s.endsAt)} · {s.reason} ({formatDateTime(s.createdAt)}, {s.adminName})</li>)}
+                {report.sanctions.map((s) => <li key={s.id}>● {sanctionTypeLabel[s.type]} {sanctionPeriod(s.type, s.startsAt, s.endsAt)} · {s.reason} ({formatDateTime(s.createdAt)}, {s.adminName}){s.releasedAt && <span className="text-emerald-300"> · 해제됨</span>}</li>)}
               </ul>
             )}
             <Link to={paths.adminMemberDetail(String(report.target.id))} className="block text-right text-xs text-indigo-300 mt-4">{t.toMember}</Link>

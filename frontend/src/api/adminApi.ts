@@ -53,6 +53,7 @@ export type AdminActionType =
   | 'COMMENT_RESTORE'
   | 'COMMENT_DELETE'
   | 'MEMBER_SANCTION'
+  | 'SANCTION_RELEASE'
   | 'MEMBER_VIEW';
 export type SortOrder = 'desc' | 'asc';
 
@@ -152,6 +153,9 @@ export interface Sanction {
   readonly endsAt: string | null;
   readonly reportId: number | null;
   readonly releasedAt: string | null;
+  /** 해제한 관리자 이름 */
+  readonly releasedBy: string | null;
+  readonly releaseReason: string | null;
   readonly adminName: string;
   readonly createdAt: string;
 }
@@ -299,6 +303,18 @@ export interface MemberListQuery extends ListQuery {
 
 export const listMembers = (query: MemberListQuery) => adminRequest<Page<AdminMember>>('GET', `/members${toQueryString(query)}`);
 export const getMember = (id: number) => adminRequest<AdminMemberDetail>('GET', `/members/${id}`);
+
+export interface ReleaseSanctionResponse {
+  readonly id: number;
+  readonly memberId: number;
+  readonly releasedAt: string;
+  readonly memberStatus: MemberStatus;
+  readonly suspendedUntil: string | null;
+}
+
+/** POST /members/{memberId}/sanctions/{sanctionId}/release — 해제 후 남은 제재로 회원 상태를 다시 정합니다. */
+export const releaseSanction = (memberId: number, sanctionId: number, reason: string) =>
+  adminRequest<ReleaseSanctionResponse>('POST', `/members/${memberId}/sanctions/${sanctionId}/release`, { reason });
 
 // ───────── 댓글
 

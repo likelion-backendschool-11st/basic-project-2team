@@ -364,8 +364,11 @@ function createAdminRepository(pool) {
     async function listSanctionsByMember(memberId) {
       return rowsOf(
         `SELECT s.id, s.type, s.reason, s.starts_at AS startsAt, s.ends_at AS endsAt, s.report_id AS reportId,
-                s.released_at AS releasedAt, a.name AS adminName, s.created_at AS createdAt
-           FROM sanction s JOIN admin_account a ON a.id = s.admin_id
+                s.released_at AS releasedAt, ra.name AS releasedBy, s.release_reason AS releaseReason,
+                a.name AS adminName, s.created_at AS createdAt
+           FROM sanction s
+           JOIN admin_account a ON a.id = s.admin_id
+           LEFT JOIN admin_account ra ON ra.id = s.released_by
           WHERE s.member_id = ?
           ORDER BY s.created_at DESC, s.id DESC`,
         [memberId],
@@ -391,6 +394,30 @@ function createAdminRepository(pool) {
         [memberId, type, reason, startsAt, endsAt, reportId ?? null, adminId],
       );
       return result.insertId;
+    }
+
+    async function lockSanction(id) {
+      return firstOf(
+        `SELECT id, member_id AS memberId, type, starts_at AS startsAt, ends_at AS endsAt, released_at AS releasedAt
+           FROM sanction WHERE id = ? FOR UPDATE`,
+        [id],
+      );
+    }
+
+    async function releaseSanction({ id, releasedAt, releasedBy, releaseReason }) {
+      await db.query('UPDATE sanction SET released_at = ?, released_by = ?, release_reason = ? WHERE id = ?', [
+        releasedAt,
+        releasedBy,
+        releaseReason,
+        id,
+      ]);
+    }
+
+    /** 해제되지 않은 제재 — 해제 후 회원 상태를 다시 정할 때 씁니다. */
+    async function listUnreleasedSanctions(memberId) {
+      return rowsOf('SELECT type, ends_at AS endsAt FROM sanction WHERE member_id = ? AND released_at IS NULL', [
+        memberId,
+      ]);
     }
 
     // ───────── 댓글
@@ -470,6 +497,9 @@ function createAdminRepository(pool) {
       lockMember,
       updateMemberStatus,
       insertSanction,
+      lockSanction,
+      releaseSanction,
+      listUnreleasedSanctions,
       listComments,
       lockComment,
       updateCommentStatus,

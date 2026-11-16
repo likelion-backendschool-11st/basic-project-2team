@@ -66,6 +66,16 @@ function createAdminController(adminService) {
     return sendSuccess(res, 201, data);
   }
 
+  async function releaseSanction(req, res) {
+    const data = await adminService.releaseSanction(
+      parseId(req.params.memberId),
+      parseId(req.params.sanctionId),
+      req.body,
+      actorOf(req),
+    );
+    return sendSuccess(res, 200, data);
+  }
+
   async function listComments(req, res) {
     return sendSuccess(res, 200, await adminService.listComments(req.query));
   }
@@ -93,6 +103,7 @@ function createAdminController(adminService) {
     listMembers,
     getMember,
     sanctionMember,
+    releaseSanction,
     listComments,
     updateComment,
     history,

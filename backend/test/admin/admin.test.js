@@ -153,8 +153,17 @@ function createFakeRepository() {
     },
     async insertSanction(sanction) {
       const id = state.sanctions.length + 1;
-      state.sanctions.push({ id, createdAt: NOW, ...sanction });
+      state.sanctions.push({ id, createdAt: NOW, releasedAt: null, ...sanction });
       return id;
+    },
+    async lockSanction(id) {
+      return snapshot(byId(state.sanctions, id));
+    },
+    async releaseSanction({ id, releasedAt, releasedBy, releaseReason }) {
+      Object.assign(byId(state.sanctions, id), { releasedAt, releasedBy, releaseReason });
+    },
+    async listUnreleasedSanctions(memberId) {
+      return state.sanctions.filter((s) => s.memberId === memberId && !s.releasedAt);
     },
     async listComments({ status, offset, limit }) {
       const viewStatus = (c) => (c.status === 'VISIBLE' && c.reportCount > 0 ? 'REPORTED' : c.status);
@@ -475,6 +484,52 @@ describe('admin API', () => {
     it('제재 입력 규칙: type, days(SUSPEND 만), reason', async () => {
       const res = await json(await request('POST', '/members/11/sanctions', { body: { type: 'SUSPEND', days: 0 } }));
       assert.deepEqual(res.body.error.fields.map((f) => f.field), ['days', 'reason']);
+    });
+
+    it('제재 해제는 남은 제재로 회원 상태를 다시 정하고, 알림·이력을 남긴다', async () => {
+      await request('POST', '/members/11/sanctions', { body: { type: 'WARNING', reason: '비매너' } });
+      await request('POST', '/members/11/sanctions', { body: { type: 'SUSPEND', days: 7, reason: '욕설' } });
+      await request('POST', '/members/11/sanctions', { body: { type: 'SUSPEND', days: 3, reason: '노쇼' } });
+
+      const first = await json(await request('POST', '/members/11/sanctions/2/release', { body: { reason: '오신고' } }));
+      assert.equal(first.status, 200);
+      assert.equal(first.body.data.memberStatus, 'SUSPENDED');
+      assert.equal(first.body.data.suspendedUntil, new Date(NOW.getTime() + 3 * DAY_MS).toISOString());
+
+      await request('POST', '/members/11/sanctions/3/release', { body: { reason: '오신고' } });
+      assert.equal(repo.state.members[1].status, 'WARNED');
+      assert.equal(repo.state.members[1].suspendedUntil, null);
+      await request('POST', '/members/11/sanctions/1/release', { body: { reason: '오신고' } });
+      assert.equal(repo.state.members[1].status, 'ACTIVE');
+
+      assert.equal(repo.state.sanctions[1].releasedBy, 1);
+      assert.equal(repo.state.sanctions[1].releaseReason, '오신고');
+      assert.match(repo.state.notifications.at(-1).message, /경고 조치가 해제되었습니다/);
+      const history = await json(await request('GET', '/history?kind=SANCTION'));
+      assert.equal(history.body.data.items.filter((h) => h.actionType === 'SANCTION_RELEASE').length, 3);
+    });
+
+    it('영구 정지 해제 후 끝난 기간 정지는 상태에 반영하지 않는다', async () => {
+      repo.state.sanctions.push({
+        id: 1, memberId: 11, type: 'SUSPEND', reason: '과거', startsAt: new Date(NOW.getTime() - 10 * DAY_MS),
+        endsAt: new Date(NOW.getTime() - 3 * DAY_MS), releasedAt: null, createdAt: NOW,
+      });
+      await request('POST', '/members/11/sanctions', { body: { type: 'BAN', reason: '사기' } });
+      const { body } = await json(await request('POST', '/members/11/sanctions/2/release', { body: { reason: '이의 신청 인용' } }));
+      assert.equal(body.data.memberStatus, 'ACTIVE');
+      assert.equal(body.data.suspendedUntil, null);
+    });
+
+    it('제재 해제 오류: 이미 해제 409, 다른 회원의 제재·없는 제재 404, 사유 필수 400', async () => {
+      await request('POST', '/members/11/sanctions', { body: { type: 'WARNING', reason: '비매너' } });
+      assert.equal((await request('POST', '/members/11/sanctions/1/release', { body: { reason: 'x' } })).status, 200);
+      const again = await json(await request('POST', '/members/11/sanctions/1/release', { body: { reason: 'x' } }));
+      assert.equal(again.body.error.code, 'SANCTION_ALREADY_RELEASED');
+      const other = await json(await request('POST', '/members/10/sanctions/1/release', { body: { reason: 'x' } }));
+      assert.equal(other.body.error.code, 'SANCTION_NOT_FOUND');
+      assert.equal((await request('POST', '/members/11/sanctions/99/release', { body: { reason: 'x' } })).status, 404);
+      const noReason = await json(await request('POST', '/members/11/sanctions/1/release', { body: {} }));
+      assert.deepEqual(noReason.body.error.fields.map((f) => f.field), ['reason']);
     });
   });
 

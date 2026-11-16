@@ -240,6 +240,14 @@ function validateSanction(body) {
   return { type, days, reason };
 }
 
+/** 제재 해제 `{ reason }` (sanction.release_reason, VARCHAR(200)) */
+function validateSanctionRelease(body) {
+  const errors = createErrors();
+  const reason = requiredReason(errors, 'reason', asObject(body).reason, REASON_MAX_LENGTH);
+  errors.throwIfAny();
+  return { reason };
+}
+
 /** 댓글 가림·복구·삭제 `{ status, reason }` */
 function validateCommentUpdate(body) {
   const source = asObject(body);
@@ -262,5 +270,6 @@ module.exports = {
   validateReportUpdate,
   validatePostDelete,
   validateSanction,
+  validateSanctionRelease,
   validateCommentUpdate,
 };
