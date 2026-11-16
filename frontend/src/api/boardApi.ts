@@ -33,6 +33,10 @@ export interface PostPage {
 export interface PostListParams {
   /** 생략하면 전체 카테고리 */
   readonly category?: Exclude<BoardCategoryId, 'all'>;
+  /** 게임 코드 (생략하면 전체 게임) */
+  readonly game?: string;
+  /** 출발 시간대 dawn|morning|afternoon|evening (생략하면 전체) */
+  readonly time?: string;
   readonly q: string;
   readonly sort: SortKey;
   readonly tags: readonly string[];
@@ -55,6 +59,8 @@ export function getPosts(params: PostListParams) {
     excludeClosed: String(params.excludeClosed),
   });
   if (params.category) query.set('category', params.category);
+  if (params.game) query.set('game', params.game);
+  if (params.time) query.set('time', params.time);
   if (params.q.trim()) query.set('q', params.q.trim());
   if (params.tags.length > 0) query.set('tags', params.tags.join(','));
   return request<PostPage>('GET', `/api/posts?${query}`);

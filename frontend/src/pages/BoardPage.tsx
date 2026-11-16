@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import BoardLayout from '../components/board/BoardLayout';
 import SearchFilterPanel from '../components/board/SearchFilterPanel';
 import SearchInputBar from '../components/board/SearchInputBar';
@@ -11,6 +11,7 @@ import { boardTagFilters, boardText } from '../data/boardData';
 import { useBoardCategory } from '../hooks/useBoardCategory';
 import { useBoardFilterState } from '../hooks/useBoardFilter';
 import { useBoardList } from '../hooks/useBoardList';
+import { useBoardGameOptions } from '../hooks/useBoardGameOptions';
 
 interface BoardPageProps {
   readonly className?: string;
@@ -20,6 +21,10 @@ interface BoardPageProps {
 export const BoardPage: React.FC<BoardPageProps> = () => {
   const { category, categories, clearCategory } = useBoardCategory();
   const filter = useBoardFilterState();
+  const gameOptions = useBoardGameOptions(category.id === 'all' ? undefined : category.id);
+  const { setGame } = filter;
+  // 카테고리가 바뀌면 이전 카테고리의 게임 선택은 의미가 없으므로 전체로 되돌립니다.
+  useEffect(() => setGame(''), [category.id, setGame]);
   const { posts, total, loading, error, pagination: pg } = useBoardList(category.id, filter);
 
   return (
@@ -41,8 +46,13 @@ export const BoardPage: React.FC<BoardPageProps> = () => {
             onReset={filter.reset}
           />
           <FilterChipsRow
-            gameValue={boardText.gameFilterAll(category.label)}
-            timeValue={boardText.timeFilterAll}
+            game={filter.game}
+            gameOptions={gameOptions}
+            gameAllLabel={boardText.gameFilterAll(category.label)}
+            onGameChange={filter.onGameChange}
+            time={filter.time}
+            timeAllLabel={boardText.timeFilterAll}
+            onTimeChange={filter.onTimeChange}
             tagFilters={boardTagFilters}
             activeTags={filter.tags}
             onToggleTag={filter.toggleTag}

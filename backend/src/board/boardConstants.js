@@ -20,6 +20,9 @@ const MAX_PAGE_SIZE = 50;
 const MAX_FILTER_TAGS = 5;
 const MAX_SEARCH_LENGTH = 50;
 /** category 코드 형식 (category.code). 목록에 없는 코드는 빈 결과로 응답합니다. */
+/** 출발 시간대(한국 시간 기준 시각 [시작, 끝)) */
+const TIME_SLOTS = Object.freeze({ dawn: [0, 6], morning: [6, 12], afternoon: [12, 18], evening: [18, 24] });
+const KST_OFFSET_HOURS = 9;
 const CATEGORY_PATTERN = /^[a-z0-9_-]{1,20}$/;
 
 /** GET /api/posts/popular · urgent (메인 화면, docs/API_SPEC.md 3절). 메인 카드 수(frontend homeData)에 맞춘 기본값 */
@@ -33,6 +36,8 @@ const boardMessages = Object.freeze({
   invalidInput: '입력값을 확인해주세요.',
   limitInvalid: `limit 는 1~${MAX_FEATURED_LIMIT} 사이의 정수여야 합니다.`,
   categoryInvalid: 'category 형식이 올바르지 않습니다.',
+  gameInvalid: 'game 은 게임 코드(영문 소문자·숫자·_-, 20자 이하)여야 합니다.',
+  timeInvalid: `time 은 ${Object.keys(TIME_SLOTS).join(', ')} 중 하나여야 합니다.`,
   sortInvalid: `sort 는 ${POST_SORTS.join(', ')} 중 하나여야 합니다.`,
   searchInvalid: `q 는 ${MAX_SEARCH_LENGTH}자 이하여야 합니다.`,
   tagsInvalid: `tags 는 쉼표로 구분한 태그 최대 ${MAX_FILTER_TAGS}개여야 합니다.`,
@@ -52,6 +57,8 @@ module.exports = {
   POST_STATUS,
   POST_ID_PATTERN,
   POST_SORTS,
+  TIME_SLOTS,
+  KST_OFFSET_HOURS,
   DEFAULT_SORT,
   DEFAULT_PAGE_SIZE,
   MAX_PAGE_SIZE,

@@ -6,25 +6,34 @@ export function useBoardFilterState() {
   const [text, setText] = useState('');
   const [tags, setTags] = useState<readonly string[]>([]);
   const [excludeClosed, setExcludeClosed] = useState(true);
+  const [game, setGame] = useState('');
+  const [time, setTime] = useState('');
   const [sort, setSort] = useState<SortKey>('recent');
 
   return {
     text,
     tags,
     excludeClosed,
+    game,
+    time,
     sort,
+    setGame,
     /** Stable key describing the current filter state (for pagination reset). */
-    filterKey: `${text}|${tags.join(',')}|${excludeClosed}|${sort}`,
+    filterKey: `${text}|${tags.join(',')}|${excludeClosed}|${game}|${time}|${sort}`,
     onTextChange: (e: ChangeEvent<HTMLInputElement>) => setText(e.target.value),
     /** Filtering is live; submit just prevents navigation. */
     onSubmit: (e: FormEvent) => e.preventDefault(),
     toggleTag: (tag: string) => setTags((prev) => (prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag])),
     onExcludeClosedChange: (e: ChangeEvent<HTMLInputElement>) => setExcludeClosed(e.target.checked),
+    onGameChange: (e: ChangeEvent<HTMLSelectElement>) => setGame(e.target.value),
+    onTimeChange: (e: ChangeEvent<HTMLSelectElement>) => setTime(e.target.value),
     onSortChange: (e: ChangeEvent<HTMLSelectElement>) => setSort(e.target.value as SortKey),
     reset: () => {
       setText('');
       setTags([]);
       setExcludeClosed(true);
+      setGame('');
+      setTime('');
       setSort('recent');
     },
   };
