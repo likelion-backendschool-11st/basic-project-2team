@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { errorMessageOf, hasAccessToken } from '../api/http';
-import { deleteNotification, getNotifications, markAllNotificationsRead, markNotificationRead, notifyNotificationsChanged, toNotificationView } from '../api/notificationApi';
+import { deleteNotification, getNotifications, markAllNotificationsRead, markNotificationRead, notifyNotificationsChanged, toNotificationView, UNREAD_COUNT_CHANGED_EVENT } from '../api/notificationApi';
 import { NOTIFICATION_PAGE_SIZE, notificationText, type NotificationView } from '../data/notificationData';
 import { paths } from '../data/routes';
 
@@ -78,6 +78,12 @@ export function useNotifications() {
       })
       .finally(notifyNotificationsChanged);
   };
+
+  // 헤더가 새 알림 도착 등으로 안 읽은 수가 달라진 걸 알리면 목록을 다시 불러옵니다.
+  useEffect(() => {
+    window.addEventListener(UNREAD_COUNT_CHANGED_EVENT, reload);
+    return () => window.removeEventListener(UNREAD_COUNT_CHANGED_EVENT, reload);
+  }, [reload]);
 
   const open = (item: NotificationView) => {
     markRead(item);
