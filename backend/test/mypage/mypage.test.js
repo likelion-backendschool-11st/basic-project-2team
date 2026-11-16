@@ -635,6 +635,12 @@ describe('마이페이지 API (/api/members)', () => {
       ]);
     });
 
+    it('가입한 지 기간이 안 된 회원은 가입일부터 시작한다', async () => {
+      repo.state.members.set(OTHER, memberRow({ id: OTHER, mannerTemp: '36.5', createdAt: new Date('2026-11-14T10:00:00Z') }));
+      const { data } = await (await get(`/${OTHER}/manner-history?days=30`)).json();
+      assert.deepEqual(data.points.map((p) => p.date), ['2026-11-14', '2026-11-15', '2026-11-16']);
+    });
+
     it('days 가 범위를 벗어나면 400, 기본은 30일', async () => {
       assert.equal((await get(`/${OTHER}/manner-history?days=91`)).status, 400);
       const { data } = await (await get(`/${OTHER}/manner-history`)).json();

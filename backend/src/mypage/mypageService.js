@@ -212,7 +212,8 @@ function createMypageService({ mypageRepository, now = () => new Date() }) {
   /**
    * GET /api/members/{memberId}/manner-history — 최근 N일(기본 30일, 한국 시간 날짜별) 매너 온도 변화.
    * 온도 이력 테이블이 없어서, 현재 온도에서 기간 안에 받은 평가를 거꾸로 빼 기간 시작 직전 온도를 구한 뒤
-   * 그 평가를 시간순으로 다시 반영해 날짜별 하루 끝 온도를 만듭니다. 기간 안에 평가가 없으면 평평한 선입니다.
+   * 그 평가를 시간순으로 다시 반영해 날짜별 하루 끝 온도를 만듭니다. 기간 안에 평가가 없으면 평평한 선이고,
+   가입한 지 days 일이 안 된 회원은 가입일부터 시작합니다.
    */
   async function getMannerHistory(memberId, query) {
     const { days } = parseHistoryQuery(query);
@@ -222,7 +223,11 @@ function createMypageService({ mypageRepository, now = () => new Date() }) {
     const dayMs = 86_400_000;
     const kstDate = (date) => new Date(date.getTime() + KST_OFFSET_HOURS * 3_600_000).toISOString().slice(0, 10);
     const todayKst = kstDate(now());
-    const firstDay = kstDate(new Date(new Date(`${todayKst}T00:00:00Z`).getTime() - (days - 1) * dayMs));
+    const windowStart = kstDate(new Date(new Date(`${todayKst}T00:00:00Z`).getTime() - (days - 1) * dayMs));
+    // 가입한 지 days 일이 안 됐으면 가입일부터 (ISO 날짜 문자열은 사전순 비교가 날짜순)
+    const joinedDay = kstDate(new Date(member.createdAt));
+    const firstDay = joinedDay > windowStart ? joinedDay : windowStart;
+    const length = Math.round((new Date(`${todayKst}T00:00:00Z`) - new Date(`${firstDay}T00:00:00Z`)) / dayMs) + 1;
     const since = new Date(new Date(`${firstDay}T00:00:00Z`).getTime() - KST_OFFSET_HOURS * 3_600_000);
 
     const reviews = await mypageRepository.findRatingsSince(memberId, since);
@@ -236,7 +241,7 @@ function createMypageService({ mypageRepository, now = () => new Date() }) {
     const deltaTenths = reviews.reduce((sum, r) => sum + RATING_DELTA_TENTHS[r.rating], 0);
     let temp = Math.min(999, Math.max(0, Math.round(current * 10) - deltaTenths)) / 10;
 
-    const points = Array.from({ length: days }, (_, i) => {
+    const points = Array.from({ length }, (_, i) => {
       const date = kstDate(new Date(new Date(`${firstDay}T00:00:00Z`).getTime() + i * dayMs));
       const ratings = ratingsByDay.get(date) ?? [];
       temp = applyRatings(temp, ratings);

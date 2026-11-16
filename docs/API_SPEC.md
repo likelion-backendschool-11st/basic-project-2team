@@ -802,7 +802,7 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 | POST / DELETE | `/api/members/me/favorites/{memberId}` | 즐겨찾기 추가 / 해제 → `204` | 🔒 |
 | GET | `/api/members/{memberId}` | 회원 프로필 (로그인하면 `viewer` 포함) | |
 | GET | `/api/members/{memberId}/posts?page=&size=` | 그 회원이 쓴 공고 (삭제되지 않은 공고, 최신순). 아이템은 `/me/posts` 에서 `canComplete`·`review` 를 뺀 형태 | |
-| GET | `/api/members/{memberId}/manner-history?days=` | 최근 N일(기본 30, 최대 90) 매너 온도 변화 → `{ days, current, points: [{ date, temp, reviewCount }] }` | |
+| GET | `/api/members/{memberId}/manner-history?days=` | 최근 N일(기본 30, 최대 90, 가입한 지 N일이 안 됐으면 가입일부터) 매너 온도 변화 → `{ days, current, points: [{ date, temp, reviewCount }] }` | |
 | GET | `/api/rankings/manner?limit=` | 매너 랭킹 (메인 명예의 전당) | |
 
 구현: `backend/src/mypage/` (`/api/members` 에 마운트), 랭킹은 `backend/src/ranking/`
