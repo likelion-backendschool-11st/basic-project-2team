@@ -19,6 +19,7 @@ function createAdminRouter(adminController, { requireAdmin }) {
   router.get('/members', adminController.listMembers);
   router.get('/members/:memberId', adminController.getMember);
   router.post('/members/:memberId/sanctions', adminController.sanctionMember);
+  router.post('/members/:memberId/sanctions/:sanctionId/release', adminController.releaseSanction);
   router.get('/comments', adminController.listComments);
   router.patch('/comments/:commentId', adminController.updateComment);
   router.get('/history', adminController.history);

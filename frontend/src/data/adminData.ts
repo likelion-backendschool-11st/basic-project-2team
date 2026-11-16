@@ -9,6 +9,7 @@ import type {
   ReportAction,
   ReportStatus,
   ReportType,
+  Sanction,
   SanctionType,
 } from '../api/adminApi';
 import { paths, ROUTES } from './routes';
@@ -199,6 +200,21 @@ export const sanctionPeriod = (type: SanctionType, startsAt: string, endsAt: str
   return `${Math.round((new Date(endsAt).getTime() - new Date(startsAt).getTime()) / 86_400_000)}일`;
 };
 
+/** 해제할 수 있는 제재: 아직 해제되지 않았고, 기간 정지라면 아직 끝나지 않은 것 */
+export const canReleaseSanction = (s: Pick<Sanction, 'type' | 'endsAt' | 'releasedAt'>, now = new Date()) =>
+  !s.releasedAt && !(s.type === 'SUSPEND' && s.endsAt && new Date(s.endsAt) <= now);
+
+export const memberText = {
+  release: '해제',
+  released: '해제됨',
+  releaseTitle: (label: string) => `${label} 조치를 해제할까요?`,
+  releaseDescription: '해제하면 남은 제재 기준으로 회원 상태가 다시 계산되고, 회원에게 사유와 함께 알림이 전달됩니다. 제재 기록은 남습니다.',
+  reasonLabel: '해제 사유',
+  reasonPlaceholder: '회원에게 통지될 해제 사유를 입력하세요 (예: 오신고 확인)',
+  reasonRequired: '해제 사유를 입력해 주세요.',
+  releasedToast: '제재를 해제했습니다.',
+};
+
 // ───────── 댓글
 
 export const commentStatusLabel: Record<CommentStatus, string> = { VISIBLE: '정상', REPORTED: '신고됨', HIDDEN: '가림', DELETED: '삭제' };
@@ -228,7 +244,7 @@ export const historyKindLabel: Record<HistoryKind, string> = {
   REPORT: '신고 처리',
   POST_DELETE: '공고 삭제',
   COMMENT: '댓글 가림·복구',
-  SANCTION: '회원 제재·정지',
+  SANCTION: '회원 제재·해제',
   LOGIN: '관리자 로그인',
 };
 export const historyTone: Record<HistoryKind, Tone> = {
@@ -248,6 +264,7 @@ const actionTypeLabel: Record<AdminActionType, string> = {
   COMMENT_RESTORE: '복구 처리',
   COMMENT_DELETE: '삭제 처리',
   MEMBER_SANCTION: '회원 제재',
+  SANCTION_RELEASE: '제재 해제',
   MEMBER_VIEW: '상세 조회',
 };
 
@@ -260,6 +277,7 @@ export function describeAction(row: Pick<AdminHistory, 'actionType' | 'detail'>)
     return detail.status === 'IN_PROGRESS' ? '처리 중 표시' : actionTypeLabel.REPORT_PROCESS;
   }
   if (row.actionType === 'MEMBER_SANCTION' && detail.type) return withDays(sanctionTypeLabel[detail.type]);
+  if (row.actionType === 'SANCTION_RELEASE' && detail.type) return `${sanctionTypeLabel[detail.type]} 해제`;
   return actionTypeLabel[row.actionType];
 }
 

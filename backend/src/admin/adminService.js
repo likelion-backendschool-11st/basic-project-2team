@@ -41,6 +41,7 @@ const {
   validateReportUpdate,
   validatePostDelete,
   validateSanction,
+  validateSanctionRelease,
   validateCommentUpdate,
 } = require('./adminValidator');
 
@@ -85,9 +86,35 @@ const toSanction = (row) => ({
   endsAt: row.endsAt,
   reportId: row.reportId,
   releasedAt: row.releasedAt,
+  releasedBy: row.releasedBy ?? null,
+  releaseReason: row.releaseReason ?? null,
   adminName: row.adminName,
   createdAt: row.createdAt,
 });
+
+/**
+ * 해제되지 않은 제재로 회원 상태를 다시 정합니다. 가장 무거운 제재를 따르고,
+ * 이미 끝난 기간 정지는 상태에 반영하지 않습니다. 정지가 남아 있으면 가장 늦게 끝나는 시각을 씁니다.
+ */
+const statusFromSanctions = (sanctions, current) => {
+  let status = memberStatus.active;
+  let suspendedUntil = null;
+  for (const s of sanctions) {
+    if (s.type === sanctionType.suspend) {
+      if (!(s.endsAt > current)) continue;
+      if (!suspendedUntil || s.endsAt > suspendedUntil) suspendedUntil = s.endsAt;
+    }
+    const next = sanctionMemberStatus[s.type];
+    if (memberStatusSeverity[next] > memberStatusSeverity[status]) status = next;
+  }
+  return { status, suspendedUntil: status === memberStatus.suspended ? suspendedUntil : null };
+};
+
+/** 기간 정지의 일수 (알림 문구용). 정지가 아니면 null */
+const sanctionDays = (sanction) =>
+  sanction.type === sanctionType.suspend && sanction.endsAt
+    ? Math.round((sanction.endsAt.getTime() - sanction.startsAt.getTime()) / DAY_MS)
+    : null;
 
 const toLog = (row) => ({
   id: row.id,
@@ -560,6 +587,47 @@ function createAdminService({ adminRepository, tokenProvider, postEvents = NO_EV
     });
   }
 
+  /**
+   * POST /api/admin/members/{memberId}/sanctions/{sanctionId}/release
+   * 제재를 해제하고(기록은 남김), 남은 제재로 회원 상태를 다시 계산한 뒤 회원에게 알립니다.
+   */
+  async function releaseSanction(memberId, sanctionId, body, { admin, ip }) {
+    const { reason } = validateSanctionRelease(body);
+    const current = now();
+
+    return adminRepository.withTransaction(async (tx) => {
+      const member = await tx.lockMember(memberId);
+      if (!member) throw notFound('MEMBER_NOT_FOUND', adminMessages.memberNotFound);
+      const sanction = await tx.lockSanction(sanctionId);
+      if (!sanction || sanction.memberId !== memberId) {
+        throw notFound('SANCTION_NOT_FOUND', adminMessages.sanctionNotFound);
+      }
+      if (member.status === memberStatus.withdrawn) throw conflict('MEMBER_WITHDRAWN', adminMessages.releaseWithdrawn);
+      if (sanction.releasedAt) throw conflict('SANCTION_ALREADY_RELEASED', adminMessages.sanctionAlreadyReleased);
+
+      await tx.releaseSanction({ id: sanctionId, releasedAt: current, releasedBy: admin.id, releaseReason: reason });
+      const { status, suspendedUntil } = statusFromSanctions(await tx.listUnreleasedSanctions(memberId), current);
+      await tx.updateMemberStatus({ id: memberId, status, suspendedUntil });
+
+      const label = adminMessages.sanctionLabel(sanction.type, sanctionDays(sanction));
+      await tx.insertNotification({
+        memberId,
+        type: notificationType.sanction,
+        message: truncate(adminMessages.releaseNotice(label, reason), NOTIFICATION_MAX_LENGTH),
+        postId: null,
+      });
+      await tx.insertActionLog({
+        adminId: admin.id,
+        actionType: actionType.sanctionRelease,
+        targetType: logTargetType.member,
+        targetId: memberId,
+        detail: { targetLabel: member.nickname, sanctionId, type: sanction.type, reason },
+        ip,
+      });
+      return { id: sanctionId, memberId, releasedAt: current, memberStatus: status, suspendedUntil };
+    });
+  }
+
   // ───────── 댓글
 
   /** GET /api/admin/comments — 관리자는 비밀 댓글 본문도 봅니다. */
@@ -637,6 +705,7 @@ function createAdminService({ adminRepository, tokenProvider, postEvents = NO_EV
     listMembers,
     getMember,
     sanctionMember,
+    releaseSanction,
     listComments,
     updateComment,
     listHistory,

@@ -3,16 +3,21 @@ import { Link } from 'react-router-dom';
 import AdminCard, { InfoGrid } from '../../components/admin/AdminCard';
 import AdminLayout from '../../components/admin/AdminLayout';
 import AdminLoadState from '../../components/admin/AdminLoadState';
+import ReasonField from '../../components/admin/ReasonField';
 import StatusBadge from '../../components/admin/StatusBadge';
+import ConfirmDialog from '../../components/ui/ConfirmDialog';
+import Toast from '../../components/ui/Toast';
 import { getMember } from '../../api/adminApi';
-import { adminText, displayName, formatDateTime, formatPhone, memberStatusLabel, memberStatusTone, sanctionPeriod, sanctionTypeLabel } from '../../data/adminData';
+import { adminText, canReleaseSanction, displayName, formatDateTime, formatPhone, memberStatusLabel, memberStatusTone, memberText, REASON_MAX_LENGTH, sanctionPeriod, sanctionTypeLabel } from '../../data/adminData';
 import { paths, ROUTES } from '../../data/routes';
 import { useAdminId, useAdminResource } from '../../hooks/useAdminDetail';
+import { useSanctionRelease } from '../../hooks/useSanctionRelease';
 
-/** Stitch screen: "회원 상세" — 개인정보 조회라 서버가 조회 기록을 남깁니다. */
+/** Stitch screen: "회원 상세" — 개인정보 조회라 서버가 조회 기록을 남깁니다. 제재 이력에서 제재를 해제할 수 있습니다. */
 export const AdminMemberDetailPage: React.FC = () => {
   const id = useAdminId('memberId');
   const { data: m, error, loading, reload } = useAdminResource(id, getMember);
+  const release = useSanctionRelease(id, reload);
   const back = { to: ROUTES.adminMembers, label: '회원 목록으로 돌아가기' };
 
   if (!m) {
@@ -73,7 +78,7 @@ export const AdminMemberDetailPage: React.FC = () => {
           {m.sanctions.length === 0 ? <p className="text-sm text-fog-muted">제재 이력이 없습니다.</p> : (
             <div className="overflow-x-auto rounded-xl border border-night-borderLight">
               <table className="w-full text-sm">
-                <thead className="bg-night-base/70 text-xs text-fog-muted"><tr>{['일시', '제재 내용', '기간', '사유', '처리자', '관련 신고'].map((h) => <th key={h} className="px-4 py-3 text-left font-semibold">{h}</th>)}</tr></thead>
+                <thead className="bg-night-base/70 text-xs text-fog-muted"><tr>{['일시', '제재 내용', '기간', '사유', '처리자', '관련 신고', '해제'].map((h) => <th key={h} className="px-4 py-3 text-left font-semibold">{h}</th>)}</tr></thead>
                 <tbody className="divide-y divide-night-borderLight">
                   {m.sanctions.map((s) => (
                     <tr key={s.id}>
@@ -83,6 +88,17 @@ export const AdminMemberDetailPage: React.FC = () => {
                       <td className="px-4 py-3">{s.reason}</td>
                       <td className="px-4 py-3 text-fog-sub">{s.adminName}</td>
                       <td className="px-4 py-3">{s.reportId ? <Link to={paths.adminReportDetail(String(s.reportId))} className="text-indigo-300">신고 상세</Link> : adminText.none}</td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        {s.releasedAt ? (
+                          <div className="text-xs text-fog-muted" title={s.releaseReason ?? undefined}>
+                            <div className="font-semibold text-emerald-300">{memberText.released}</div>
+                            <div>{formatDateTime(s.releasedAt)}{s.releasedBy && ` · ${s.releasedBy}`}</div>
+                            {s.releaseReason && <div className="max-w-[200px] truncate">사유: {s.releaseReason}</div>}
+                          </div>
+                        ) : m.status !== 'WITHDRAWN' && canReleaseSanction(s) ? (
+                          <button type="button" onClick={() => release.open(s)} className="h-8 px-3 rounded-lg border border-night-borderLight bg-night-card text-xs font-semibold text-fog-headline hover:bg-white/10">{memberText.release}</button>
+                        ) : adminText.none}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -91,6 +107,20 @@ export const AdminMemberDetailPage: React.FC = () => {
           )}
         </AdminCard>
       </div>
+      <ConfirmDialog
+        isOpen={release.dialog.isOpen}
+        title={memberText.releaseTitle(release.target ? sanctionTypeLabel[release.target.type] : '')}
+        description={memberText.releaseDescription}
+        confirmLabel={release.busy ? adminText.loading : memberText.release}
+        cancelLabel="취소"
+        icon="fa-unlock"
+        tone="brand"
+        onConfirm={() => void release.confirm()}
+        onCancel={release.dialog.close}
+      >
+        <ReasonField label={memberText.reasonLabel} value={release.reason} onChange={release.changeReason} maxLength={REASON_MAX_LENGTH} placeholder={memberText.reasonPlaceholder} error={release.error} rows={3} />
+      </ConfirmDialog>
+      <Toast message={release.toast.message} />
     </AdminLayout>
   );
 };
