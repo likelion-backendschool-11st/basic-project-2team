@@ -10,6 +10,7 @@ const {
   GAME_CODE_PATTERN,
   PROFILE_PLAY_STYLES,
   WITHDRAW_REASON_MAX_LENGTH,
+  AVATAR_MAX_BYTES,
   accountMessages: m,
 } = require('./accountConstants');
 
@@ -128,4 +129,26 @@ function validateWithdraw(body) {
   return { password, reason };
 }
 
-module.exports = { validateProfileUpdate, validatePasswordChange, validateWithdraw };
+/** 파일 앞부분(시그니처)으로 이미지 형식을 판별합니다. Content-Type·확장자는 믿지 않습니다. SVG 는 받지 않습니다. */
+function detectImageExtension(buffer) {
+  const startsWith = (bytes, offset = 0) => bytes.every((byte, i) => buffer[offset + i] === byte);
+  if (startsWith([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) return 'png';
+  if (startsWith([0xff, 0xd8, 0xff])) return 'jpg';
+  if (buffer.subarray(0, 6).toString('latin1') === 'GIF87a' || buffer.subarray(0, 6).toString('latin1') === 'GIF89a') return 'gif';
+  if (buffer.subarray(0, 4).toString('latin1') === 'RIFF' && buffer.subarray(8, 12).toString('latin1') === 'WEBP') return 'webp';
+  return null;
+}
+
+/**
+ * 프로필 이미지 업로드 본문 (express.raw 가 Buffer 로 넘김). 이미지가 아니거나 비었으면 400 INVALID_IMAGE.
+ * @returns {{ buffer: Buffer, extension: 'png' | 'jpg' | 'gif' | 'webp' }}
+ */
+function validateAvatar(body) {
+  const buffer = Buffer.isBuffer(body) ? body : null;
+  const extension = buffer && buffer.length > 0 ? detectImageExtension(buffer) : null;
+  if (!buffer || !extension) throw new ApiError(400, 'INVALID_IMAGE', m.avatarInvalid);
+  if (buffer.length > AVATAR_MAX_BYTES) throw new ApiError(413, 'IMAGE_TOO_LARGE', m.avatarTooLarge);
+  return { buffer, extension };
+}
+
+module.exports = { validateProfileUpdate, validatePasswordChange, validateWithdraw, validateAvatar };

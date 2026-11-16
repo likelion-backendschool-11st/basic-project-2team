@@ -51,6 +51,15 @@ export const withdraw = (password: string, reason: string | null) =>
   request<void>('DELETE', '/api/members/me', reason ? { password, reason } : { password });
 
 /**
+ * PUT /api/members/me/avatar — 이미지 파일 바이트를 그대로 보냅니다 (PNG·JPG·GIF·WEBP, 2MB 이하).
+ * 이미지가 아니면 400 INVALID_IMAGE, 너무 크면 413. 돌려받은 avatarUrl 은 서버 경로라 화면에서는 assetUrl 로 바꿔 씁니다.
+ */
+export const uploadAvatar = (file: File) => request<{ readonly avatarUrl: string }>('PUT', '/api/members/me/avatar', file);
+
+/** DELETE /api/members/me/avatar → 204. 기본 이미지로 되돌립니다. */
+export const deleteAvatar = () => request<void>('DELETE', '/api/members/me/avatar');
+
+/**
  * PATCH /api/members/me/password → 204.
  * 현재 비밀번호가 틀리면 400 INVALID_PASSWORD, 새 비밀번호가 지금과 같으면 400 SAME_PASSWORD.
  * 성공하면 서버가 모든 Refresh Token 을 폐기하므로 다시 로그인해야 합니다.

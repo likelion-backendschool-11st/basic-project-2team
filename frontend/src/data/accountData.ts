@@ -10,6 +10,19 @@ export interface AccountNavItem {
   readonly danger?: boolean;
 }
 
+/** 계정 관리 좌측 프로필 이미지 변경 (서버 AVATAR_CONTENT_TYPES · AVATAR_MAX_BYTES 와 같은 규칙) */
+export const avatarText = {
+  changeLabel: '프로필 이미지 변경',
+  resetLabel: '기본 이미지로',
+  uploading: '올리는 중...',
+  accept: 'image/png,image/jpeg,image/gif,image/webp',
+  acceptedTypes: ['image/png', 'image/jpeg', 'image/gif', 'image/webp'] as readonly string[],
+  maxBytes: 2 * 1024 * 1024,
+  invalidType: 'PNG, JPG, GIF, WEBP 이미지만 올릴 수 있어요.',
+  tooLarge: '2MB 이하의 이미지만 올릴 수 있어요.',
+  failed: '프로필 이미지를 바꾸지 못했습니다. 잠시 후 다시 시도해주세요.',
+};
+
 export const accountNav: readonly AccountNavItem[] = [
   { id: 'profile', label: '프로필 수정', icon: 'fa-user-pen', to: ROUTES.profileEdit },
   { id: 'password', label: '비밀번호 변경', icon: 'fa-key', to: ROUTES.passwordChange },

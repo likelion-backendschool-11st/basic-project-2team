@@ -1,5 +1,6 @@
 'use strict';
 
+const path = require('node:path');
 const express = require('express');
 const cors = require('cors');
 const { env } = require('./config/env');
@@ -17,6 +18,8 @@ const { createBoardModule } = require('./board');
 const { createAdminModule } = require('./admin');
 const { createMypageModule } = require('./mypage');
 const { createAccountModule } = require('./account');
+const { createAvatarStorage } = require('./account/avatarStorage');
+const { AVATAR_URL_PREFIX } = require('./account/accountConstants');
 const { createReviewModule } = require('./review');
 const { createRankingModule } = require('./ranking');
 const { createPollModule } = require('./poll');
@@ -40,6 +43,7 @@ const { createPollModule } = require('./poll');
  *   rankingRepository?: object,
  *   pollRepository?: object,
  *   postEvents?: ReturnType<typeof createPostEvents>,
+ *   avatarStorage?: ReturnType<typeof createAvatarStorage>,
  *   corsOrigins: string[],
  *   bcryptRounds: number,
  *   auth?: typeof env.auth,
@@ -63,6 +67,7 @@ function createApp({
   rankingRepository,
   pollRepository,
   postEvents = createPostEvents(),
+  avatarStorage = createAvatarStorage(path.join(env.uploadDir, 'avatars')),
   corsOrigins,
   bcryptRounds,
   auth = env.auth,
@@ -72,6 +77,17 @@ function createApp({
 
   app.use(cors({ origin: corsOrigins }));
   app.use(express.json());
+
+  // 업로드한 프로필 이미지. 저장할 때 이미지 형식을 확인하고, 브라우저가 다른 형식으로 추측하지 않게 nosniff 를 붙입니다.
+  app.use(
+    AVATAR_URL_PREFIX.replace(/\/$/, ''),
+    express.static(avatarStorage.dir, {
+      index: false,
+      dotfiles: 'deny',
+      maxAge: '7d',
+      setHeaders: (res) => res.setHeader('X-Content-Type-Options', 'nosniff'),
+    }),
+  );
 
   const tokenProvider = createTokenProvider(auth);
   const requireAuth = createRequireAuth(tokenProvider);
@@ -114,7 +130,7 @@ function createApp({
   const admin = createAdminModule({ pool, adminRepository, tokenProvider, postEvents, requireAdmin, bcryptRounds, now });
   app.use('/api/admin', admin.router);
   // GET /api/members/:memberId(mypage)가 /me 를 잡지 않도록 account 를 먼저 마운트합니다.
-  const account = createAccountModule({ pool, accountRepository, requireAuth, bcryptRounds, now });
+  const account = createAccountModule({ pool, accountRepository, avatarStorage, requireAuth, bcryptRounds, now });
   app.use('/api/members', account.router);
   const mypage = createMypageModule({ pool, mypageRepository, requireAuth, optionalAuth, now });
   app.use('/api/members', mypage.router);

@@ -22,7 +22,17 @@ function createAccountController(accountService) {
     return res.status(204).end();
   }
 
-  return { getMe, updateProfile, changePassword, withdraw };
+  /** 본문은 express.raw 가 넘긴 이미지 Buffer */
+  async function updateAvatar(req, res) {
+    return sendSuccess(res, 200, await accountService.updateAvatar(req.auth.memberId, req.body));
+  }
+
+  async function deleteAvatar(req, res) {
+    await accountService.deleteAvatar(req.auth.memberId);
+    return res.status(204).end();
+  }
+
+  return { getMe, updateProfile, changePassword, withdraw, updateAvatar, deleteAvatar };
 }
 
 module.exports = { createAccountController };

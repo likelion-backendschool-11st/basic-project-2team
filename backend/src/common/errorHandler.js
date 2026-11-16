@@ -16,6 +16,9 @@ function errorHandler(err, req, res, _next) {
   if (err && err.type === 'entity.parse.failed') {
     return sendError(res, 400, 'INVALID_JSON', '요청 본문이 올바른 JSON 형식이 아닙니다.');
   }
+  if (err && err.type === 'entity.too.large') {
+    return sendError(res, 413, 'PAYLOAD_TOO_LARGE', '요청 본문이 허용된 크기를 넘었습니다.');
+  }
   console.error(err);
   return sendError(res, 500, 'INTERNAL_SERVER_ERROR', '서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
 }

@@ -1,8 +1,12 @@
 'use strict';
 
+const path = require('node:path');
+
 /** Reads process.env once and exposes typed config values with local-dev defaults. */
 const env = Object.freeze({
   port: Number(process.env.PORT ?? 8080),
+  /** 업로드한 파일(프로필 이미지 등)을 저장할 폴더. 기본값은 backend/uploads (git 에 올리지 않음) */
+  uploadDir: path.resolve(process.env.UPLOAD_DIR ?? path.join(__dirname, '..', '..', 'uploads')),
   corsOrigins: (process.env.CORS_ORIGIN ?? 'http://localhost:5173')
     .split(',')
     .map((origin) => origin.trim())

@@ -13,7 +13,7 @@ import {
 import type { ApplicationStatus, PostStatus } from '../data/postData';
 import { paths } from '../data/routes';
 import { styleChoices } from '../data/writeData';
-import { request } from './http';
+import { assetUrl, request } from './http';
 
 /* ── 응답 타입 (docs/API_SPEC.md 8절) ── */
 
@@ -170,7 +170,7 @@ export function toProfileSummary(res: MemberProfileResponse): ProfileSummary {
   const mainGame = res.games.find((g) => g.isMain) ?? res.games[0];
   const style = mainGame ? [styleLabel(mainGame.playStyle), mainGame.playTimeSlot].filter(Boolean).join(' / ') : '';
   return {
-    avatarUrl: res.avatarUrl,
+    avatarUrl: assetUrl(res.avatarUrl),
     nickname: res.nickname,
     levelLabel: `${t.levelPrefix}${res.level}`,
     mainGameBadge: mainGame ? `${t.mainGamePrefix}${mainGame.name}` : null,
@@ -260,6 +260,6 @@ export const toFavoriteUser = (item: FavoriteItem): FavoriteUser => ({
   name: item.nickname,
   level: item.level,
   detail: item.mainGame ? [item.mainGame.name, styleLabel(item.playStyle)].filter(Boolean).join(' · ') : favoritesText.noMainGame,
-  avatarUrl: item.avatarUrl,
+  avatarUrl: assetUrl(item.avatarUrl),
   manner: `${favoritesText.mannerPrefix}${formatTemperature(item.mannerTemp)}`,
 });
