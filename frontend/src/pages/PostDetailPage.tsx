@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import CommentSection from '../components/comments/CommentSection';
+import { CommentChannelTabs, PartyChannelBanner, PartyComposerHeader } from '../components/comments/PartyChannel';
 import ReportDialog from '../components/comments/ReportDialog';
 import PollCloseDialog from '../components/poll/PollCloseDialog';
 import PollFormDialog from '../components/poll/PollFormDialog';
@@ -19,9 +20,10 @@ import RelatedPosts from '../components/post/RelatedPosts';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import Toast from '../components/ui/Toast';
 import LoggedInLayout from '../components/user/LoggedInLayout';
-import { COMMENTS_ANCHOR_ID, commentText } from '../data/commentData';
+import { COMMENTS_ANCHOR_ID, commentText, type CommentChannel } from '../data/commentData';
 import { postDetailText, postText } from '../data/postData';
 import { paths, ROUTES } from '../data/routes';
+import { useAuth } from '../hooks/useAuth';
 import { useComments } from '../hooks/useComments';
 import { usePoll } from '../hooks/usePoll';
 import { usePostDetail } from '../hooks/usePostDetail';
@@ -45,6 +47,12 @@ const PostDetailView: React.FC<{ readonly postId: string }> = ({ postId }) => {
   const navigate = useNavigate();
   const post = usePostDetail(postId);
   const thread = useComments(postId, post.detail?.commentCount ?? 0);
+  // 참가자 전용 댓글은 공대장과 승인된 파티원만 불러옵니다 (서버도 그 외에는 403).
+  const isPartyMember = Boolean(post.detail?.isOwner || post.accepted);
+  const partyThread = useComments(postId, 0, { channel: 'party', enabled: isPartyMember });
+  const [channel, setChannel] = useState<CommentChannel>('public');
+  const activeThread = channel === 'party' ? partyThread : thread;
+  const { user } = useAuth();
   const poll = usePoll(postId);
   // 다른 사람의 신청·승인·댓글·투표 등을 새로고침 없이 반영합니다. 댓글 신호는 공고의 댓글 수도 바뀌므로 상세도 함께 불러옵니다.
   // 파티원이 바뀌면(승인·탈퇴) 투표 자격도 바뀌고, 「댓글 작성자만」 투표는 댓글에 따라 자격이 바뀌므로 투표도 다시 불러옵니다.
@@ -55,6 +63,7 @@ const PostDetailView: React.FC<{ readonly postId: string }> = ({ postId }) => {
     },
     onComments: () => {
       thread.refresh();
+      partyThread.refresh();
       post.refresh();
       if (poll.poll?.commentersOnly) poll.refresh();
     },
@@ -113,11 +122,15 @@ const PostDetailView: React.FC<{ readonly postId: string }> = ({ postId }) => {
           <PostDescription detail={detail} />
           {current?.pinned && pollWidget}
           <CommentSection
-            thread={thread}
+            thread={activeThread}
             ownerView={detail.isOwner}
             title={detail.isOwner ? '댓글 및 공대 문의' : commentText.title}
+            tabs={<CommentChannelTabs active={channel} publicCount={thread.total} partyCount={isPartyMember ? partyThread.total : null} onSelect={setChannel} />}
+            notice={channel === 'party' && isPartyMember ? <PartyChannelBanner current={detail.current} max={detail.max} /> : undefined}
+            composerHeader={user && <PartyComposerHeader nickname={user.nickname} avatarUrl={user.avatarUrl} level={user.level} mannerTemp={user.mannerTemp} isHost={detail.isOwner} />}
+            locked={channel === 'party' && !isPartyMember}
             onCreatePoll={canCreatePoll ? poll.openCreate : undefined}
-            poll={current && !current.pinned ? pollWidget : undefined}
+            poll={current && !current.pinned && channel === 'public' ? pollWidget : undefined}
           />
         </div>
         <aside className="flex flex-col gap-5 xl:sticky xl:top-24">
@@ -138,15 +151,15 @@ const PostDetailView: React.FC<{ readonly postId: string }> = ({ postId }) => {
       <ConfirmDialog isOpen={post.disband.isOpen} title={postText.disband.title} description={postText.disband.description} confirmLabel={postText.disband.confirm} cancelLabel={postText.disband.cancel} icon="fa-people-group" onConfirm={post.confirmDisband} onCancel={post.disband.close} />
       <ConfirmDialog isOpen={post.leave.isOpen} title={leaveText.title} description={leaveText.description} confirmLabel={leaveText.confirm} cancelLabel={leaveText.cancel} icon="fa-right-from-bracket" tone="warning" onConfirm={post.confirmLeave} onCancel={post.leave.close} />
       <ConfirmDialog isOpen={post.closeRecruit.isOpen} title={postText.closeConfirm.title} description={postText.closeConfirm.description} confirmLabel={postText.closeConfirm.confirm} cancelLabel={postText.closeConfirm.cancel} icon="fa-circle-check" tone="brand" onConfirm={post.confirmClose} onCancel={post.closeRecruit.close} />
-      <ConfirmDialog isOpen={thread.deleteDialog.isOpen} title={commentText.deleteDialog.title} description={commentText.deleteDialog.description} confirmLabel={commentText.deleteDialog.confirm} cancelLabel={commentText.deleteDialog.cancel} icon="fa-trash-can" onConfirm={thread.confirmDelete} onCancel={thread.deleteDialog.close} />
-      <ReportDialog isOpen={thread.reportDialog.isOpen} onConfirm={thread.confirmReport} onClose={thread.reportDialog.close} />
+      <ConfirmDialog isOpen={activeThread.deleteDialog.isOpen} title={commentText.deleteDialog.title} description={commentText.deleteDialog.description} confirmLabel={commentText.deleteDialog.confirm} cancelLabel={commentText.deleteDialog.cancel} icon="fa-trash-can" onConfirm={activeThread.confirmDelete} onCancel={activeThread.deleteDialog.close} />
+      <ReportDialog isOpen={activeThread.reportDialog.isOpen} onConfirm={activeThread.confirmReport} onClose={activeThread.reportDialog.close} />
       <ApplicantsDialog isOpen={post.applicantsDialog.isOpen} applicants={post.applicants} onResolve={post.resolveApplicant} onClose={post.applicantsDialog.close} />
       {poll.formDialog.isOpen && (
         <PollFormDialog editing={poll.formTarget} scheduleAt={detail.scheduleAt} busy={poll.busy} onSubmit={(input) => void poll.save(input)} onClose={poll.formDialog.close} />
       )}
       {poll.closeDialog.isOpen && current && <PollCloseDialog poll={current} busy={poll.busy} onSubmit={(input) => void poll.confirm(input)} onClose={poll.closeDialog.close} />}
       {poll.participantsDialog.isOpen && current && <PollParticipantsDialog poll={current} busy={poll.busy} onRemind={() => void poll.remind()} onClose={poll.participantsDialog.close} />}
-      <Toast message={thread.toast.message ?? poll.toast.message ?? post.toast.message} />
+      <Toast message={thread.toast.message ?? partyThread.toast.message ?? poll.toast.message ?? post.toast.message} />
     </LoggedInLayout>
   );
 };

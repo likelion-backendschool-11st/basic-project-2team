@@ -451,7 +451,7 @@ function createAdminRepository(pool) {
 
     async function lockComment(id) {
       return firstOf(
-        `SELECT id, post_id AS postId, author_id AS authorId, content, status
+        `SELECT id, post_id AS postId, author_id AS authorId, content, status, is_party_only AS isPartyOnly
            FROM comment WHERE id = ? FOR UPDATE`,
         [id],
       );

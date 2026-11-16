@@ -17,7 +17,7 @@ const ROOT_ORDER = Object.freeze({
 
 /** 목록·작성 응답에 공통으로 쓰는 댓글 + 작성자 컬럼 */
 const COMMENT_COLUMNS = `c.id, c.post_id AS postId, c.parent_id AS parentId, c.accepted_reply_id AS acceptedReplyId, c.content, c.is_secret AS isSecret,
-       c.status, c.created_at AS createdAt,
+       c.is_party_only AS isPartyOnly, c.status, c.created_at AS createdAt,
        m.id AS authorId, m.nickname AS authorNickname, m.avatar_url AS authorAvatarUrl, m.status AS authorStatus`;
 
 /**
@@ -44,21 +44,41 @@ function createCommentRepository(pool) {
   /** 대댓글의 부모 후보: 같은 공고의 삭제되지 않은 댓글. 없으면 null */
   async function findParentComment(postId, commentId) {
     const [rows] = await pool.query(
-      `SELECT c.id, c.parent_id AS parentId, c.author_id AS authorId
+      `SELECT c.id, c.parent_id AS parentId, c.author_id AS authorId, c.is_party_only AS isPartyOnly
          FROM comment c WHERE c.id = ? AND c.post_id = ? AND ${ALIVE_COMMENT} LIMIT 1`,
       [commentId, postId],
     );
     return rows[0] ?? null;
   }
 
-  /** 댓글 저장과 공고 comment_count +1 을 한 트랜잭션으로 처리하고 새 댓글 id 를 반환합니다. */
-  async function createComment({ postId, authorId, parentId, content, isSecret }) {
+  /**
+   * 파티 확정 인원: 공고 작성자(공대장) + 승인(ACCEPTED)된 신청자. 참가자 전용 댓글의 권한 확인과 역할 표시에 씁니다.
+   * @returns {Promise<Array<{ memberId: number, isHost: boolean, role: string | null, mannerTemp: number }>>}
+   */
+  async function findPartyMembers(postId) {
+    const [rows] = await pool.query(
+      `SELECT m.id AS memberId, TRUE AS isHost, NULL AS role, m.manner_temp AS mannerTemp
+         FROM post p JOIN member m ON m.id = p.author_id WHERE p.id = ?
+       UNION ALL
+       SELECT m.id, FALSE, a.role, m.manner_temp
+         FROM post_application a JOIN member m ON m.id = a.applicant_id
+        WHERE a.post_id = ? AND a.status = 'ACCEPTED'`,
+      [postId, postId],
+    );
+    return rows.map((row) => ({ ...row, isHost: Boolean(row.isHost), mannerTemp: Number(row.mannerTemp) }));
+  }
+
+  /**
+   * 댓글 저장과 공고 comment_count +1 을 한 트랜잭션으로 처리하고 새 댓글 id 를 반환합니다.
+   * 참가자 전용 댓글은 공개 목록·카드에 보이는 comment_count 에 넣지 않습니다.
+   */
+  async function createComment({ postId, authorId, parentId, content, isSecret, isPartyOnly = false }) {
     return inTransaction(async (connection) => {
       const [result] = await connection.query(
-        'INSERT INTO comment (post_id, author_id, parent_id, content, is_secret) VALUES (?, ?, ?, ?, ?)',
-        [postId, authorId, parentId, content, isSecret],
+        'INSERT INTO comment (post_id, author_id, parent_id, content, is_secret, is_party_only) VALUES (?, ?, ?, ?, ?, ?)',
+        [postId, authorId, parentId, content, isSecret, isPartyOnly],
       );
-      await connection.query('UPDATE post SET comment_count = comment_count + 1 WHERE id = ?', [postId]);
+      if (!isPartyOnly) await connection.query('UPDATE post SET comment_count = comment_count + 1 WHERE id = ?', [postId]);
       // 댓글 작성 +2 (하루 10회까지, docs/03-db-design.md 결정 사항 8-1)
       await awardDailyLimitedPoints(connection, { memberId: authorId, actionType: 'COMMENT_CREATE', refId: result.insertId });
       return result.insertId;
@@ -77,21 +97,26 @@ function createCommentRepository(pool) {
   }
 
   /**
-   * 루트 댓글 한 페이지와 루트 댓글 전체 수 (삭제된 루트 댓글은 대댓글과 함께 제외).
-   * @param {{ postId: number, sort: 'oldest' | 'newest', limit: number, offset: number }} filter
+   * 한 채널의 루트 댓글 한 페이지와 루트 댓글 전체 수 (삭제된 루트 댓글은 대댓글과 함께 제외).
+   * commentCount 는 그 채널의 살아 있는 댓글 수(답글 포함)입니다.
+   * @param {{ postId: number, sort: 'oldest' | 'newest', limit: number, offset: number, partyOnly?: boolean }} filter
    */
-  async function findRootCommentPage({ postId, sort, limit, offset }) {
-    const condition = `c.post_id = ? AND c.parent_id IS NULL AND ${ALIVE_COMMENT}`;
-    const [[{ totalCount }]] = await pool.query(`SELECT COUNT(*) AS totalCount FROM comment c WHERE ${condition}`, [postId]);
+  async function findRootCommentPage({ postId, sort, limit, offset, partyOnly = false }) {
+    const channel = `c.post_id = ? AND c.is_party_only = ? AND ${ALIVE_COMMENT}`;
+    const condition = `${channel} AND c.parent_id IS NULL`;
+    const [[{ totalCount, commentCount }]] = await pool.query(
+      `SELECT COALESCE(SUM(c.parent_id IS NULL), 0) AS totalCount, COUNT(*) AS commentCount FROM comment c WHERE ${channel}`,
+      [postId, partyOnly],
+    );
     const [rows] = await pool.query(
       `SELECT ${COMMENT_COLUMNS}
          FROM comment c JOIN member m ON m.id = c.author_id
         WHERE ${condition}
         ORDER BY ${ROOT_ORDER[sort]}
         LIMIT ? OFFSET ?`,
-      [postId, limit, offset],
+      [postId, partyOnly, limit, offset],
     );
-    return { rows, totalCount };
+    return { rows, totalCount: Number(totalCount), commentCount: Number(commentCount) };
   }
 
   /** 여러 루트 댓글의 대댓글 (항상 등록순) */
@@ -159,11 +184,11 @@ function createCommentRepository(pool) {
   }
 
   /**
-   * 댓글과 그 대댓글을 소프트 삭제하고, 삭제된 수만큼 공고 comment_count 를 줄입니다.
+   * 댓글과 그 대댓글을 소프트 삭제하고, 삭제된 수만큼 공고 comment_count 를 줄입니다 (참가자 전용 댓글은 세지 않았으므로 그대로 둠).
    * 삭제된 댓글마다 작성자(대댓글은 각자의 작성자)가 받은 작성 점수를 회수합니다.
    * @returns {Promise<number>} 삭제된 댓글 수
    */
-  async function deleteCommentWithReplies({ commentId, postId, deletedAt }) {
+  async function deleteCommentWithReplies({ commentId, postId, deletedAt, isPartyOnly = false }) {
     return inTransaction(async (connection) => {
       const [targets] = await connection.query(
         `SELECT c.id FROM comment c WHERE (c.id = ? OR c.parent_id = ?) AND ${ALIVE_COMMENT} FOR UPDATE`,
@@ -177,10 +202,12 @@ function createCommentRepository(pool) {
       );
       const count = result.affectedRows;
       if (count > 0) {
-        await connection.query(
-          'UPDATE post SET comment_count = IF(comment_count > ?, comment_count - ?, 0) WHERE id = ?',
-          [count, count, postId],
-        );
+        if (!isPartyOnly) {
+          await connection.query(
+            'UPDATE post SET comment_count = IF(comment_count > ?, comment_count - ?, 0) WHERE id = ?',
+            [count, count, postId],
+          );
+        }
         await revokeActivityPoints(connection, 'COMMENT_CREATE', ids);
       }
       return count;
@@ -231,6 +258,7 @@ function createCommentRepository(pool) {
     findPost,
     findMemberStatus,
     findParentComment,
+    findPartyMembers,
     createComment,
     findCommentById,
     findRootCommentPage,

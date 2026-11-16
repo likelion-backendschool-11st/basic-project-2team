@@ -17,6 +17,13 @@ const DEFAULT_COMMENT_SORT = 'oldest';
 const DEFAULT_COMMENT_PAGE_SIZE = 4;
 const MAX_COMMENT_PAGE_SIZE = 50;
 
+/**
+ * 댓글 채널. public 은 누구나 보는 일반 댓글, party 는 참가가 확정된 파티원(공대장 + 승인된 파티원)만 보고 쓰는 댓글입니다.
+ * comment.is_party_only 로 저장하고, 답글은 부모 댓글의 채널을 따릅니다.
+ */
+const COMMENT_CHANNELS = Object.freeze({ public: 'public', party: 'party' });
+const DEFAULT_COMMENT_CHANNEL = COMMENT_CHANNELS.public;
+
 /** 댓글을 쓸 수 없는 회원 상태 (정지 기간이 지난 SUSPENDED 는 허용) */
 const MEMBER_STATUS = Object.freeze({
   suspended: 'SUSPENDED',
@@ -48,6 +55,8 @@ const commentMessages = Object.freeze({
   unauthorized: '로그인이 필요합니다.',
   withdrawnAuthor: '탈퇴한 회원',
   commentNotFound: '존재하지 않는 댓글입니다.',
+  channelInvalid: `channel 은 ${Object.values(COMMENT_CHANNELS).join(', ')} 중 하나여야 합니다.`,
+  partyOnly: '참가가 확정된 파티원만 볼 수 있는 댓글입니다.',
   notCommentAuthor: '본인이 작성한 댓글만 수정·삭제할 수 있습니다.',
   commentHidden: '관리자가 가린 댓글은 수정할 수 없습니다.',
   targetTypeInvalid: `현재는 ${REPORT_TARGET_TYPES.comment} 신고만 접수할 수 있습니다.`,
@@ -64,6 +73,8 @@ const commentMessages = Object.freeze({
 });
 
 module.exports = {
+  COMMENT_CHANNELS,
+  DEFAULT_COMMENT_CHANNEL,
   COMMENT_STATUS,
   COMMENT_MAX_LENGTH,
   COMMENT_SORTS,

@@ -12,7 +12,7 @@ import {
 } from '../api/commentApi';
 import { ApiRequestError } from '../api/http';
 import { getMemberProfile, type MemberProfileResponse } from '../api/mypageApi';
-import { COMMENT_PAGE_SIZE, commentText, type CommentSort, type PostComment } from '../data/commentData';
+import { COMMENT_PAGE_SIZE, commentText, type CommentChannel, type CommentSort, type PostComment } from '../data/commentData';
 import { useModal } from './useModal';
 import { usePagination } from './usePagination';
 import { useToast } from './useToast';
@@ -42,17 +42,26 @@ function toPostComment(c: CommentResponse, seq: number, now: number): PostCommen
     reported: c.reported,
     accepted: c.accepted,
     solved: (c as Partial<RootCommentResponse>).acceptedReplyId != null,
+    partyMember: c.partyMember,
   };
+}
+
+export interface CommentThreadOptions {
+  /** 기본 public. party 는 참가자 전용 댓글 */
+  readonly channel?: CommentChannel;
+  /** false 면 불러오지 않습니다 (파티원이 아니어서 참가자 전용 댓글을 볼 수 없을 때) */
+  readonly enabled?: boolean;
 }
 
 /**
  * 댓글 스레드: 서버(GET /api/posts/{postId}/comments)에서 루트 댓글 기준 페이지를 불러오고
  * 작성·답글·수정·삭제·신고를 API 로 처리합니다. 정렬·페이지가 바뀌면 다시 불러옵니다.
- * @param initialTotal 공고 상세의 commentCount (대댓글 포함 전체 댓글 수)
+ * @param initialTotal 공고 상세의 commentCount (대댓글 포함 전체 댓글 수). 참가자 전용 채널은 공고 수에 들어가지 않으므로 목록 응답의 commentCount 를 씁니다.
  */
-export function useComments(postId: string, initialTotal: number) {
+export function useComments(postId: string, initialTotal: number, { channel = 'public', enabled = true }: CommentThreadOptions = {}) {
   const [comments, setComments] = useState<readonly PostComment[]>([]);
   const [rootTotal, setRootTotal] = useState(0);
+  const [channelCount, setChannelCount] = useState(0);
   const [totalDelta, setTotalDelta] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -77,15 +86,25 @@ export function useComments(postId: string, initialTotal: number) {
   useEffect(() => setTotalDelta(0), [initialTotal]);
 
   useEffect(() => {
+    if (!enabled) {
+      setComments([]);
+      setRootTotal(0);
+      setChannelCount(0);
+      setLoading(false);
+      return;
+    }
     let cancelled = false;
     setLoading(true);
-    getComments(postId, { sort, page, size: COMMENT_PAGE_SIZE })
+    getComments(postId, { sort, page, size: COMMENT_PAGE_SIZE, channel })
       .then((result) => {
         if (cancelled) return;
         const now = Date.now();
         const flat = result.items.flatMap((root) => [root, ...root.replies]);
         setComments(flat.map((c, i) => toPostComment(c, i, now)));
         setRootTotal(result.totalCount);
+        setChannelCount(result.commentCount);
+        // 참가자 전용 수는 방금 받은 commentCount 에 이미 반영돼 있으므로 화면 보정값을 비웁니다.
+        if (channel === 'party') setTotalDelta(0);
         setError(null);
       })
       .catch((err: unknown) => {
@@ -97,7 +116,7 @@ export function useComments(postId: string, initialTotal: number) {
     return () => {
       cancelled = true;
     };
-  }, [postId, sort, page, reloadKey]);
+  }, [postId, sort, page, reloadKey, channel, enabled]);
 
   // 새 루트 댓글을 단 뒤 그 댓글이 보이는 페이지로 이동합니다 (전체 페이지 수가 늘어난 다음에 이동해야 합니다).
   useEffect(() => {
@@ -126,7 +145,7 @@ export function useComments(postId: string, initialTotal: number) {
     const body = text.trim();
     if (!body) return false;
     try {
-      await createComment(postId, { text: body, secret: opts.secret ?? false, ...(opts.parentId ? { parentId: Number(opts.parentId) } : {}) });
+      await createComment(postId, { text: body, secret: opts.secret ?? false, channel, ...(opts.parentId ? { parentId: Number(opts.parentId) } : {}) });
     } catch (err) {
       toast.show(errorMessage(err, commentText.loadFailed));
       return false;
@@ -214,7 +233,8 @@ export function useComments(postId: string, initialTotal: number) {
   };
 
   return {
-    comments, accept, cancelAccept, refresh: reload, total: Math.max(0, initialTotal + totalDelta), visible, repliesOf, sort, setSort, paging, loading, error,
+    channel,
+    comments, accept, cancelAccept, refresh: reload, total: channel === 'party' ? channelCount + totalDelta : Math.max(0, initialTotal + totalDelta), visible, repliesOf, sort, setSort, paging, loading, error,
     replyTo, setReplyTo, editing, setEditing, popoverFor, setPopoverFor, profileOf,
     add, saveEdit, askDelete, confirmDelete, askReport, confirmReport, deleteDialog, reportDialog, toast,
   };

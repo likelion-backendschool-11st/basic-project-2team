@@ -11,11 +11,21 @@ const {
   REPORT_TARGET_TYPES,
   REPORT_REASONS,
   REPORT_DETAIL_MAX_LENGTH,
+  COMMENT_CHANNELS,
+  DEFAULT_COMMENT_CHANNEL,
   commentMessages: m,
 } = require('./commentConstants');
 
 const charLength = (value) => Array.from(value).length;
 const asString = (value) => (typeof value === 'string' ? value.trim() : '');
+const CHANNEL_VALUES = Object.values(COMMENT_CHANNELS);
+
+/** channel 값(public | party)을 검증합니다. 없으면 public, 틀리면 null */
+function parseChannel(raw) {
+  if (raw === undefined || raw === null || raw === '') return DEFAULT_COMMENT_CHANNEL;
+  const channel = asString(raw);
+  return CHANNEL_VALUES.includes(channel) ? channel : null;
+}
 
 /** 쿼리의 양의 정수 문자열이면 숫자로, 아니면 null (값이 없으면 fallback) */
 function parseInteger(raw, fallback) {
@@ -32,8 +42,8 @@ function parseId(raw) {
 }
 
 /**
- * 댓글 목록 쿼리(sort, page, size)를 검증·정규화합니다.
- * @returns {{ sort: 'oldest' | 'newest', page: number, size: number }}
+ * 댓글 목록 쿼리(sort, page, size, channel)를 검증·정규화합니다.
+ * @returns {{ sort: 'oldest' | 'newest', page: number, size: number, channel: 'public' | 'party' }}
  */
 function parseCommentListQuery(query) {
   const fields = [];
@@ -48,8 +58,11 @@ function parseCommentListQuery(query) {
   const size = parseInteger(query.size, DEFAULT_COMMENT_PAGE_SIZE);
   if (size === null || size < 1 || size > MAX_COMMENT_PAGE_SIZE) fail('size', m.sizeInvalid);
 
+  const channel = parseChannel(query.channel);
+  if (channel === null) fail('channel', m.channelInvalid);
+
   if (fields.length > 0) throw new ApiError(400, 'INVALID_INPUT', m.invalidInput, fields);
-  return { sort, page, size };
+  return { sort, page, size, channel };
 }
 
 const asObject = (body) => (body && typeof body === 'object' ? body : {});
@@ -66,8 +79,9 @@ function checkText(raw, fail) {
 const parseCommentId = (raw) => parseId(raw);
 
 /**
- * 댓글·대댓글 작성 요청 본문 `{ text, parentId?, secret? }` 을 검증·정규화합니다.
- * @returns {{ text: string, parentId: number | null, secret: boolean }}
+ * 댓글·대댓글 작성 요청 본문 `{ text, parentId?, secret?, channel? }` 을 검증·정규화합니다.
+ * 답글의 채널은 부모 댓글을 따르므로 서비스에서 다시 정합니다.
+ * @returns {{ text: string, parentId: number | null, secret: boolean, channel: 'public' | 'party' }}
  */
 function validateCreateComment(body) {
   const source = asObject(body);
@@ -85,8 +99,11 @@ function validateCreateComment(body) {
     if (parentId === null) fail('parentId', m.parentIdInvalid);
   }
 
+  const channel = parseChannel(source.channel);
+  if (channel === null) fail('channel', m.channelInvalid);
+
   if (fields.length > 0) throw new ApiError(400, 'INVALID_INPUT', m.invalidInput, fields);
-  return { text, parentId, secret };
+  return { text, parentId, secret, channel };
 }
 
 /**
