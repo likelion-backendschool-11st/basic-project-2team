@@ -470,10 +470,12 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 
 ```json
 [{ "id": 3, "status": "PENDING", "role": "서포터", "message": "잘 부탁드려요", "appliedAt": "2026-11-12T00:00:00.000Z",
-   "applicant": { "id": 2, "nickname": "빛나는오더", "avatarUrl": null, "level": 52, "mannerTemp": 99.8, "reviewCount": 184 } }]
+   "applicant": { "id": 2, "nickname": "빛나는오더", "avatarUrl": null, "level": 52, "mannerTemp": 99.8, "reviewCount": 184,
+                  "topTags": [{ "code": "kind", "label": "#친절함", "count": 42 }] } }]
 ```
 
-- 탈퇴한 신청자의 `nickname` 은 `"탈퇴한 회원"` 입니다. 오류: 400 `INVALID_INPUT`, 403 `NOT_POST_AUTHOR`.
+- `applicant.topTags` 는 신청자가 받은 평가에서 많이 선택된 태그 최대 3개입니다(많은 순, 같으면 태그 정렬 순). 받은 태그가 없으면 `[]`.
+- 탈퇴한 신청자의 `nickname` 은 `"탈퇴한 회원"` 이고 `topTags` 는 `[]` 입니다. 오류: 400 `INVALID_INPUT`, 403 `NOT_POST_AUTHOR`.
 
 **승인/거절 (`PATCH /api/posts/{postId}/applications/{applicationId}`)** 🔒 작성자 — 본문 `{ "status": "ACCEPTED" | "REJECTED" }` → `200` `{ "id": 3, "status": "ACCEPTED", "current": 2, "max": 8, "postStatus": "OPEN" }`
 
