@@ -250,6 +250,7 @@ function createAdminService({ adminRepository, tokenProvider, postEvents = NO_EV
   /** 관리자 공고 삭제: 소프트 삭제 + 작성자에게 사유 알림 (REQ-ADMIN-003) */
   async function removePost(tx, { post, reason, admin, current, events }) {
     await tx.deletePost({ id: post.id, adminId: admin.id, reason, now: current });
+    await tx.revokePoints('POST_CREATE', [post.id]);
     events.push([post.id, POST_EVENT.post]);
     await tx.insertNotification({
       memberId: post.authorId,
@@ -263,7 +264,11 @@ function createAdminService({ adminRepository, tokenProvider, postEvents = NO_EV
     const deleting = status === commentStatus.deleted;
     await tx.updateCommentStatus({ id: comment.id, status, deletedAt: deleting ? current : null });
     events.push([comment.postId, POST_EVENT.comments]);
-    if (deleting) await tx.decrementCommentCount(comment.postId);
+    // 삭제하면 작성 점수를 회수합니다 (가림·복구는 점수를 건드리지 않음). 호출하는 쪽이 이미 삭제된 댓글을 걸러냅니다.
+    if (deleting) {
+      await tx.decrementCommentCount(comment.postId);
+      await tx.revokePoints('COMMENT_CREATE', [comment.id]);
+    }
   }
 
   // ───────── 신고

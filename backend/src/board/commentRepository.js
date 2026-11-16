@@ -2,6 +2,7 @@
 
 const { POST_STATUS } = require('./boardConstants');
 const { COMMENT_STATUS, COMMENT_HIDE_REPORT_COUNT } = require('./commentConstants');
+const { awardDailyLimitedPoints, revokeActivityPoints } = require('../common/activityPoint');
 
 /** 삭제되지 않은 공고 (소프트 삭제: deleted_at / status = DELETED) */
 const ALIVE_POST = `p.deleted_at IS NULL AND p.status <> '${POST_STATUS.deleted}'`;
@@ -58,6 +59,8 @@ function createCommentRepository(pool) {
         [postId, authorId, parentId, content, isSecret],
       );
       await connection.query('UPDATE post SET comment_count = comment_count + 1 WHERE id = ?', [postId]);
+      // 댓글 작성 +2 (하루 10회까지, docs/03-db-design.md 결정 사항 8-1)
+      await awardDailyLimitedPoints(connection, { memberId: authorId, actionType: 'COMMENT_CREATE', refId: result.insertId });
       return result.insertId;
     });
   }
@@ -145,14 +148,20 @@ function createCommentRepository(pool) {
 
   /**
    * 댓글과 그 대댓글을 소프트 삭제하고, 삭제된 수만큼 공고 comment_count 를 줄입니다.
+   * 삭제된 댓글마다 작성자(대댓글은 각자의 작성자)가 받은 작성 점수를 회수합니다.
    * @returns {Promise<number>} 삭제된 댓글 수
    */
   async function deleteCommentWithReplies({ commentId, postId, deletedAt }) {
     return inTransaction(async (connection) => {
+      const [targets] = await connection.query(
+        `SELECT c.id FROM comment c WHERE (c.id = ? OR c.parent_id = ?) AND ${ALIVE_COMMENT} FOR UPDATE`,
+        [commentId, commentId],
+      );
+      const ids = targets.map((row) => row.id);
+      if (ids.length === 0) return 0;
       const [result] = await connection.query(
-        `UPDATE comment c SET c.status = '${COMMENT_STATUS.deleted}', c.deleted_at = ?
-          WHERE (c.id = ? OR c.parent_id = ?) AND ${ALIVE_COMMENT}`,
-        [deletedAt, commentId, commentId],
+        `UPDATE comment c SET c.status = '${COMMENT_STATUS.deleted}', c.deleted_at = ? WHERE c.id IN (?)`,
+        [deletedAt, ids],
       );
       const count = result.affectedRows;
       if (count > 0) {
@@ -160,6 +169,7 @@ function createCommentRepository(pool) {
           'UPDATE post SET comment_count = IF(comment_count > ?, comment_count - ?, 0) WHERE id = ?',
           [count, count, postId],
         );
+        await revokeActivityPoints(connection, 'COMMENT_CREATE', ids);
       }
       return count;
     });

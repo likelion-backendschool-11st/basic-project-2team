@@ -1,6 +1,7 @@
 'use strict';
 
 const { reportStatus, postStatus, commentStatus, COMMENT_REPORTED } = require('./adminConstants');
+const { revokeActivityPoints } = require('../common/activityPoint');
 
 /** LIKE 검색어의 %, _ 를 글자 그대로 찾도록 이스케이프합니다. */
 const likePattern = (q) => `%${q.replace(/[\\%_]/g, '\\$&')}%`;
@@ -437,6 +438,15 @@ function createAdminRepository(pool) {
       ]);
     }
 
+    /**
+     * 삭제한 공고·댓글로 받은 작성 점수를 회수합니다 (docs/03-db-design.md 결정 사항 8-2). withTransaction 안에서 호출합니다.
+     * @param {'POST_CREATE' | 'COMMENT_CREATE'} actionType
+     * @param {number[]} refIds
+     */
+    async function revokePoints(actionType, refIds) {
+      await revokeActivityPoints(db, actionType, refIds);
+    }
+
     /** 댓글 삭제 시 공고의 댓글 수를 줄입니다 (UNSIGNED 라 0 아래로 내려가지 않게). */
     async function decrementCommentCount(postId) {
       await db.query('UPDATE post SET comment_count = IF(comment_count > 0, comment_count - 1, 0) WHERE id = ?', [
@@ -474,6 +484,7 @@ function createAdminRepository(pool) {
       lockComment,
       updateCommentStatus,
       decrementCommentCount,
+      revokePoints,
     };
   }
 
