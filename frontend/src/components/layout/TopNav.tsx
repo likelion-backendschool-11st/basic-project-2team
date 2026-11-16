@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { topNavItems } from '../../data/layoutData';
 import { useActiveRoute } from '../../hooks/useActiveRoute';
+import { useUnreadNotificationCount } from '../../hooks/useUnreadNotificationCount';
 
 interface TopNavProps {
   readonly className?: string;
@@ -9,6 +10,7 @@ interface TopNavProps {
 
 export const TopNav: React.FC<TopNavProps> = ({ className = '' }) => {
   const { isActive } = useActiveRoute();
+  const unread = useUnreadNotificationCount();
   return (
     <nav className={`hidden md:flex items-center gap-1.5 bg-night-surface border border-night-borderLight rounded-full p-1 shadow-inner backdrop-blur-md ${className}`}>
       {topNavItems.map((item) => (
@@ -22,7 +24,14 @@ export const TopNav: React.FC<TopNavProps> = ({ className = '' }) => {
           }
         >
           <span>{item.label}</span>
-          {item.dot && <span className="w-2 h-2 rounded-full bg-roseAccent" />}
+          {item.badge && unread > 0 && (
+            <span
+              aria-label={`안 읽은 알림 ${unread}개`}
+              className="min-w-[18px] h-[18px] px-1 rounded-full bg-roseAccent text-white text-[10px] font-bold leading-[18px] text-center"
+            >
+              {unread > 99 ? '99+' : unread}
+            </span>
+          )}
         </Link>
       ))}
     </nav>

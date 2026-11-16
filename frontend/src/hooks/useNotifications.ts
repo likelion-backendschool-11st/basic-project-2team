@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { errorMessageOf, hasAccessToken } from '../api/http';
-import { deleteNotification, getNotifications, markAllNotificationsRead, markNotificationRead, toNotificationView } from '../api/notificationApi';
+import { deleteNotification, getNotifications, markAllNotificationsRead, markNotificationRead, notifyNotificationsChanged, toNotificationView } from '../api/notificationApi';
 import { NOTIFICATION_PAGE_SIZE, notificationText, type NotificationView } from '../data/notificationData';
 import { paths } from '../data/routes';
 
@@ -71,10 +71,12 @@ export function useNotifications() {
     setActionError(null);
     setItems((prev) => prev.map((n) => (n.id === item.id ? { ...n, read: true } : n)));
     setUnreadCount((c) => Math.max(0, c - 1));
-    markNotificationRead(item.id).catch((err: unknown) => {
-      setActionError(errorMessageOf(err, notificationText.markFailed));
-      reload();
-    });
+    markNotificationRead(item.id)
+      .catch((err: unknown) => {
+        setActionError(errorMessageOf(err, notificationText.markFailed));
+        reload();
+      })
+      .finally(notifyNotificationsChanged);
   };
 
   const open = (item: NotificationView) => {
@@ -89,7 +91,10 @@ export function useNotifications() {
     if (!item.read) setUnreadCount((c) => Math.max(0, c - 1));
     deleteNotification(item.id)
       .catch((err: unknown) => setActionError(errorMessageOf(err, notificationText.deleteFailed)))
-      .finally(reload);
+      .finally(() => {
+        reload();
+        notifyNotificationsChanged();
+      });
   };
 
   /** 「모두 읽음」: 서버에서 처리한 뒤 목록을 다시 불러옵니다(안 읽은 알림 필터에서는 목록이 비게 됩니다). */
@@ -100,6 +105,7 @@ export function useNotifications() {
     try {
       await markAllNotificationsRead();
       reload();
+      notifyNotificationsChanged();
     } catch (err) {
       setActionError(errorMessageOf(err, notificationText.markFailed));
     } finally {

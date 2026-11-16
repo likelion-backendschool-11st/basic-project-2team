@@ -3,7 +3,8 @@ import { ROUTES } from './routes';
 export interface NavItem {
   readonly label: string;
   readonly to: string;
-  readonly dot?: boolean;
+  /** 안 읽은 알림 수 배지를 붙일 메뉴 */
+  readonly badge?: boolean;
 }
 
 export const brand = {
@@ -15,7 +16,7 @@ export const brand = {
 export const topNavItems: readonly NavItem[] = [
   { label: '홈', to: ROUTES.home },
   { label: '파티매칭 게시판', to: ROUTES.board },
-  { label: '알림', to: ROUTES.notifications, dot: true },
+  { label: '알림', to: ROUTES.notifications, badge: true },
   { label: '마이페이지', to: ROUTES.myPage },
 ];
 
