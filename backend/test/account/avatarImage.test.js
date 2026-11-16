@@ -26,6 +26,13 @@ describe('프로필 이미지 변환', () => {
     assert.equal(meta.width, AVATAR_SIZE);
   });
 
+  it('압축을 풀면 너무 큰 이미지(압축 폭탄)는 400 INVALID_IMAGE', async () => {
+    // 5000×5000 단색 PNG 는 용량이 매우 작지만 풀면 2천 5백만 픽셀이라 한도(4096×4096)를 넘습니다.
+    const bomb = await sharp({ create: { width: 5000, height: 5000, channels: 3, background: '#000' } }).png({ compressionLevel: 9 }).toBuffer();
+    assert.ok(bomb.length < 2 * 1024 * 1024);
+    await assert.rejects(processAvatar(bomb), (err) => err.status === 400 && err.code === 'INVALID_IMAGE');
+  });
+
   it('이미지처럼 보이지만 읽을 수 없는 파일은 400 INVALID_IMAGE', async () => {
     const fake = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(32, 1)]);
     await assert.rejects(processAvatar(fake), (err) => err.status === 400 && err.code === 'INVALID_IMAGE');
