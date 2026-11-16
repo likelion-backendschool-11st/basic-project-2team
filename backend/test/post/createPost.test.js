@@ -79,7 +79,7 @@ describe('POST /api/posts', () => {
     const res = await post({ ...validBody(), title: '[카멘] 시발 서폿 구함', body: '개새끼 오지마', partyName: '병신팟', detail: undefined, customDetail: 'ㅅㅂ 레이드' });
     assert.equal(res.status, 400);
     const { error } = await res.json();
-    assert.equal(error.code, 'INVALID_INPUT');
+    assert.equal(error.code, 'PROFANITY_DETECTED');
     assert.deepEqual(error.fields.map((f) => f.field).sort(), ['body', 'customDetail', 'partyName', 'title']);
     assert.equal(repo.state.posts.length, 0);
   });

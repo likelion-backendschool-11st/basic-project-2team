@@ -21,7 +21,8 @@ import RelatedPosts from '../components/post/RelatedPosts';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import Toast from '../components/ui/Toast';
 import LoggedInLayout from '../components/user/LoggedInLayout';
-import { COMMENTS_ANCHOR_ID, commentText, type CommentChannel } from '../data/commentData';
+import NoticeDialog from '../components/ui/NoticeDialog';
+import { COMMENTS_ANCHOR_ID, commentText, profanityDialog, type CommentChannel } from '../data/commentData';
 import { postDetailText, postText } from '../data/postData';
 import { paths, ROUTES } from '../data/routes';
 import { useAuth } from '../hooks/useAuth';
@@ -161,6 +162,7 @@ const PostDetailView: React.FC<{ readonly postId: string }> = ({ postId }) => {
       <ConfirmDialog isOpen={activeThread.deleteDialog.isOpen} title={commentText.deleteDialog.title} description={commentText.deleteDialog.description} confirmLabel={commentText.deleteDialog.confirm} cancelLabel={commentText.deleteDialog.cancel} icon="fa-trash-can" onConfirm={activeThread.confirmDelete} onCancel={activeThread.deleteDialog.close} />
       <ReportDialog isOpen={activeThread.reportDialog.isOpen} onConfirm={activeThread.confirmReport} onClose={activeThread.reportDialog.close} />
       <ReportDialog isOpen={post.reportDialog.isOpen} title={postText.reportTitle} onConfirm={post.confirmReport} onClose={post.reportDialog.close} />
+      <NoticeDialog isOpen={activeThread.profanity.message !== null} title={profanityDialog.title} description={activeThread.profanity.message ?? ''} confirmLabel={profanityDialog.confirm} onClose={activeThread.profanity.close} />
       <NoShowReportDialog report={noShowReport} />
       <ApplicantsDialog isOpen={post.applicantsDialog.isOpen} applicants={post.applicants} onResolve={post.resolveApplicant} onClose={post.applicantsDialog.close} />
       {poll.formDialog.isOpen && (

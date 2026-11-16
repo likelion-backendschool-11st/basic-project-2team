@@ -22,4 +22,7 @@ function containsProfanity(text) {
   return BAD_WORDS.some((word) => normalized.includes(word));
 }
 
-module.exports = { containsProfanity };
+/** 욕설 때문에 거절할 때 쓰는 오류 코드 (프론트가 이 코드를 보고 경고 모달을 띄움) */
+const PROFANITY_ERROR_CODE = 'PROFANITY_DETECTED';
+
+module.exports = { containsProfanity, PROFANITY_ERROR_CODE };

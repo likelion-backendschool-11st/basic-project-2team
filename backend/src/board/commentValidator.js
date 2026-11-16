@@ -1,7 +1,7 @@
 'use strict';
 
 const { ApiError } = require('../common/ApiError');
-const { containsProfanity } = require('../common/profanityFilter');
+const { containsProfanity, PROFANITY_ERROR_CODE } = require('../common/profanityFilter');
 const { POST_ID_PATTERN } = require('./boardConstants');
 const {
   COMMENT_MAX_LENGTH,
@@ -74,7 +74,7 @@ function checkText(raw, fail) {
   const text = asString(raw);
   if (!text) fail('text', m.textRequired);
   else if (charLength(text) > COMMENT_MAX_LENGTH) fail('text', m.textTooLong);
-  else if (containsProfanity(text)) fail('text', m.profanity);
+  else if (containsProfanity(text)) throw new ApiError(400, PROFANITY_ERROR_CODE, m.invalidInput, [{ field: 'text', message: m.profanity }]);
   return text;
 }
 
