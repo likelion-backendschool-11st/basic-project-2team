@@ -43,12 +43,22 @@ function createCommentController(commentService) {
     return res.status(204).end();
   }
 
+  async function accept(req, res) {
+    const data = await commentService.acceptComment(requireCommentId(req), req.auth.memberId);
+    return sendSuccess(res, 200, data);
+  }
+
+  async function cancelAccept(req, res) {
+    await commentService.cancelAcceptance(requireCommentId(req), req.auth.memberId);
+    return res.status(204).end();
+  }
+
   async function report(req, res) {
     const data = await commentService.reportComment(req.auth.memberId, req.body);
     return sendSuccess(res, 201, data);
   }
 
-  return { list, create, update, remove, report };
+  return { list, create, update, remove, accept, cancelAccept, report };
 }
 
 module.exports = { createCommentController };

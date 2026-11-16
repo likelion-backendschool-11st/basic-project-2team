@@ -38,6 +38,7 @@ export const writeText = {
   titlePlaceholder: '예) [카멘 1-3관] 1620+ 숙련 랏서폿 1분 모십니다',
   bodyPlaceholder: '모집 내용을 자세히 적어주세요. 출발 시간, 현재 구성, 참여 조건 등을 알려주시면 더 빨리 파티가 모입니다.',
   markdown: 'Markdown 지원',
+  previewEmpty: '미리볼 내용이 없습니다. 본문을 입력해 주세요.',
   charCount: '글자수:',
   readTime: '예상 읽는 시간:',
   active: '작성창 활성화됨',

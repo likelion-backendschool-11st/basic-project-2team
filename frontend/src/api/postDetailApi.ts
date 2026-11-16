@@ -135,7 +135,7 @@ export function toPostDetail(res: PostDetailResponse): PostDetail {
       },
       { icon: 'fa-regular fa-circle-check', label: t.tileSpec, value: res.requiredSpec ?? t.specNone, note: styleLabel(res.style), noteTone: 'muted' },
     ],
-    intro: toParagraphs(res.body),
+    intro: res.body,
     steps: [],
     pledgeTitle: t.pledgeTitle,
     pledge: t.pledge,

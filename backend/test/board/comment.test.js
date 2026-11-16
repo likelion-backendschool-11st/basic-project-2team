@@ -35,6 +35,7 @@ function createFakeRepository() {
       id: c.id,
       postId: c.postId,
       parentId: c.parentId,
+      acceptedReplyId: c.acceptedReplyId ?? null,
       content: c.content,
       isSecret: c.isSecret ? 1 : 0,
       status: c.status,
@@ -102,9 +103,13 @@ function createFakeRepository() {
       const post = c && state.posts.get(c.postId);
       if (!c || !post || post.status === 'DELETED') return null;
       const parent = state.comments.find((x) => x.id === c.parentId);
-      return { ...withAuthor(c), postAuthorId: post.authorId, parentAuthorId: parent?.authorId ?? null };
+      return { ...withAuthor(c), postAuthorId: post.authorId, parentAuthorId: parent?.authorId ?? null, parentAcceptedReplyId: parent?.acceptedReplyId ?? null };
+    },
+    async setAcceptedReply(commentId, replyId) {
+      state.comments.find((x) => x.id === commentId).acceptedReplyId = replyId;
     },
     async updateCommentContent(commentId, content) {
+      for (const c of state.comments) if (c.acceptedReplyId === commentId) c.acceptedReplyId = null;
       state.comments.find((x) => x.id === commentId).content = content;
     },
     async deleteCommentWithReplies({ commentId, postId, deletedAt }) {
@@ -201,6 +206,7 @@ describe('댓글 API /api/posts/:postId/comments', () => {
         secret: false,
         hidden: false,
         reported: false,
+        accepted: false,
         createdAt: body.data.createdAt,
       });
       assert.equal(repo.state.posts.get(POST_ID).commentCount, 1);
@@ -552,6 +558,100 @@ describe('댓글 API /api/posts/:postId/comments', () => {
       );
       assert.equal((await report(valid(999))).body.error.code, 'COMMENT_NOT_FOUND');
       assert.equal((await report(valid(1), null)).status, 401);
+    });
+  });
+  describe('답글 채택', () => {
+    const accept = (id, memberId = ALICE) => send('PUT', `/api/comments/${id}/accept`, undefined, memberId);
+    const cancel = (id, memberId = ALICE) => send('DELETE', `/api/comments/${id}/accept`, undefined, memberId);
+    /** 앨리스의 댓글(질문) 아래에 밥·호스트가 답글을 단 상태 */
+    const thread = () => {
+      const root = repo.seed({ authorId: ALICE, content: '스펙 얼마나 필요해요?' });
+      const first = repo.seed({ authorId: HOST_ID, parentId: root, content: '1600 이상이요' });
+      const second = repo.seed({ authorId: BOB, parentId: root, content: '1620 권장입니다' });
+      return { root, first, second };
+    };
+    const replies = async () => (await list()).body.data.items[0];
+
+    it('댓글 작성자가 답글을 채택하면 그 답글은 제자리에서 accepted 표시만 붙고 acceptedReplyId 가 내려가며, comments 신호를 보낸다', async () => {
+      const { root, first, second } = thread();
+      const res = await accept(second);
+      assert.equal(res.status, 200);
+      assert.deepEqual(res.body.data, { commentId: root, acceptedReplyId: second });
+      assert.deepEqual(events.log, [[POST_ID, 'comments']]);
+
+      const item = await replies();
+      assert.equal(item.acceptedReplyId, second);
+      assert.deepEqual(item.replies.map((r) => [r.id, r.accepted]), [[first, false], [second, true]]); // 순서는 등록순 그대로
+      assert.equal(item.accepted, false);
+    });
+
+    it('다른 답글을 채택하면 채택이 그 답글로 바뀌고(댓글당 하나), 채택 취소하면 acceptedReplyId 가 null 이다', async () => {
+      const { first, second } = thread();
+      await accept(first);
+      await accept(second);
+      assert.equal((await replies()).acceptedReplyId, second);
+
+      assert.equal((await cancel(first)).status, 204); // 채택된 답글이 아니면 아무 일도 없음
+      assert.equal((await replies()).acceptedReplyId, second);
+      assert.equal((await cancel(second)).status, 204);
+      const item = await replies();
+      assert.equal(item.acceptedReplyId, null);
+      assert.deepEqual(item.replies.map((r) => r.id), [first, second]);
+    });
+
+    it('댓글 작성자가 아니면 403 (공고 작성자나 답글 작성자도 안 됨), 로그인이 없으면 401', async () => {
+      const { second } = thread();
+      for (const memberId of [HOST_ID, BOB]) {
+        const res = await accept(second, memberId);
+        assert.equal(res.status, 403);
+        assert.equal(res.body.error.code, 'NOT_PARENT_AUTHOR');
+      }
+      assert.equal((await cancel(second, HOST_ID)).status, 403);
+      assert.equal((await fetch(`${baseUrl}/api/comments/${second}/accept`, { method: 'PUT' })).status, 401);
+      assert.equal((await replies()).acceptedReplyId, null);
+    });
+
+    it('답글이 아닌 댓글은 채택할 수 없다', async () => {
+      const { root } = thread();
+      assert.equal((await accept(root)).body.error.code, 'NOT_A_REPLY');
+      assert.equal((await cancel(root)).body.error.code, 'NOT_A_REPLY');
+    });
+
+    it('본인 답글 · 비밀 답글 · 가려진 답글 · 없는 댓글은 채택할 수 없다', async () => {
+      const { root } = thread();
+      const own = repo.seed({ authorId: ALICE, parentId: root, content: '내 답글' });
+      const secret = repo.seed({ authorId: BOB, parentId: root, content: '비밀', isSecret: true });
+      const hidden = repo.seed({ authorId: BOB, parentId: root, content: '가림', status: 'HIDDEN' });
+      assert.equal((await accept(own)).body.error.code, 'CANNOT_ACCEPT_OWN');
+      assert.equal((await accept(secret)).body.error.code, 'CANNOT_ACCEPT_SECRET');
+      assert.equal((await accept(hidden)).body.error.code, 'COMMENT_HIDDEN');
+      assert.equal((await accept(999)).status, 404);
+      assert.equal((await accept('abc')).status, 404);
+      assert.deepEqual(events.log, []);
+    });
+
+    it('채택된 답글을 작성자가 고치면 채택이 풀리고(응답도 accepted false), 다른 답글을 고쳐도 채택은 그대로다', async () => {
+      const { first, second } = thread();
+      await accept(second);
+      const other = await send('PATCH', `/api/comments/${first}`, { text: '다른 답글 수정' }, HOST_ID);
+      assert.equal(other.status, 200);
+      assert.equal((await replies()).acceptedReplyId, second);
+
+      const edited = await send('PATCH', `/api/comments/${second}`, { text: '채택 뒤에 내용을 바꿈' }, BOB);
+      assert.equal(edited.status, 200);
+      assert.equal(edited.body.data.accepted, false);
+      const item = await replies();
+      assert.equal(item.acceptedReplyId, null);
+      assert.deepEqual(item.replies.map((r) => r.accepted), [false, false]);
+    });
+
+    it('채택된 답글이 가려지거나 삭제되면 채택이 없는 것으로 내려간다', async () => {
+      const { second } = thread();
+      await accept(second);
+      repo.state.comments.find((c) => c.id === second).status = 'HIDDEN';
+      assert.equal((await replies()).acceptedReplyId, null);
+      repo.state.comments.find((c) => c.id === second).status = 'DELETED';
+      assert.equal((await replies()).acceptedReplyId, null);
     });
   });
 });

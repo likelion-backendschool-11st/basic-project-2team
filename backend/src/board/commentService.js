@@ -27,7 +27,7 @@ function canReadSecret(row, { viewerId, postAuthorId, parentAuthorId }) {
 
 /**
  * DB 행 → 댓글 응답 (docs/API_SPEC.md 5절 「댓글 아이템」)
- * @param {{ viewerId: number | null, postAuthorId: number, parentAuthorId: number | null, reportedIds?: Set<number> }} context
+ * @param {{ viewerId: number | null, postAuthorId: number, parentAuthorId: number | null, reportedIds?: Set<number>, accepted?: boolean }} context
  */
 function toComment(row, context) {
   const secret = Boolean(row.isSecret);
@@ -46,6 +46,7 @@ function toComment(row, context) {
     secret,
     hidden: row.status === COMMENT_STATUS.hidden,
     reported: (context.reportedIds ?? EMPTY_SET).has(row.id),
+    accepted: context.accepted === true,
     createdAt: toIso(row.createdAt),
   };
 }
@@ -106,12 +107,16 @@ function createCommentService({ commentRepository, postEvents = NO_EVENTS, now =
         : await commentRepository.findReportedCommentIds(viewerId, [...rows, ...replies].map((row) => row.id));
 
     const base = { viewerId, postAuthorId: post.authorId, parentAuthorId: null, reportedIds };
-    const items = rows.map((root) => ({
-      ...toComment(root, base),
-      replies: replies
-        .filter((reply) => reply.parentId === root.id)
-        .map((reply) => toComment(reply, { ...base, parentAuthorId: root.authorId })),
-    }));
+    const items = rows.map((root) => {
+      // 채택된 답글(보이는 상태일 때만)도 등록순 위치 그대로 두고 accepted 로 표시합니다. 맨 위 복사본은 화면이 acceptedReplyId 로 만듭니다.
+      const mine = replies.filter((reply) => reply.parentId === root.id);
+      const acceptedId = mine.find((reply) => reply.id === root.acceptedReplyId && reply.status === COMMENT_STATUS.visible)?.id ?? null;
+      return {
+        ...toComment(root, base),
+        acceptedReplyId: acceptedId,
+        replies: mine.map((reply) => toComment(reply, { ...base, parentAuthorId: root.authorId, accepted: reply.id === acceptedId })),
+      };
+    });
 
     return { items, page, size, totalCount, totalPages: Math.ceil(totalCount / size) };
   }
@@ -167,11 +172,15 @@ function createCommentService({ commentRepository, postEvents = NO_EVENTS, now =
     }
     assertCanWrite(await commentRepository.findMemberStatus(memberId), now());
 
-    await commentRepository.updateCommentContent(commentId, text);
+    await commentRepository.updateCommentContent(commentId, text); // 채택된 답글이면 채택도 함께 풀림
     commentsChanged(comment.postId);
     return toComment(
       { ...comment, content: text },
-      { viewerId: memberId, postAuthorId: comment.postAuthorId, parentAuthorId: comment.parentAuthorId ?? null },
+      {
+        viewerId: memberId,
+        postAuthorId: comment.postAuthorId,
+        parentAuthorId: comment.parentAuthorId ?? null,
+      },
     );
   }
 
@@ -185,6 +194,39 @@ function createCommentService({ commentRepository, postEvents = NO_EVENTS, now =
     assertAuthor(comment, memberId);
     await commentRepository.deleteCommentWithReplies({ commentId, postId: comment.postId, deletedAt: now() });
     commentsChanged(comment.postId);
+  }
+
+  /**
+   * PUT /api/comments/{commentId}/accept — 답글이 달린 댓글의 작성자가 그 답글을 채택합니다(이미 채택한 답글이 있으면 이 답글로 바뀜).
+   * 대상은 답글(대댓글)만 가능하고, 본인이 쓴 답글·비밀 답글·관리자가 가린 답글은 채택할 수 없습니다.
+   * @param {number} commentId 채택할 답글의 id
+   * @param {number} memberId
+   */
+  async function acceptComment(commentId, memberId) {
+    const reply = await loadComment(commentId);
+    if (reply.parentId === null) throw new ApiError(400, 'NOT_A_REPLY', commentMessages.notAReply);
+    if (reply.parentAuthorId !== memberId) throw new ApiError(403, 'NOT_PARENT_AUTHOR', commentMessages.notParentAuthor);
+    if (reply.authorId === memberId) throw new ApiError(400, 'CANNOT_ACCEPT_OWN', commentMessages.cannotAcceptOwn);
+    if (reply.isSecret) throw new ApiError(400, 'CANNOT_ACCEPT_SECRET', commentMessages.cannotAcceptSecret);
+    if (reply.status !== COMMENT_STATUS.visible) throw new ApiError(400, 'COMMENT_HIDDEN', commentMessages.cannotAcceptHidden);
+
+    await commentRepository.setAcceptedReply(reply.parentId, reply.id);
+    commentsChanged(reply.postId);
+    return { commentId: reply.parentId, acceptedReplyId: reply.id };
+  }
+
+  /**
+   * DELETE /api/comments/{commentId}/accept — 댓글 작성자가 이 답글의 채택을 취소합니다. 채택된 답글이 아니면 아무 일도 없습니다.
+   * @param {number} commentId 답글의 id
+   * @param {number} memberId
+   */
+  async function cancelAcceptance(commentId, memberId) {
+    const reply = await loadComment(commentId);
+    if (reply.parentId === null) throw new ApiError(400, 'NOT_A_REPLY', commentMessages.notAReply);
+    if (reply.parentAuthorId !== memberId) throw new ApiError(403, 'NOT_PARENT_AUTHOR', commentMessages.notParentAuthor);
+    if (reply.parentAcceptedReplyId !== reply.id) return;
+    await commentRepository.setAcceptedReply(reply.parentId, null);
+    commentsChanged(reply.postId);
   }
 
   /**
@@ -211,7 +253,7 @@ function createCommentService({ commentRepository, postEvents = NO_EVENTS, now =
     return { id };
   }
 
-  return { listComments, createComment, updateComment, deleteComment, reportComment };
+  return { listComments, createComment, updateComment, deleteComment, acceptComment, cancelAcceptance, reportComment };
 }
 
 module.exports = { createCommentService };

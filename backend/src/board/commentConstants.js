@@ -56,6 +56,11 @@ const commentMessages = Object.freeze({
   detailTooLong: `상세 사유는 ${REPORT_DETAIL_MAX_LENGTH}자 이하로 입력해주세요.`,
   cannotReportSelf: '본인이 작성한 댓글은 신고할 수 없습니다.',
   alreadyReported: '이미 신고한 댓글입니다.',
+  notParentAuthor: '답글이 달린 댓글의 작성자만 답글을 채택할 수 있습니다.',
+  notAReply: '답글만 채택할 수 있습니다.',
+  cannotAcceptOwn: '본인이 작성한 답글은 채택할 수 없습니다.',
+  cannotAcceptSecret: '비밀 댓글은 채택할 수 없습니다.',
+  cannotAcceptHidden: '관리자가 가린 댓글은 채택할 수 없습니다.',
 });
 
 module.exports = {
