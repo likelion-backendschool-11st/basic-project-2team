@@ -6,12 +6,14 @@ interface CommentComposerProps {
   readonly submitLabel: string;
   readonly allowSecret?: boolean;
   readonly autoFocus?: boolean;
+  /** 입력창 위에 놓을 머리 줄 (참가자 전용 채널의 내 파티 정보) */
+  readonly header?: React.ReactNode;
   /** 성공하면 true — 입력창을 비웁니다. 서버 요청이면 Promise 를 돌려줍니다. */
   readonly onSubmit: (text: string, secret: boolean) => boolean | Promise<boolean>;
   readonly onCancel?: () => void;
 }
 
-export const CommentComposer: React.FC<CommentComposerProps> = ({ placeholder, submitLabel, allowSecret, autoFocus, onSubmit, onCancel }) => {
+export const CommentComposer: React.FC<CommentComposerProps> = ({ placeholder, submitLabel, allowSecret, autoFocus, header, onSubmit, onCancel }) => {
   const [text, setText] = useState('');
   const [secret, setSecret] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -25,7 +27,8 @@ export const CommentComposer: React.FC<CommentComposerProps> = ({ placeholder, s
     }
   };
   return (
-    <div className="rounded-2xl border border-night-borderLight bg-night-base/60 p-4">
+    <div className={`rounded-2xl border bg-night-base/60 p-4 ${header ? 'border-mercury/30' : 'border-night-borderLight'}`}>
+      {header}
       {allowSecret && (
         <label className="flex items-center justify-end gap-2 text-[11px] text-fog-sub mb-2 cursor-pointer">
           <input type="checkbox" checked={secret} onChange={(e) => setSecret(e.target.checked)} className="rounded border-night-borderLight bg-night-card text-mercury" />{commentText.secret}

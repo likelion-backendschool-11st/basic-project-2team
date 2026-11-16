@@ -293,7 +293,8 @@ function createAdminService({ adminRepository, tokenProvider, postEvents = NO_EV
     events.push([comment.postId, POST_EVENT.comments]);
     // 삭제하면 작성 점수를 회수합니다 (가림·복구는 점수를 건드리지 않음). 호출하는 쪽이 이미 삭제된 댓글을 걸러냅니다.
     if (deleting) {
-      await tx.decrementCommentCount(comment.postId);
+      // 참가자 전용 댓글은 공고 comment_count 에 넣지 않았으므로 줄이지 않습니다.
+      if (!comment.isPartyOnly) await tx.decrementCommentCount(comment.postId);
       await tx.revokePoints('COMMENT_CREATE', [comment.id]);
     }
   }

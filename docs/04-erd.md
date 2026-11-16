@@ -319,6 +319,7 @@ erDiagram
         bigint accepted_reply_id FK "채택된 답글, NULL 허용"
         varchar(500) content
         boolean is_secret "비밀 댓글"
+        boolean is_party_only "참가자 전용 댓글"
         varchar(20) status "VISIBLE / HIDDEN / DELETED"
         int report_count "기본 0, 5 이상이면 HIDDEN"
         datetime deleted_at

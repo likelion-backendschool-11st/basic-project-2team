@@ -27,7 +27,7 @@ const members = () =>
 
 /** DB 대신 메모리에 저장하는 가짜 repository */
 function createFakeRepository() {
-  const state = { posts: new Map(), members: new Map(), comments: [], reports: [], seconds: 0 };
+  const state = { posts: new Map(), members: new Map(), comments: [], reports: [], party: [], seconds: 0 };
   const alive = (c) => c.status !== 'DELETED';
   const withAuthor = (c) => {
     const m = state.members.get(c.authorId);
@@ -38,6 +38,7 @@ function createFakeRepository() {
       acceptedReplyId: c.acceptedReplyId ?? null,
       content: c.content,
       isSecret: c.isSecret ? 1 : 0,
+      isPartyOnly: c.isPartyOnly ? 1 : 0,
       status: c.status,
       createdAt: c.createdAt,
       authorId: c.authorId,
@@ -57,6 +58,7 @@ function createFakeRepository() {
         id: state.comments.length + 1,
         parentId: null,
         isSecret: false,
+        isPartyOnly: false,
         status: 'VISIBLE',
         reportCount: 0,
         postId: POST_ID,
@@ -65,7 +67,7 @@ function createFakeRepository() {
       };
       state.comments.push(row);
       const post = state.posts.get(row.postId);
-      if (post) post.commentCount += 1;
+      if (post && !row.isPartyOnly) post.commentCount += 1;
       return row.id;
     },
     async findPost(postId) {
@@ -78,19 +80,24 @@ function createFakeRepository() {
     },
     async findParentComment(postId, commentId) {
       const c = state.comments.find((x) => x.id === commentId && x.postId === postId && alive(x));
-      return c ? { id: c.id, parentId: c.parentId, authorId: c.authorId } : null;
+      return c ? { id: c.id, parentId: c.parentId, authorId: c.authorId, isPartyOnly: c.isPartyOnly ? 1 : 0 } : null;
     },
-    async createComment({ postId, authorId, parentId, content, isSecret }) {
-      return this.seed({ postId, authorId, parentId, content, isSecret });
+    async findPartyMembers(postId) {
+      const post = state.posts.get(postId);
+      return [{ memberId: post.authorId, isHost: true, role: null, mannerTemp: 36.5 }, ...state.party];
+    },
+    async createComment({ postId, authorId, parentId, content, isSecret, isPartyOnly = false }) {
+      return this.seed({ postId, authorId, parentId, content, isSecret, isPartyOnly });
     },
     async findCommentById(id) {
       const c = state.comments.find((x) => x.id === id);
       return c ? withAuthor(c) : null;
     },
-    async findRootCommentPage({ postId, sort, limit, offset }) {
-      const roots = state.comments.filter((c) => c.postId === postId && c.parentId === null && alive(c)).sort(byTime);
+    async findRootCommentPage({ postId, sort, limit, offset, partyOnly = false }) {
+      const channel = state.comments.filter((c) => c.postId === postId && Boolean(c.isPartyOnly) === partyOnly && alive(c));
+      const roots = channel.filter((c) => c.parentId === null).sort(byTime);
       if (sort === 'newest') roots.reverse();
-      return { rows: roots.slice(offset, offset + limit).map(withAuthor), totalCount: roots.length };
+      return { rows: roots.slice(offset, offset + limit).map(withAuthor), totalCount: roots.length, commentCount: channel.length };
     },
     async findReplies(parentIds) {
       return state.comments
@@ -112,11 +119,11 @@ function createFakeRepository() {
       for (const c of state.comments) if (c.acceptedReplyId === commentId) c.acceptedReplyId = null;
       state.comments.find((x) => x.id === commentId).content = content;
     },
-    async deleteCommentWithReplies({ commentId, postId, deletedAt }) {
+    async deleteCommentWithReplies({ commentId, postId, deletedAt, isPartyOnly = false }) {
       const targets = state.comments.filter((c) => (c.id === commentId || c.parentId === commentId) && alive(c));
       for (const c of targets) Object.assign(c, { status: 'DELETED', deletedAt });
       const post = state.posts.get(postId);
-      post.commentCount = Math.max(0, post.commentCount - targets.length);
+      if (!isPartyOnly) post.commentCount = Math.max(0, post.commentCount - targets.length);
       return targets.length;
     },
     async createCommentReport({ reporterId, commentId, targetMemberId, postId, reasonCode, detail }) {
@@ -157,6 +164,7 @@ describe('댓글 API /api/posts/:postId/comments', () => {
     repo.state.seconds = 0;
     repo.state.posts = new Map([[POST_ID, { id: POST_ID, authorId: HOST_ID, status: 'OPEN', commentCount: 0 }]]);
     repo.state.members = members();
+    repo.state.party = [];
   });
 
   const as = (memberId) => ({ Authorization: `Bearer ${tokens.createAccessToken(memberId)}` });
@@ -207,6 +215,8 @@ describe('댓글 API /api/posts/:postId/comments', () => {
         hidden: false,
         reported: false,
         accepted: false,
+        partyOnly: false,
+        partyMember: null,
         createdAt: body.data.createdAt,
       });
       assert.equal(repo.state.posts.get(POST_ID).commentCount, 1);
@@ -315,7 +325,7 @@ describe('댓글 API /api/posts/:postId/comments', () => {
       const { status, body } = await list();
       assert.equal(status, 200);
       const { items, ...paging } = body.data;
-      assert.deepEqual(paging, { page: 1, size: 4, totalCount: 6, totalPages: 2 });
+      assert.deepEqual(paging, { page: 1, size: 4, totalCount: 6, totalPages: 2, channel: 'public', commentCount: 8 });
       assert.deepEqual(
         items.map((c) => c.text),
         ['댓글 1', '댓글 2', '댓글 3', '댓글 4'],
@@ -396,7 +406,7 @@ describe('댓글 API /api/posts/:postId/comments', () => {
 
     it('댓글이 없으면 빈 목록', async () => {
       const { body } = await list();
-      assert.deepEqual(body.data, { items: [], page: 1, size: 4, totalCount: 0, totalPages: 0 });
+      assert.deepEqual(body.data, { items: [], page: 1, size: 4, totalCount: 0, totalPages: 0, channel: 'public', commentCount: 0 });
     });
 
     it('잘못된 sort·page·size 는 400, 없는 공고는 404', async () => {
@@ -652,6 +662,84 @@ describe('댓글 API /api/posts/:postId/comments', () => {
       assert.equal((await replies()).acceptedReplyId, null);
       repo.state.comments.find((c) => c.id === second).status = 'DELETED';
       assert.equal((await replies()).acceptedReplyId, null);
+    });
+  });
+
+  describe('참가자 전용 댓글 (channel=party)', () => {
+    // 앨리스는 승인된 파티원, 밥은 파티원이 아님
+    const joinAlice = () => repo.state.party.push({ memberId: ALICE, isHost: false, role: '워로드 (딜러)', mannerTemp: 99.8 });
+    const partyList = (memberId, query = '') => list(`?channel=party${query}`, memberId === null ? {} : as(memberId));
+
+    it('파티원이 쓴 참가자 전용 댓글은 파티 정보와 함께 저장되고 공고 comment_count 에는 들어가지 않는다', async () => {
+      joinAlice();
+      const { status, body } = await write({ text: '암호 1번 맡을게요', channel: 'party', secret: true });
+      assert.equal(status, 201);
+      assert.equal(body.data.partyOnly, true);
+      assert.equal(body.data.secret, false, '참가자 전용 채널에는 비밀 댓글이 없다');
+      assert.deepEqual(body.data.partyMember, { isHost: false, role: '워로드 (딜러)', mannerTemp: 99.8 });
+      assert.equal(repo.state.posts.get(POST_ID).commentCount, 0);
+    });
+
+    it('공개 목록과 참가자 전용 목록은 서로의 댓글을 섞지 않는다', async () => {
+      joinAlice();
+      repo.seed({ authorId: BOB, content: '공개 댓글' });
+      const party = repo.seed({ authorId: HOST_ID, content: '공대원 공지', isPartyOnly: true });
+      repo.seed({ authorId: ALICE, parentId: party, content: '확인했습니다', isPartyOnly: true });
+
+      const open = (await list()).body.data;
+      assert.deepEqual(open.items.map((c) => c.text), ['공개 댓글']);
+      assert.equal(open.commentCount, 1);
+
+      const { status, body } = await partyList(ALICE);
+      assert.equal(status, 200);
+      assert.equal(body.data.channel, 'party');
+      assert.equal(body.data.totalCount, 1);
+      assert.equal(body.data.commentCount, 2, '답글까지 센 채널 댓글 수');
+      const [root] = body.data.items;
+      assert.equal(root.text, '공대원 공지');
+      assert.deepEqual(root.partyMember, { isHost: true, role: null, mannerTemp: 36.5 });
+      assert.deepEqual(root.replies.map((r) => [r.text, r.partyMember?.role]), [['확인했습니다', '워로드 (딜러)']]);
+    });
+
+    it('파티원이 아니면 403 PARTY_ONLY, 비로그인은 401 — 목록도 작성도 막는다', async () => {
+      const outsider = await partyList(BOB);
+      assert.equal(outsider.status, 403);
+      assert.equal(outsider.body.error.code, 'PARTY_ONLY');
+      assert.equal((await partyList(null)).status, 401);
+
+      const written = await write({ text: '몰래 쓰기', channel: 'party' }, BOB);
+      assert.equal(written.status, 403);
+      assert.equal(repo.state.comments.length, 0);
+    });
+
+    it('공대장은 신청 없이도 참가자 전용 댓글을 보고 쓸 수 있다', async () => {
+      assert.equal((await partyList(HOST_ID)).status, 200);
+      assert.equal((await write({ text: '출발 10분 전 집합', channel: 'party' }, HOST_ID)).status, 201);
+    });
+
+    it('참가자 전용 댓글의 답글은 channel 을 보내지 않아도 참가자 전용이 되고, 파티원이 아니면 달 수 없다', async () => {
+      joinAlice();
+      const root = repo.seed({ authorId: HOST_ID, content: '공지', isPartyOnly: true });
+      const reply = await write({ text: '넵', parentId: root });
+      assert.equal(reply.status, 201);
+      assert.equal(reply.body.data.partyOnly, true);
+      assert.equal((await write({ text: '저도요', parentId: root }, BOB)).status, 403);
+    });
+
+    it('파티원이 아니면 참가자 전용 댓글을 신고할 수 없고, 파티를 떠난 작성자는 고칠 수 없지만 지울 수는 있다', async () => {
+      const id = repo.seed({ authorId: ALICE, content: '떠나기 전 댓글', isPartyOnly: true });
+      const report = await send('POST', '/api/reports', { targetType: 'COMMENT', targetId: id, reason: '기타' }, BOB);
+      assert.equal(report.status, 403);
+      assert.equal((await send('PATCH', `/api/comments/${id}`, { text: '수정' })).status, 403);
+      assert.equal((await send('DELETE', `/api/comments/${id}`)).status, 204);
+      assert.equal(repo.state.posts.get(POST_ID).commentCount, 0, '세지 않았던 댓글이라 줄이지도 않음');
+    });
+
+    it('channel 값이 틀리면 400 INVALID_INPUT', async () => {
+      const { status, body } = await list('?channel=secret');
+      assert.equal(status, 400);
+      assert.equal(body.error.fields[0].field, 'channel');
+      assert.equal((await write({ text: '안녕', channel: 'vip' })).status, 400);
     });
   });
 });

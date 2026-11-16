@@ -190,6 +190,7 @@ API의 `level`은 **서비스 활동 레벨**(`member.level`)입니다. 공고 �
 | accepted_reply_id | BIGINT UNSIGNED | FK → comment, NULL 가능 | 이 댓글에 달린 답글 중 채택된 답글. 댓글 작성자만 지정·해제하며 한 댓글에 하나뿐(답글 행이 지워지면 NULL). 채택된 답글이 가려지거나 삭제되면 채택 없음으로 취급. 마이그레이션은 `db/migrations/2026-11-16-comment-accepted-reply.sql` |
 | content | VARCHAR(500) | | 프론트에서도 500자 |
 | is_secret | BOOLEAN | | 비밀 댓글 |
+| is_party_only | BOOLEAN | 기본 FALSE | 참가자 전용 댓글 — 공고 작성자 + `ACCEPTED` 신청자만 열람·작성. 답글은 부모 댓글 값을 따름. `post.comment_count` 에 넣지 않음 (결정 사항 17). 마이그레이션은 `db/migrations/2026-11-16-comment-party-only.sql` |
 | status | VARCHAR(20) | 기본 `VISIBLE` | VISIBLE / HIDDEN(관리자 가림, Q&A-003) / DELETED |
 | report_count | INT UNSIGNED | 기본 0 | REPORT-004. 5건 이상이면 status를 `HIDDEN`으로 자동 변경 (같은 사람의 중복 신고는 report UNIQUE로 막히므로 서로 다른 신고자 수) |
 | deleted_at | DATETIME | | |
@@ -309,7 +310,7 @@ PK와 UNIQUE는 그 자체가 인덱스라서, 중복되는 인덱스는 따로 
 | post_scrap | (post_id) | 스크랩 수 집계, 공고 삭제 시 정리 | PK가 member_id로 시작해서 post_id로는 찾을 수 없습니다. |
 | post_application | UQ(post_id, applicant_id) | 중복 지원 차단, 신청자 목록 | post_id로 시작하므로 신청자 목록 조회에도 쓰입니다. |
 | post_application | (applicant_id, status, created_at) | 마이페이지의 지원 중인 공고 (MYPAGE-001) | |
-| comment | (post_id, parent_id, created_at) | 루트 댓글 페이징, 대댓글 묶기 | 공고 상세에서 매번 실행되는 쿼리 |
+| comment | (post_id, is_party_only, parent_id, created_at) | 채널(공개·참가자 전용)별 루트 댓글 페이징, 대댓글 묶기 | 공고 상세에서 매번 실행되는 쿼리 |
 | comment | (author_id, created_at) | 내 댓글 | |
 | comment | (status, created_at) | 관리자 댓글 목록 | |
 | poll | (post_id, id) | 공고의 최근 투표, 진행 중인 투표 확인 | post_id FK 인덱스도 겸함 |
@@ -369,3 +370,4 @@ PK와 UNIQUE는 그 자체가 인덱스라서, 중복되는 인덱스는 따로 
 | 14 | 카테고리 | `mmorpg`, `fps`, `aos`, `steam`, `etc` 5개 | 프론트·API와 동일 |
 | 15 | 마스터 데이터 FK | category·game·game_content·tag·review_tag를 참조하는 FK는 모두 RESTRICT | 쓰이는 마스터 행은 지우지 않고 `is_active`로 숨깁니다. |
 | 16 | 파티 의견 조율 투표 | 공고당 진행 중 투표 1개, 항목 2~5개, 공대원(파티장+수락된 파티원)만 투표, 투표 전까지만 편집, 마감 시각이 지나도 공대장이 확정해야 `CONFIRMED` | Stitch 투표 화면(생성·편집·결과 확정·참여자 현황) 기준. 출발 10분 전 미투표자 자동 배정은 배치가 필요해 뒤로 미룹니다. |
+| 17 | 참가자 전용 댓글 | `comment.is_party_only` 로 공개 댓글과 같은 테이블에 두고, 권한은 매 요청마다 현재 파티원(공고 작성자 + `ACCEPTED`)인지로 확인. 공고 `comment_count` 는 공개 댓글만 셈 | Stitch 「참가자 전용 댓글」 화면. 별도 테이블보다 답글·신고·채택·관리자 가림을 그대로 재사용할 수 있습니다. 파티를 떠나면 바로 못 보게 되며, 자기 댓글 삭제만 가능합니다. |

@@ -536,8 +536,8 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 
 | Method | URI | 설명 | 인증 |
 | --- | --- | --- | --- |
-| GET | `/api/posts/{postId}/comments?sort=oldest\|newest&page=&size=4` | 댓글 목록 (루트 댓글 기준 페이징, 대댓글 포함) | |
-| POST | `/api/posts/{postId}/comments` | 댓글/대댓글 작성 `{ text, parentId?, secret }` | 🔒 |
+| GET | `/api/posts/{postId}/comments?sort=oldest\|newest&page=&size=4&channel=public\|party` | 댓글 목록 (루트 댓글 기준 페이징, 대댓글 포함). `channel=party` 는 참가자 전용 댓글 | `party` 는 🔒 파티원 |
+| POST | `/api/posts/{postId}/comments` | 댓글/대댓글 작성 `{ text, parentId?, secret, channel? }` | 🔒 (`party` 는 파티원) |
 | PATCH | `/api/comments/{commentId}` | 댓글 수정 `{ text }` | 🔒 작성자 |
 | DELETE | `/api/comments/{commentId}` | 댓글 삭제 (대댓글 함께 삭제) | 🔒 작성자 |
 | PUT | `/api/comments/{replyId}/accept` | 답글 채택 (댓글당 하나, 이미 채택한 답글이 있으면 이 답글로 교체) | 🔒 댓글 작성자 |
@@ -545,13 +545,23 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 
 - 비밀 댓글은 댓글 작성자와 공고 작성자에게만 본문을 노출합니다. 대댓글이면 부모 댓글 작성자에게도 노출합니다.
 
+**참가자 전용 댓글 (`channel=party`)**
+
+- 공고 상세의 댓글은 두 채널로 나뉩니다. `public`(기본)은 누구나 보는 일반 댓글, `party` 는 **참가가 확정된 파티원(공고 작성자 + `ACCEPTED` 신청자)** 만 보고 쓰는 「공대원 시크릿 채널」입니다. 저장은 `comment.is_party_only` 입니다.
+- 두 채널은 섞이지 않습니다. `public` 목록에는 참가자 전용 댓글이 나오지 않고, 공고의 `commentCount`(목록 카드·상세)에도 들어가지 않습니다. 참가자 전용 댓글 수는 `channel=party` 목록 응답의 `commentCount` 로 봅니다.
+- 답글은 부모 댓글의 채널을 따릅니다(답글 작성 때 `channel` 은 무시). 참가자 전용 채널에는 비밀 댓글이 없습니다(`secret` 을 보내도 `false` 로 저장).
+- 파티원이 아니면 목록·작성·신고·답글 채택이 403 `PARTY_ONLY`, 비로그인이면 401 `UNAUTHORIZED` 입니다. 파티를 떠난 작성자는 자기 참가자 전용 댓글을 **삭제만** 할 수 있습니다(수정은 403 `PARTY_ONLY`).
+- 참가자 전용 목록의 댓글 아이템에는 작성자의 파티 정보 `partyMember: { isHost, role, mannerTemp }` 가 들어 있습니다(`role` 은 신청할 때 고른 포지션, 공대장은 `null`). 작성자가 파티를 떠났으면 `null` 입니다. `public` 채널에서는 항상 `null` 입니다.
+- 새 참가자 전용 댓글도 같은 SSE `event: comments` 를 보냅니다(신호에는 내용이 없으므로 파티원이 아닌 사람은 공개 목록만 다시 불러옵니다).
+
 **댓글 목록 (`GET /api/posts/{postId}/comments`)**
 
 - 로그인 없이 조회할 수 있습니다. `Authorization` 헤더를 보내면 `mine` 과 비밀 댓글 본문이 로그인한 사용자 기준으로 채워집니다 (토큰이 틀리면 401).
 - `sort`: `oldest`(기본, 등록순) · `newest`(최신순). 루트 댓글에만 적용되고 `replies` 는 항상 등록순입니다.
-- 페이징은 루트 댓글 기준입니다. `size` 기본 4, 최대 50. `totalCount` 는 루트 댓글 수입니다 (대댓글 포함 전체 수는 공고 상세의 `commentCount`).
+- `channel`: `public`(기본) · `party`(참가자 전용, 위 규칙). 응답에 요청한 `channel` 이 그대로 들어 있습니다.
+- 페이징은 루트 댓글 기준입니다. `size` 기본 4, 최대 50. `totalCount` 는 루트 댓글 수, `commentCount` 는 그 채널의 대댓글 포함 전체 댓글 수입니다 (`public` 이면 공고 상세의 `commentCount` 와 같음).
 - 삭제된 댓글(`DELETED`)은 빠지고, 루트 댓글이 삭제되면 그 대댓글도 함께 빠집니다. 관리자가 가린 댓글(`HIDDEN`)은 `hidden: true` 로 내려주며 프론트에서 [펼쳐보기] 뒤에 보여줍니다.
-- 오류: 400 `INVALID_INPUT`(sort·page·size), 404 `POST_NOT_FOUND`.
+- 오류: 400 `INVALID_INPUT`(sort·page·size·channel), 401 `UNAUTHORIZED`(`party` 를 비로그인으로), 403 `PARTY_ONLY`, 404 `POST_NOT_FOUND`.
 
 ```json
 {
@@ -562,6 +572,7 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
       "isPostAuthor": false, "mine": false,
       "text": "극신속 홀나 1625입니다. 스펙 확인 부탁드려요!",
       "secret": false, "hidden": false, "reported": false, "accepted": false,
+      "partyOnly": false, "partyMember": null,
       "createdAt": "2026-11-12T11:40:00.000Z",
       "acceptedReplyId": 13,
       "replies": [
@@ -570,12 +581,13 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
           "author": { "id": 3, "nickname": "빛나는오더", "avatarUrl": null },
           "isPostAuthor": true, "mine": true,
           "text": null, "secret": true, "hidden": false, "reported": false, "accepted": true,
+          "partyOnly": false, "partyMember": null,
           "createdAt": "2026-11-12T11:45:00.000Z"
         }
       ]
     }
   ],
-  "page": 1, "size": 4, "totalCount": 6, "totalPages": 2
+  "page": 1, "size": 4, "totalCount": 6, "totalPages": 2, "channel": "public", "commentCount": 9
 }
 ```
 
@@ -591,10 +603,10 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 { "text": "디코 채널 링크 알려주시면 바로 들어가겠습니다.", "parentId": 12, "secret": false }
 ```
 
-- `text` 필수(앞뒤 공백 제거 후 1~500자), `secret` 선택(boolean, 기본 `false`), `parentId` 선택 — 넣으면 그 댓글의 대댓글이 됩니다.
+- `text` 필수(앞뒤 공백 제거 후 1~500자), `secret` 선택(boolean, 기본 `false`), `parentId` 선택 — 넣으면 그 댓글의 대댓글이 됩니다. `channel` 선택(`public` 기본 · `party`) — 루트 댓글에만 쓰이고 답글은 부모를 따릅니다.
 - 대댓글은 1단계까지입니다. `parentId` 는 같은 공고의 삭제되지 않은 루트 댓글이어야 합니다.
-- 응답 `201` — 작성된 댓글 (목록 아이템과 같은 형식, `replies` 없음). 공고의 `commentCount` 가 1 오릅니다.
-- 오류: 400 `INVALID_INPUT`(필드별) · `REPLY_DEPTH_EXCEEDED`(대댓글에 답글), 401 `UNAUTHORIZED`, 403 `ACCOUNT_SUSPENDED` · `ACCOUNT_BANNED`, 404 `POST_NOT_FOUND` · `COMMENT_NOT_FOUND`(부모 댓글 없음).
+- 응답 `201` — 작성된 댓글 (목록 아이템과 같은 형식, `replies` 없음). 공고의 `commentCount` 가 1 오릅니다 (참가자 전용 댓글은 오르지 않음).
+- 오류: 400 `INVALID_INPUT`(필드별) · `REPLY_DEPTH_EXCEEDED`(대댓글에 답글), 401 `UNAUTHORIZED`, 403 `ACCOUNT_SUSPENDED` · `ACCOUNT_BANNED` · `PARTY_ONLY`, 404 `POST_NOT_FOUND` · `COMMENT_NOT_FOUND`(부모 댓글 없음).
 
 **댓글 수정 (`PATCH /api/comments/{commentId}`)** 🔒 작성자
 
@@ -617,7 +629,7 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 
 **댓글 삭제 (`DELETE /api/comments/{commentId}`)** 🔒 작성자
 
-- 응답 `204`. 소프트 삭제(`status = DELETED`, `deleted_at`)이며, 루트 댓글이면 대댓글도 함께 삭제됩니다. 삭제된 수만큼 공고의 `commentCount` 가 줄어듭니다.
+- 응답 `204`. 소프트 삭제(`status = DELETED`, `deleted_at`)이며, 루트 댓글이면 대댓글도 함께 삭제됩니다. 삭제된 수만큼 공고의 `commentCount` 가 줄어듭니다 (참가자 전용 댓글은 세지 않았으므로 그대로).
 - 오류: 401 `UNAUTHORIZED`, 403 `NOT_COMMENT_AUTHOR`, 404 `COMMENT_NOT_FOUND`(없음, 이미 삭제됨).
 
 ### 파티 의견 조율 투표 (Poll)
