@@ -20,7 +20,7 @@ import { useToast } from './useToast';
 /** 프로필 팝오버에 보여줄 작성자 정보. 불러오는 중이면 'loading', 실패하면 'error' */
 export type CommentAuthorProfile = MemberProfileResponse | 'loading' | 'error';
 
-const errorMessage = (err: unknown, fallback: string) => (err instanceof ApiRequestError ? err.message : fallback);
+const errorMessage = (err: unknown, fallback: string) => (err instanceof ApiRequestError ? (err.fields[0]?.message ?? err.message) : fallback);
 
 /** API 댓글 → 화면용 PostComment. seq 는 서버가 정한 순서(목록 안의 위치)입니다. */
 function toPostComment(c: CommentResponse, seq: number, now: number): PostComment {

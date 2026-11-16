@@ -1,6 +1,7 @@
 'use strict';
 
 const { ApiError } = require('../common/ApiError');
+const { containsProfanity } = require('../common/profanityFilter');
 const {
   TITLE_MIN_LENGTH,
   TITLE_MAX_LENGTH,
@@ -100,6 +101,16 @@ function validateCreatePost(body, now, keepSchedule = null) {
 
   const tags = normalizeTags(source.tags);
   if (tags === null) fail('tags', m.tagsInvalid);
+
+  // 길이·형식 오류가 없는 필드만 욕설을 검사합니다 (한 필드에 오류 메시지를 두 개 쌓지 않음).
+  for (const [field, label, value] of [
+    ['title', '제목', title],
+    ['body', '내용', postBody],
+    ['partyName', '파티명', partyName],
+    ['customDetail', '상세 분류', customDetail],
+  ]) {
+    if (!fields.some((f) => f.field === field) && containsProfanity(value)) fail(field, m.profanity(label));
+  }
 
   if (fields.length > 0) throw new ApiError(400, 'INVALID_INPUT', m.invalidInput, fields);
 
