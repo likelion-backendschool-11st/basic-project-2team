@@ -36,10 +36,19 @@ function createMypageRepository(pool) {
     const [rows] = await pool.query(
       `SELECT m.id, m.nickname, m.avatar_url AS avatarUrl, m.bio, m.age_range AS ageRange,
               m.age_range_public AS ageRangePublic, m.level, m.manner_temp AS mannerTemp,
-              m.review_count AS reviewCount, m.status, m.created_at AS createdAt
+              m.review_count AS reviewCount, m.activity_point AS activityPoint, m.status, m.created_at AS createdAt
          FROM member m
         WHERE m.id = ?
         LIMIT 1`,
+      [memberId],
+    );
+    return rows[0] ?? null;
+  }
+
+  /** 헤더 간략 프로필의 레벨·경험치 게이지용 (화면을 옮길 때마다 불리므로 member 한 행만 읽습니다) */
+  async function findLevel(memberId) {
+    const [rows] = await pool.query(
+      'SELECT level, activity_point AS activityPoint, status FROM member WHERE id = ? LIMIT 1',
       [memberId],
     );
     return rows[0] ?? null;
@@ -235,6 +244,7 @@ function createMypageRepository(pool) {
 
   return {
     findMember,
+    findLevel,
     findGameProfiles,
     findProfileStats,
     findTopReviewTags,

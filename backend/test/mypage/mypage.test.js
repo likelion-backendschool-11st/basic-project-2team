@@ -25,6 +25,8 @@ const memberRow = (overrides) => ({
   level: 48,
   mannerTemp: '98.4',
   reviewCount: 4,
+  // Lv.48 은 누적 56,400점부터, Lv.49 는 58,800점부터 → 이번 레벨에서 600 / 2,400 (25%)
+  activityPoint: 57000,
   status: 'ACTIVE',
   createdAt: new Date('2026-10-01T00:00:00Z'),
   ...overrides,
@@ -65,6 +67,10 @@ function createFakeRepository() {
     async findMember(memberId) {
       const row = state.members.get(memberId);
       return row ? { ...row } : null;
+    },
+    async findLevel(memberId) {
+      const row = state.members.get(memberId);
+      return row ? { level: row.level, activityPoint: row.activityPoint, status: row.status } : null;
     },
     async findGameProfiles(memberId) {
       return state.games.get(memberId) ?? [];
@@ -197,8 +203,14 @@ describe('마이페이지 API (/api/members)', () => {
         ],
         createdAt: '2026-10-01T00:00:00.000Z',
         ageRangePublic: false,
+        exp: { activityPoint: 57000, current: 600, required: 2400, percent: 25 },
       });
       assert.deepEqual(repo.state.calls, [{ name: 'findProfileStats', recentRatingLimit: 30 }]);
+    });
+
+    it('다른 회원 프로필(GET /:memberId)에는 경험치를 싣지 않는다', async () => {
+      const { data } = await (await get(`/${ME}`, as(OTHER))).json();
+      assert.equal(data.exp, undefined);
     });
 
     it('평가가 없으면 averageRating 은 null, topTags 는 빈 배열이다', async () => {
@@ -216,6 +228,22 @@ describe('마이페이지 API (/api/members)', () => {
 
     it('탈퇴한 회원의 토큰이면 401 UNAUTHORIZED', async () => {
       const res = await get('/me/summary', as(WITHDRAWN));
+      assert.equal(res.status, 401);
+      assert.equal((await res.json()).error.code, 'UNAUTHORIZED');
+    });
+  });
+
+  describe('GET /me/level', () => {
+    it('내 레벨과 이번 레벨의 경험치 진행도를 돌려준다', async () => {
+      const res = await get('/me/level', as(ME));
+      assert.equal(res.status, 200);
+      const { data } = await res.json();
+      assert.deepEqual(data, { level: 48, exp: { activityPoint: 57000, current: 600, required: 2400, percent: 25 } });
+    });
+
+    it('토큰이 없거나 탈퇴한 회원이면 401 UNAUTHORIZED', async () => {
+      assert.equal((await get('/me/level')).status, 401);
+      const res = await get('/me/level', as(WITHDRAWN));
       assert.equal(res.status, 401);
       assert.equal((await res.json()).error.code, 'UNAUTHORIZED');
     });

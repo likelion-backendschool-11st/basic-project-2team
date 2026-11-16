@@ -1,6 +1,7 @@
 import React from 'react';
 import { profileText, type ProfileSummary } from '../../data/myPageData';
 import ProfileStatsPanel from './ProfileStatsPanel';
+import ExpGauge from '../ui/ExpGauge';
 
 interface ProfileSummaryCardProps {
   readonly profile: ProfileSummary;
@@ -29,6 +30,7 @@ export const ProfileSummaryCard: React.FC<ProfileSummaryCardProps> = ({ profile,
           </span>
         </div>
         <span className="text-xs text-slate-400 mt-3 font-medium">{profileText.avatarCaption}</span>
+        {profile.exp && <ExpGauge exp={profile.exp} className="mt-3 w-full max-w-[200px]" />}
       </div>
 
       <div className="lg:col-span-5 flex flex-col justify-center space-y-2.5">

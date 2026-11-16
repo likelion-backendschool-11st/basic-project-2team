@@ -1,4 +1,5 @@
 import { ROUTES } from './routes';
+import type { ExpGaugeView } from './userData';
 
 export type GameAccent = 'amber' | 'blue' | 'rose';
 export type ActivityTab = 'posts' | 'parties' | 'comments' | 'scraps';
@@ -52,6 +53,8 @@ export interface ProfileSummary {
   readonly avatarUrl: string | null;
   readonly nickname: string;
   readonly levelLabel: string;
+  /** 경험치 게이지. 내 프로필에만 있고 다른 회원 프로필(댓글 팝오버 등)에서는 null */
+  readonly exp: ExpGaugeView | null;
   /** 대표 게임 배지. 게이머 프로필이 없으면 null */
   readonly mainGameBadge: string | null;
   readonly fields: readonly ProfileField[];
