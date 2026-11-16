@@ -152,6 +152,7 @@ export function useComments(postId: string, initialTotal: number) {
       setComments((prev) => prev.map((c) => (c.id === id ? { ...c, text: updated.text ?? body, edited: true } : c)));
       setEditing(null);
       toast.show(commentText.updated);
+      reload(); // 채택된 답글을 고치면 채택이 풀리므로 목록을 다시 불러옵니다.
     } catch (err) {
       toast.show(errorMessage(err, commentText.loadFailed));
     }
