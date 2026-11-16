@@ -44,6 +44,10 @@ export interface Applicant {
   readonly name: string;
   readonly avatarUrl: string | null;
   readonly spec: string;
+  readonly mannerTemp: number;
+  readonly reviewCount: number;
+  /** 대표 평가 태그 라벨 (#친절함 …) */
+  readonly topTags: readonly string[];
 }
 
 const toPartyState = (status: PostStatus): PartyState => (status === 'OPEN' ? 'open' : status === 'PAUSED' ? 'paused' : 'closed');
@@ -135,6 +139,9 @@ export function usePostDetail(postId: string) {
             name: a.applicant.nickname,
             avatarUrl: a.applicant.avatarUrl,
             spec: [`Lv.${a.applicant.level}`, a.role, a.message].filter(Boolean).join(' · '),
+            mannerTemp: a.applicant.mannerTemp,
+            reviewCount: a.applicant.reviewCount,
+            topTags: (a.applicant.topTags ?? []).map((tag) => tag.label),
           })),
         );
       })

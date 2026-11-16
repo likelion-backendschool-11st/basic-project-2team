@@ -63,7 +63,16 @@ export interface ApplicationResponse {
   readonly role: string | null;
   readonly message: string | null;
   readonly appliedAt: string;
-  readonly applicant: { readonly id: number; readonly nickname: string; readonly avatarUrl: string | null; readonly level: number; readonly mannerTemp: number; readonly reviewCount: number };
+  readonly applicant: {
+    readonly id: number;
+    readonly nickname: string;
+    readonly avatarUrl: string | null;
+    readonly level: number;
+    readonly mannerTemp: number;
+    readonly reviewCount: number;
+    /** 받은 평가에서 많이 선택된 태그 (최대 3개, 많은 순) */
+    readonly topTags: readonly { readonly code: string; readonly label: string; readonly count: number }[];
+  };
 }
 export const getPendingApplications = (postId: string) => request<readonly ApplicationResponse[]>('GET', postUrl(postId, '/applications?status=PENDING'));
 export const decideApplication = (postId: string, applicationId: number, status: 'ACCEPTED' | 'REJECTED') =>
