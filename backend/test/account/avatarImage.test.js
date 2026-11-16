@@ -1,0 +1,33 @@
+'use strict';
+
+const { describe, it } = require('node:test');
+const assert = require('node:assert/strict');
+const sharp = require('sharp');
+const { processAvatar, AVATAR_SIZE } = require('../../src/account/avatarImage');
+
+const make = (width, height, format) => sharp({ create: { width, height, channels: 3, background: '#4488ff' } })[format]().toBuffer();
+
+describe('프로필 이미지 변환', () => {
+  it('큰 직사각형 이미지를 256×256 WEBP 로 줄이고 용량도 줄인다', async () => {
+    for (const format of ['png', 'jpeg']) {
+      const input = await make(1600, 900, format);
+      const { buffer, extension } = await processAvatar(input);
+      const meta = await sharp(buffer).metadata();
+      assert.deepEqual([extension, meta.format, meta.width, meta.height], ['webp', 'webp', AVATAR_SIZE, AVATAR_SIZE]);
+      assert.ok(buffer.length < input.length);
+    }
+  });
+
+  it('EXIF 회전을 적용하고 위치 정보 등 메타데이터를 남기지 않는다', async () => {
+    const input = await sharp({ create: { width: 400, height: 100, channels: 3, background: '#fff' } }).jpeg().withExif({ IFD0: { Orientation: '6' } }).toBuffer();
+    const { buffer } = await processAvatar(input);
+    const meta = await sharp(buffer).metadata();
+    assert.equal(meta.exif, undefined);
+    assert.equal(meta.width, AVATAR_SIZE);
+  });
+
+  it('이미지처럼 보이지만 읽을 수 없는 파일은 400 INVALID_IMAGE', async () => {
+    const fake = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(32, 1)]);
+    await assert.rejects(processAvatar(fake), (err) => err.status === 400 && err.code === 'INVALID_IMAGE');
+  });
+});

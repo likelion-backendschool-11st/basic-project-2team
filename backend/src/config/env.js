@@ -18,6 +18,20 @@ const env = Object.freeze({
     password: process.env.DB_PASSWORD ?? 'begg',
     database: process.env.DB_NAME ?? 'beggdb',
   }),
+  /**
+   * Cloudflare R2(프로필 이미지 저장). 아래 다섯 값이 모두 있어야 켜지고, 하나라도 없으면 로컬 폴더(uploadDir)에 저장합니다.
+   * 접근 키는 서버(.env)에만 두고 프론트·git 에 올리지 않습니다.
+   */
+  r2: Object.freeze({
+    accountId: process.env.R2_ACCOUNT_ID ?? '',
+    accessKeyId: process.env.R2_ACCESS_KEY_ID ?? '',
+    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY ?? '',
+    bucket: process.env.R2_BUCKET ?? '',
+    /** 브라우저가 이미지를 불러올 공개 주소 (커스텀 도메인 또는 r2.dev). 끝의 `/` 는 없어도 됩니다. */
+    publicBaseUrl: process.env.R2_PUBLIC_BASE_URL ?? '',
+    /** 버킷 안에서 프로필 이미지를 모아 둘 폴더(키 접두어) */
+    avatarPrefix: process.env.R2_AVATAR_PREFIX ?? 'avatars/',
+  }),
   bcryptRounds: Number(process.env.BCRYPT_ROUNDS ?? 10),
   auth: Object.freeze({
     /** JWT 서명 키. 운영 환경에서는 반드시 길고 무작위한 값으로 지정합니다. */
@@ -30,6 +44,11 @@ const env = Object.freeze({
     rememberMeTtlDays: Number(process.env.REMEMBER_ME_TTL_DAYS ?? 14),
   }),
 });
+
+const r2Values = [env.r2.accountId, env.r2.accessKeyId, env.r2.secretAccessKey, env.r2.bucket, env.r2.publicBaseUrl];
+if (r2Values.some(Boolean) && !r2Values.every(Boolean)) {
+  console.warn('R2_* 환경 변수가 일부만 설정되어 있어 R2 를 쓰지 않고 로컬 폴더에 저장합니다.');
+}
 
 if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET) {
   throw new Error('JWT_SECRET 환경 변수를 설정해야 합니다.');

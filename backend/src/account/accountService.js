@@ -11,6 +11,7 @@ const {
   SANCTION_TYPES,
   accountMessages,
 } = require('./accountConstants');
+const { processAvatar } = require('./avatarImage');
 const { validateProfileUpdate, validatePasswordChange, validateWithdraw, validateAvatar } = require('./accountValidator');
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -72,11 +73,12 @@ function planWithdrawal(sanctionTypes, now) {
  * @param {{
  *   accountRepository: ReturnType<typeof import('./accountRepository').createAccountRepository>,
  *   avatarStorage: ReturnType<typeof import('./avatarStorage').createAvatarStorage>,
+ *   avatarProcessor?: typeof processAvatar,
  *   bcryptRounds: number,
  *   now?: () => Date,
  * }} deps
  */
-function createAccountService({ accountRepository, avatarStorage, bcryptRounds, now = () => new Date() }) {
+function createAccountService({ accountRepository, avatarStorage, avatarProcessor = processAvatar, bcryptRounds, now = () => new Date() }) {
   /** 더 쓰지 않는 이미지 파일 정리. 실패해도(파일 잠김 등) 요청은 성공으로 두고 로그만 남깁니다. */
   async function discardAvatarFile(avatarUrl) {
     try {
@@ -180,8 +182,10 @@ function createAccountService({ accountRepository, avatarStorage, bcryptRounds, 
 
   /** PUT /api/members/me/avatar — 새 이미지를 저장하고 주소를 바꾼 뒤, 이전 이미지 파일을 지웁니다. */
   async function updateAvatar(memberId, body) {
-    const { buffer, extension } = validateAvatar(body);
+    const upload = validateAvatar(body);
     const account = await findActiveAccount(memberId);
+    // 작은 정사각형 WEBP 로 변환해서 저장합니다 (원본은 보관하지 않음).
+    const { buffer, extension } = await avatarProcessor(upload.buffer, upload.extension);
     const avatarUrl = await avatarStorage.save(memberId, buffer, extension);
     let updated;
     try {
