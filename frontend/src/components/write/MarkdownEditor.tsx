@@ -1,6 +1,7 @@
 import React from 'react';
 import type { ToolbarAction } from '../../data/writeData';
 import { writeText } from '../../data/writeData';
+import MarkdownBody from '../ui/MarkdownBody';
 
 interface MarkdownEditorProps {
   readonly value: string;
@@ -25,7 +26,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ value, onChange,
       <span className="text-[11px] font-mono text-mercury-light bg-mercury/10 px-2 py-1 rounded">{writeText.markdown}</span>
     </div>
     {previewing ? (
-      <div className="flex-1 p-6 whitespace-pre-wrap text-sm leading-7 text-fog-headline">{value}</div>
+      <div className="flex-1 p-6">{value.trim() ? <MarkdownBody source={value} /> : <p className="text-sm text-fog-muted">{writeText.previewEmpty}</p>}</div>
     ) : (
       <textarea ref={textareaRef} value={value} onChange={(e) => onChange(e.target.value)} placeholder={writeText.bodyPlaceholder} className="flex-1 w-full resize-none bg-transparent border-0 p-6 text-sm leading-7 text-fog-headline placeholder:text-fog-muted focus:ring-0 focus:outline-none" />
     )}

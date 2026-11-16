@@ -342,6 +342,7 @@ CREATE TABLE comment (
   post_id       BIGINT UNSIGNED NOT NULL,
   author_id     BIGINT UNSIGNED NOT NULL,
   parent_id     BIGINT UNSIGNED NULL COMMENT 'NULL이면 루트 댓글. 깊이 1단계는 애플리케이션에서 검증',
+  accepted_reply_id BIGINT UNSIGNED NULL COMMENT '이 댓글에 달린 답글 중 채택된 답글 id. NULL이면 채택 없음. 댓글 작성자만 지정',
   content       VARCHAR(500)    NOT NULL,
   is_secret     BOOLEAN         NOT NULL DEFAULT FALSE,
   status        VARCHAR(20)     NOT NULL DEFAULT 'VISIBLE' COMMENT 'VISIBLE / HIDDEN / DELETED',
@@ -355,7 +356,8 @@ CREATE TABLE comment (
   INDEX idx_comment_status_created      (status, created_at),
   CONSTRAINT fk_comment_post   FOREIGN KEY (post_id)   REFERENCES post (id)    ON DELETE RESTRICT,
   CONSTRAINT fk_comment_author FOREIGN KEY (author_id) REFERENCES member (id)  ON DELETE RESTRICT,
-  CONSTRAINT fk_comment_parent FOREIGN KEY (parent_id) REFERENCES comment (id) ON DELETE RESTRICT
+  CONSTRAINT fk_comment_parent FOREIGN KEY (parent_id) REFERENCES comment (id) ON DELETE RESTRICT,
+  CONSTRAINT fk_comment_accepted_reply FOREIGN KEY (accepted_reply_id) REFERENCES comment (id) ON DELETE SET NULL
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '댓글·대댓글 (소프트 삭제)';
 
 CREATE TABLE poll (

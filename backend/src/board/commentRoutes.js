@@ -18,6 +18,8 @@ function createCommentItemRouter(commentController, { requireAuth }) {
   const router = Router();
   router.patch('/:commentId', requireAuth, commentController.update);
   router.delete('/:commentId', requireAuth, commentController.remove);
+  router.put('/:commentId/accept', requireAuth, commentController.accept);
+  router.delete('/:commentId/accept', requireAuth, commentController.cancelAccept);
   return router;
 }
 

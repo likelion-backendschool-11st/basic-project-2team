@@ -61,6 +61,10 @@ export const CommentSection: React.FC<CommentSectionProps> = ({ thread: t, owner
             onCancelEdit={() => t.setEditing(null)}
             onDelete={() => t.askDelete(item.id)}
             onReport={() => t.askReport(item.id)}
+            // 답글 채택은 그 답글이 달린 댓글(c)의 작성자만 — 본인 답글·비밀·가려진 답글은 서버도 거절합니다.
+            canAccept={depth === 1 && c.mine && !item.mine && !item.secret && !item.hidden}
+            onAccept={() => t.accept(item.id)}
+            onCancelAccept={() => t.cancelAccept(item.id)}
             onTogglePopover={() => t.setPopoverFor(t.popoverFor === item.id ? null : item.id)}
             onPopoverAction={t.toast.show}
             renderReply={render}

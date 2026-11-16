@@ -23,6 +23,10 @@ interface CommentItemProps {
   readonly onCancelEdit: () => void;
   readonly onDelete: () => void;
   readonly onReport: () => void;
+  /** 이 답글이 달린 댓글의 작성자(=보는 사람)만 true: 답글 채택 / 채택 취소 버튼을 보여줍니다. */
+  readonly canAccept?: boolean;
+  readonly onAccept?: () => void;
+  readonly onCancelAccept?: () => void;
   readonly onTogglePopover: () => void;
   readonly onPopoverAction: (message: string) => void;
   readonly renderReply: (reply: PostComment) => React.ReactNode;
@@ -39,17 +43,22 @@ export const CommentItem: React.FC<CommentItemProps> = (p) => {
   const hidden = c.locked;
   const [draft, setDraft] = useState(c.text);
   const [showHidden, setShowHidden] = useState(false);
+  // 답글 접기/펼치기. 채택된 답글의 복사본은 접어도 계속 보입니다.
+  const [repliesOpen, setRepliesOpen] = useState(true);
+  const pinned = c.solved ? p.replies.find((r) => r.accepted) : undefined;
   const collapsed = c.hidden && !showHidden;
   // 프로필 창은 작성자 줄 바로 아래에 떠서, 아래 댓글을 밀어내지 않고 스크롤 위치도 그대로 둡니다.
   const profileAnchor = useRef<HTMLDivElement>(null);
   useDismiss(profileAnchor, p.popoverOpen, p.onTogglePopover);
   return (
-    <div className={depth ? 'ml-8 mt-2 rounded-xl bg-night-base/70 p-3' : 'rounded-xl bg-night-base/50 p-4'}>
+    <div className={`${depth ? 'ml-8 mt-2 rounded-xl bg-night-base/70 p-3' : 'rounded-xl bg-night-base/50 p-4'} ${c.accepted ? 'border border-emeraldAccent/50 bg-emeraldAccent/10 ring-1 ring-emeraldAccent/20' : ''}`}>
       <div ref={profileAnchor} className="relative">
       <div className="flex items-center gap-2 text-xs">
         <button type="button" onClick={p.onTogglePopover} className="w-7 h-7 rounded-full bg-mercury/25 text-white text-[11px] font-bold hover:ring-2 hover:ring-mercury/50" aria-label={`${c.author} 프로필`} aria-expanded={p.popoverOpen} aria-haspopup="dialog"><Avatar url={c.avatarUrl} name={c.author} className="w-full h-full rounded-full flex items-center justify-center" /></button>
         <span className="font-bold text-white">{c.author}</span>
         {c.badge === 'mine' && <span className="px-1.5 rounded bg-emeraldAccent/15 text-emerald-300 text-[10px]">{commentText.mine}</span>}
+        {c.solved && <span className="px-1.5 rounded bg-emeraldAccent/15 text-emerald-300 text-[10px] inline-flex items-center gap-1"><i className="fa-solid fa-circle-check" />{commentText.solvedBadge}</span>}
+        {c.accepted && <span className="px-1.5 rounded bg-emeraldAccent/15 text-emerald-300 text-[10px] inline-flex items-center gap-1"><i className="fa-solid fa-circle-check" />{commentText.acceptedBadge}</span>}
         {c.badge === 'author' && <span className="px-1.5 rounded bg-mercury/30 text-indigo-200 text-[10px]">{commentText.author}</span>}
         <span className="text-fog-muted">{ago(c.ageMin)}</span>
         {c.secret && <i className="fa-solid fa-lock text-[10px] text-amberAccent" />}
@@ -77,6 +86,11 @@ export const CommentItem: React.FC<CommentItemProps> = (p) => {
       {!p.isEditing && (
         <div className="mt-2 flex items-center gap-4">
           {depth === 0 && <button type="button" className={action} onClick={p.onReply}><i className="fa-solid fa-reply" />{commentText.reply}</button>}
+          {p.canAccept && (c.accepted ? (
+            p.onCancelAccept && <button type="button" className={`${action} text-emerald-300`} onClick={p.onCancelAccept}><i className="fa-solid fa-circle-check" />{commentText.cancelAccept}</button>
+          ) : (
+            p.onAccept && <button type="button" className={action} onClick={p.onAccept}><i className="fa-regular fa-circle-check" />{commentText.accept}</button>
+          ))}
           {mine ? (
             <>
               {!c.hidden && <button type="button" className={action} onClick={p.onEdit}><i className="fa-solid fa-pen" />{commentText.edit}</button>}
@@ -88,9 +102,26 @@ export const CommentItem: React.FC<CommentItemProps> = (p) => {
         </div>
       )}
       {p.isReplying && (
-        <div className="mt-3 ml-6"><CommentComposer autoFocus placeholder={commentText.replyPlaceholder} submitLabel={commentText.submitReply} onSubmit={(t) => p.onSubmitReply(t)} onCancel={p.onCancelReply} /></div>
+        <div className="mt-3 ml-6"><CommentComposer autoFocus placeholder={commentText.replyPlaceholder} submitLabel={commentText.submitReply} onSubmit={(t) => { setRepliesOpen(true); return p.onSubmitReply(t); }} onCancel={p.onCancelReply} /></div>
       )}
-      {p.replies.map((r) => <React.Fragment key={r.id}>{p.renderReply(r)}</React.Fragment>)}
+      {pinned && (
+        <div className="ml-8 mt-3 rounded-xl border border-emeraldAccent/50 bg-emeraldAccent/10 p-3 ring-1 ring-emeraldAccent/20" aria-label={commentText.pinnedTitle}>
+          <div className="flex items-center gap-2 text-xs">
+            <span className="inline-flex items-center gap-1 font-bold text-emerald-300"><i className="fa-solid fa-circle-check" />{commentText.pinnedTitle}</span>
+            <Avatar url={pinned.avatarUrl} name={pinned.author} className="w-5 h-5 shrink-0 rounded-full bg-mercury/25 text-white text-[10px] font-bold flex items-center justify-center" />
+            <span className="font-bold text-white">{pinned.author}</span>
+            <span className="text-fog-muted">{ago(pinned.ageMin)}</span>
+          </div>
+          <p className="mt-2 text-sm leading-6 text-fog-headline whitespace-pre-wrap break-words">{pinned.text}</p>
+        </div>
+      )}
+      {p.replies.length > 0 && (
+        <button type="button" aria-expanded={repliesOpen} onClick={() => setRepliesOpen((v) => !v)} className={`${action} ml-8 mt-3 text-xs`}>
+          <i className={`fa-solid ${repliesOpen ? 'fa-chevron-up' : 'fa-chevron-down'} text-[10px]`} />
+          {repliesOpen ? commentText.repliesClose(p.replies.length) : commentText.repliesOpen(p.replies.length)}
+        </button>
+      )}
+      {repliesOpen && p.replies.map((r) => <React.Fragment key={r.id}>{p.renderReply(r)}</React.Fragment>)}
     </div>
   );
 };

@@ -187,6 +187,7 @@ API의 `level`은 **서비스 활동 레벨**(`member.level`)입니다. 공고 �
 | post_id | BIGINT UNSIGNED | FK → post | |
 | author_id | BIGINT UNSIGNED | FK → member | |
 | parent_id | BIGINT UNSIGNED | FK → comment, NULL 가능 | 대댓글. 깊이 1단계는 애플리케이션에서 검증 |
+| accepted_reply_id | BIGINT UNSIGNED | FK → comment, NULL 가능 | 이 댓글에 달린 답글 중 채택된 답글. 댓글 작성자만 지정·해제하며 한 댓글에 하나뿐(답글 행이 지워지면 NULL). 채택된 답글이 가려지거나 삭제되면 채택 없음으로 취급. 마이그레이션은 `db/migrations/2026-11-16-comment-accepted-reply.sql` |
 | content | VARCHAR(500) | | 프론트에서도 500자 |
 | is_secret | BOOLEAN | | 비밀 댓글 |
 | status | VARCHAR(20) | 기본 `VISIBLE` | VISIBLE / HIDDEN(관리자 가림, Q&A-003) / DELETED |
@@ -280,6 +281,7 @@ API의 `level`은 **서비스 활동 레벨**(`member.level`)입니다. 공고 �
 | post | post_tag, post_scrap | 1:N | CASCADE | |
 | post | notification | 1:N | SET NULL | 알림은 공고 링크가 없어도 문구만으로 의미가 있습니다. |
 | comment | comment (parent_id) | 1:N, 자기 참조 | RESTRICT | 소프트 삭제 시 "삭제된 댓글입니다"로 표시 |
+| comment | comment (accepted_reply_id) | 0..1:1, 자기 참조 | SET NULL | 댓글 작성자가 채택한 답글 |
 | review | review_tag_map | 1:N | CASCADE | |
 | poll | poll_option, poll_vote | 1:N | CASCADE | 투표에만 딸린 데이터. poll_option → poll_vote 도 CASCADE |
 | member | poll(author_id) / poll_vote | 1:N | RESTRICT / CASCADE | 만든 사람 기록은 보존, 투표 기록은 회원에게만 딸린 데이터 |

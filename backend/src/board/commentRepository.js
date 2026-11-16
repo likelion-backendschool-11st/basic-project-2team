@@ -16,7 +16,7 @@ const ROOT_ORDER = Object.freeze({
 });
 
 /** 목록·작성 응답에 공통으로 쓰는 댓글 + 작성자 컬럼 */
-const COMMENT_COLUMNS = `c.id, c.post_id AS postId, c.parent_id AS parentId, c.content, c.is_secret AS isSecret,
+const COMMENT_COLUMNS = `c.id, c.post_id AS postId, c.parent_id AS parentId, c.accepted_reply_id AS acceptedReplyId, c.content, c.is_secret AS isSecret,
        c.status, c.created_at AS createdAt,
        m.id AS authorId, m.nickname AS authorNickname, m.avatar_url AS authorAvatarUrl, m.status AS authorStatus`;
 
@@ -129,7 +129,7 @@ function createCommentRepository(pool) {
    */
   async function findCommentContext(commentId) {
     const [rows] = await pool.query(
-      `SELECT ${COMMENT_COLUMNS}, p.author_id AS postAuthorId, pc.author_id AS parentAuthorId
+      `SELECT ${COMMENT_COLUMNS}, p.author_id AS postAuthorId, pc.author_id AS parentAuthorId, pc.accepted_reply_id AS parentAcceptedReplyId
          FROM comment c
          JOIN member m ON m.id = c.author_id
          JOIN post p ON p.id = c.post_id
@@ -139,6 +139,11 @@ function createCommentRepository(pool) {
       [commentId],
     );
     return rows[0] ?? null;
+  }
+
+  /** 댓글의 채택 답글을 바꿉니다 (null 이면 채택 해제). 댓글 한 줄 UPDATE 라 교체가 원자적이고 댓글당 하나가 보장됩니다. */
+  async function setAcceptedReply(commentId, replyId) {
+    await pool.query('UPDATE comment SET accepted_reply_id = ? WHERE id = ?', [replyId, commentId]);
   }
 
   /** 댓글 본문 수정 */
@@ -224,6 +229,7 @@ function createCommentRepository(pool) {
     findRootCommentPage,
     findReplies,
     findCommentContext,
+    setAcceptedReply,
     updateCommentContent,
     deleteCommentWithReplies,
     createCommentReport,

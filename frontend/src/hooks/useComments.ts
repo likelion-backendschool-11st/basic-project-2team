@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  acceptReply,
+  cancelReplyAcceptance,
   createComment,
   deleteComment,
   getComments,
   reportComment,
   updateComment,
   type CommentResponse,
+  type RootCommentResponse,
 } from '../api/commentApi';
 import { ApiRequestError } from '../api/http';
 import { getMemberProfile, type MemberProfileResponse } from '../api/mypageApi';
@@ -37,6 +40,8 @@ function toPostComment(c: CommentResponse, seq: number, now: number): PostCommen
     text: c.text ?? '',
     secret: c.secret,
     reported: c.reported,
+    accepted: c.accepted,
+    solved: (c as Partial<RootCommentResponse>).acceptedReplyId != null,
   };
 }
 
@@ -169,6 +174,26 @@ export function useComments(postId: string, initialTotal: number) {
     }
   };
 
+  /** 댓글 작성자: 그 댓글에 달린 답글 채택(이미 채택한 답글이 있으면 교체). 성공하면 다시 불러와 답글 맨 위에 하이라이트합니다. */
+  const accept = async (id: string) => {
+    try {
+      await acceptReply(Number(id));
+      toast.show(commentText.acceptedToast);
+      reload();
+    } catch (err) {
+      toast.show(errorMessage(err, commentText.loadFailed));
+    }
+  };
+  const cancelAccept = async (id: string) => {
+    try {
+      await cancelReplyAcceptance(Number(id));
+      toast.show(commentText.cancelAcceptedToast);
+      reload();
+    } catch (err) {
+      toast.show(errorMessage(err, commentText.loadFailed));
+    }
+  };
+
   const markReported = (id: string) => setComments((prev) => prev.map((c) => (c.id === id ? { ...c, reported: true } : c)));
   const askReport = (id: string) => { setReportId(id); reportDialog.open(); };
   /** 신고 접수. detail 은 선택 입력(빈 문자열이면 보내지 않음) */
@@ -188,7 +213,7 @@ export function useComments(postId: string, initialTotal: number) {
   };
 
   return {
-    comments, refresh: reload, total: Math.max(0, initialTotal + totalDelta), visible, repliesOf, sort, setSort, paging, loading, error,
+    comments, accept, cancelAccept, refresh: reload, total: Math.max(0, initialTotal + totalDelta), visible, repliesOf, sort, setSort, paging, loading, error,
     replyTo, setReplyTo, editing, setEditing, popoverFor, setPopoverFor, profileOf,
     add, saveEdit, askDelete, confirmDelete, askReport, confirmReport, deleteDialog, reportDialog, toast,
   };
