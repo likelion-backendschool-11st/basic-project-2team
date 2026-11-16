@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import { commentText, type PostComment } from '../../data/commentData';
 import type { CommentAuthorProfile } from '../../hooks/useComments';
 import { useDismiss } from '../../hooks/useDismiss';
+import { Avatar } from '../ui/Avatar';
 import CommentComposer from './CommentComposer';
 import UserPopover from './UserPopover';
 
@@ -46,7 +47,7 @@ export const CommentItem: React.FC<CommentItemProps> = (p) => {
     <div className={depth ? 'ml-8 mt-2 rounded-xl bg-night-base/70 p-3' : 'rounded-xl bg-night-base/50 p-4'}>
       <div ref={profileAnchor} className="relative">
       <div className="flex items-center gap-2 text-xs">
-        <button type="button" onClick={p.onTogglePopover} className="w-7 h-7 rounded-full bg-mercury/25 text-white text-[11px] font-bold hover:ring-2 hover:ring-mercury/50" aria-label={`${c.author} 프로필`} aria-expanded={p.popoverOpen} aria-haspopup="dialog">{c.initial}</button>
+        <button type="button" onClick={p.onTogglePopover} className="w-7 h-7 rounded-full bg-mercury/25 text-white text-[11px] font-bold hover:ring-2 hover:ring-mercury/50" aria-label={`${c.author} 프로필`} aria-expanded={p.popoverOpen} aria-haspopup="dialog"><Avatar url={c.avatarUrl} name={c.author} className="w-full h-full rounded-full flex items-center justify-center" /></button>
         <span className="font-bold text-white">{c.author}</span>
         {c.badge === 'mine' && <span className="px-1.5 rounded bg-emeraldAccent/15 text-emerald-300 text-[10px]">{commentText.mine}</span>}
         {c.badge === 'author' && <span className="px-1.5 rounded bg-mercury/30 text-indigo-200 text-[10px]">{commentText.author}</span>}

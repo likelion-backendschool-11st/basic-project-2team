@@ -40,6 +40,7 @@ export type PartyState = 'open' | 'paused' | 'closed';
 export interface Applicant {
   readonly id: number;
   readonly name: string;
+  readonly avatarUrl: string | null;
   readonly spec: string;
 }
 
@@ -127,6 +128,7 @@ export function usePostDetail(postId: string) {
           items.map((a) => ({
             id: a.id,
             name: a.applicant.nickname,
+            avatarUrl: a.applicant.avatarUrl,
             spec: [`Lv.${a.applicant.level}`, a.role, a.message].filter(Boolean).join(' · '),
           })),
         );
@@ -143,7 +145,7 @@ export function usePostDetail(postId: string) {
     getParticipants(postId)
       .then((items) => {
         if (cancelled) return;
-        setParticipants(items.map((p) => ({ name: p.nickname, role: p.isHost ? postDetailText.leaderRole : (p.role ?? postDetailText.slotRole), leader: p.isHost })));
+        setParticipants(items.map((p) => ({ name: p.nickname, avatarUrl: p.avatarUrl, role: p.isHost ? postDetailText.leaderRole : (p.role ?? postDetailText.slotRole), leader: p.isHost })));
       })
       .catch(() => !cancelled && setParticipants([]));
     return () => {

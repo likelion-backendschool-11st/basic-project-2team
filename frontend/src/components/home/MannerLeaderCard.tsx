@@ -1,6 +1,7 @@
 import React from 'react';
 import type { MannerLeader } from '../../data/homeData';
 import { avatarStyles, rankBadgeStyles, tagStyles } from '../../data/accentStyles';
+import { Avatar } from '../ui/Avatar';
 
 interface MannerLeaderCardProps {
   readonly leader: MannerLeader;
@@ -15,7 +16,7 @@ export const MannerLeaderCard: React.FC<MannerLeaderCardProps> = ({ leader }) =>
     <div className="flex items-center gap-3">
       <div className="relative">
         <div className={`w-10 h-10 rounded-full border flex items-center justify-center font-bold text-white text-sm ${avatarStyles[leader.accent]}`}>
-          {leader.initial}
+          <Avatar url={leader.avatarUrl} name={leader.name} className="w-full h-full rounded-full flex items-center justify-center" />
         </div>
         <span
           className={`absolute -bottom-1 -right-1 w-4 h-4 text-[9px] font-black rounded-full flex items-center justify-center shadow ${rankBadgeStyles[leader.rank]}`}

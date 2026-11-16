@@ -9,6 +9,7 @@ export interface PostComment {
   readonly parentId?: string;
   readonly author: string;
   readonly initial: string;
+  readonly avatarUrl?: string | null;
   readonly badge?: 'mine' | 'author';
   /** 로그인한 사용자가 쓴 댓글 → 수정·삭제 버튼 */
   readonly mine: boolean;

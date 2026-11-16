@@ -1,6 +1,7 @@
 import React from 'react';
 import type { Participant } from '../../data/postData';
 import { postText } from '../../data/postData';
+import { Avatar } from '../ui/Avatar';
 
 interface ParticipantsCardProps {
   readonly participants: readonly Participant[];
@@ -17,7 +18,7 @@ export const ParticipantsCard: React.FC<ParticipantsCardProps> = ({ participants
     <ul className="grid grid-cols-4 gap-3 text-center">
       {participants.map((p) => (
         <li key={`${p.leader ? 'host' : 'member'}-${p.name}`}>
-          <span className={`mx-auto w-12 h-12 rounded-full bg-night-card flex items-center justify-center text-sm font-bold text-white border-2 ${p.leader ? 'border-amberAccent' : 'border-night-borderLight'}`}>{p.name[0]}</span>
+          <Avatar url={p.avatarUrl} name={p.name} className={`mx-auto w-12 h-12 rounded-full bg-night-card flex items-center justify-center text-sm font-bold text-white border-2 ${p.leader ? 'border-amberAccent' : 'border-night-borderLight'}`} />
           <div className="text-[11px] text-white mt-1.5 truncate">{p.name}</div>
           <div className="text-[10px] text-fog-muted">{p.role}</div>
         </li>

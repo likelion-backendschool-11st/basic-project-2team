@@ -6,6 +6,7 @@ export type ApplicationStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'CANCELED'
 
 export interface Participant {
   readonly name: string;
+  readonly avatarUrl?: string | null;
   readonly role: string;
   readonly leader?: boolean;
 }
@@ -18,7 +19,7 @@ export interface PostDetail {
   readonly title: string;
   readonly current: number;
   readonly max: number;
-  readonly host: { readonly id: number; readonly name: string; readonly level: number; readonly record: string; readonly manner: string };
+  readonly host: { readonly id: number; readonly name: string; readonly avatarUrl?: string | null; readonly level: number; readonly record: string; readonly manner: string };
   readonly views: number;
   readonly postedAgo: string;
   readonly tiles: readonly { readonly icon: string; readonly label: string; readonly value: string; readonly note: string; readonly noteTone: 'good' | 'muted' }[];
