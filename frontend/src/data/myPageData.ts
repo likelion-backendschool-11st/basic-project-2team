@@ -260,6 +260,7 @@ export const favoritesText = {
   levelPrefix: 'Lv.',
   mannerPrefix: '매너 ',
   noMainGame: '대표 게임 미설정',
+  viewProfile: '프로필 보기',
   remove: '즐겨찾기 해제',
   removed: (name: string) => `${name}님을 즐겨찾기에서 해제했습니다.`,
   removeFailed: '즐겨찾기 해제에 실패했습니다.',
