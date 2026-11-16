@@ -6,6 +6,7 @@ import { getGames } from '../api/gameApi';
 import { ApiRequestError, errorMessageOf } from '../api/http';
 import { DEFAULT_PLAY_STYLE, ageRanges, playStyles, profileText, type GameOption } from '../data/accountData';
 import { ROUTES } from '../data/routes';
+import { useAuth } from './useAuth';
 
 export type NicknameStatus = 'idle' | 'checking' | 'invalid' | 'taken' | 'available';
 
@@ -24,6 +25,8 @@ const isNicknameFormatOk = (value: string) => {
 /** 프로필 수정 — GET /api/members/me · GET /api/games 로 채우고 PATCH /api/members/me 로 저장합니다. */
 export function useProfileForm() {
   const navigate = useNavigate();
+  /** 프로필을 처음 설정하는 중(신규 회원 등)이면 true — 안내 배너를 보이고 취소 버튼을 숨깁니다. */
+  const setupRequired = useAuth().user?.profileSetupRequired === true;
   const [loaded, setLoaded] = useState<LoadedProfile | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [gameOptions, setGameOptions] = useState<readonly GameOption[]>([]);
@@ -142,8 +145,9 @@ export function useProfileForm() {
         mainGame,
         playStyle: styleId,
       });
-      updateStoredUser({ nickname: me.nickname });
-      navigate(ROUTES.myPage);
+      // 선호 게임을 1개 이상 저장했으므로 프로필 설정 필수 상태가 풀립니다. 처음 설정이었다면 메인으로 보냅니다.
+      updateStoredUser({ nickname: me.nickname, profileSetupRequired: false });
+      navigate(setupRequired ? ROUTES.homeLoggedIn : ROUTES.myPage);
     } catch (err) {
       if (err instanceof ApiRequestError && err.code === 'DUPLICATE_NICKNAME') setStatus('taken');
       else setSaveError(errorMessageOf(err, profileText.saveFailed));
@@ -153,6 +157,7 @@ export function useProfileForm() {
   };
 
   return {
+    setupRequired,
     loading: loaded === null && loadError === null,
     loadError,
     gameOptions,

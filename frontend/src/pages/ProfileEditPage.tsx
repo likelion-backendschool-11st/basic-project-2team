@@ -2,6 +2,7 @@ import React from 'react';
 import AccountShell from '../components/account/AccountShell';
 import FormActions from '../components/account/FormActions';
 import GameCheckCard from '../components/account/GameCheckCard';
+import ProfileSetupNotice from '../components/account/ProfileSetupNotice';
 import FieldStatusMessage, { type FieldStatusTone } from '../components/signup/FieldStatusMessage';
 import { checkboxClass, inputBaseClass, labelClass } from '../components/signup/fieldStyles';
 import { accountPanelText, playStyles, profileText } from '../data/accountData';
@@ -44,6 +45,7 @@ export const ProfileEditPage: React.FC<ProfileEditPageProps> = () => {
   return (
     <AccountShell active="profile" title={text.title} description={text.description}>
       <form onSubmit={form.onSubmit} className="flex flex-col gap-8">
+        {form.setupRequired && <ProfileSetupNotice {...profileText.setupNotice} />}
         <section className="flex flex-col gap-2">
           <label htmlFor="nickname" className={`${labelClass} font-bold text-white`}>
             {profileText.nicknameLabel} <span className="text-mercury-light">*</span>
@@ -138,7 +140,7 @@ export const ProfileEditPage: React.FC<ProfileEditPageProps> = () => {
 
         {form.saveError && <FieldStatusMessage tone="error" message={form.saveError} />}
 
-        <FormActions submitLabel={form.saving ? profileText.saving : profileText.save} submitIcon="fa-floppy-disk" disabled={!form.canSave} />
+        <FormActions submitLabel={form.saving ? profileText.saving : profileText.save} submitIcon="fa-floppy-disk" disabled={!form.canSave} secondary={form.setupRequired ? <></> : undefined} />
       </form>
     </AccountShell>
   );

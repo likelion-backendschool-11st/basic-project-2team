@@ -49,6 +49,9 @@ function createFakeRepository() {
     async recordLoginSuccess({ memberId, now }) {
       Object.assign(byId(memberId), { loginFailCount: 0, lockedUntil: null, lastLoginAt: now });
     },
+    async hasGameProfile(memberId) {
+      return byId(memberId).gameCount > 0;
+    },
     async saveRefreshToken({ memberId, tokenHash, expiresAt }) {
       state.tokens.push({ id: state.tokens.length + 1, memberId, tokenHash, expiresAt, revokedAt: null });
     },
@@ -109,6 +112,7 @@ describe('member login API', () => {
       level: 48,
       mannerTemp: 98.4,
       avatarUrl: null,
+      gameCount: 2,
     });
   });
 
@@ -138,6 +142,7 @@ describe('member login API', () => {
       mannerTemp: 98.4,
       avatarUrl: null,
       online: true,
+      profileSetupRequired: false,
     });
 
     const access = jwt.verify(data.accessToken, AUTH.jwtSecret);
@@ -158,6 +163,20 @@ describe('member login API', () => {
 
     assert.equal(member().loginFailCount, 0);
     assert.deepEqual(member().lastLoginAt, clock);
+  });
+
+  it('선호 게임이 없으면(프로필 미설정) user.profileSetupRequired=true — 설정할 때까지 매 로그인마다', async () => {
+    member().gameCount = 0;
+    const first = await (await login()).json();
+    assert.equal(first.data.user.profileSetupRequired, true);
+
+    advance(60 * 1000);
+    const second = await (await login()).json();
+    assert.equal(second.data.user.profileSetupRequired, true, '첫 로그인이 지나도 프로필을 저장하기 전까지는 계속 필수');
+
+    member().gameCount = 1;
+    const afterSetup = await (await login()).json();
+    assert.equal(afterSetup.data.user.profileSetupRequired, false);
   });
 
   it('rememberMe=true 면 Refresh Token 유효 기간이 길어진다', async () => {

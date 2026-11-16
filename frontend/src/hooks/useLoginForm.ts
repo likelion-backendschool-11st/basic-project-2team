@@ -2,7 +2,7 @@ import { useCallback, useState, type ChangeEvent, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { login, loginSanctionOf, type LoginSanction } from '../api/authApi';
 import { errorMessageOf } from '../api/http';
-import { loginText } from '../data/authData';
+import { loginText, profileSetupPromptText } from '../data/authData';
 import { ROUTES } from '../data/routes';
 
 export function useLoginForm() {
@@ -16,6 +16,10 @@ export function useLoginForm() {
   /** 정지·영구 정지 회원이 로그인하면 안내 모달에 보여줄 제재 내용 (null 이면 모달 닫힘) */
   const [sanction, setSanction] = useState<LoginSanction | null>(null);
   const closeSanction = useCallback(() => setSanction(null), []);
+  /** 프로필을 아직 설정하지 않은 회원(신규 가입 등)이면 프로필 설정 안내 모달에 보여줄 닉네임 (null 이면 모달 닫힘) */
+  const [profilePromptNickname, setProfilePromptNickname] = useState<string | null>(null);
+  /** 안내 모달 "프로필 설정하러 가기" — 프로필 수정 화면으로 이동 (건너뛸 수 없음) */
+  const goToProfileSetup = useCallback(() => navigate(profileSetupPromptText.confirmRedirect), [navigate]);
 
   const onUsernameChange = (e: ChangeEvent<HTMLInputElement>) => {
     setUsername(e.target.value);
@@ -43,8 +47,9 @@ export function useLoginForm() {
     }
     setSubmitting(true);
     try {
-      await login(id, password, rememberMe);
-      navigate(loginText.successRedirect);
+      const user = await login(id, password, rememberMe);
+      if (user.profileSetupRequired) setProfilePromptNickname(user.nickname);
+      else navigate(loginText.successRedirect);
     } catch (err) {
       setError(errorMessageOf(err, loginText.failedMessage));
       setSanction(loginSanctionOf(err));
@@ -61,6 +66,8 @@ export function useLoginForm() {
     submitting,
     sanction,
     closeSanction,
+    profilePromptNickname,
+    goToProfileSetup,
     onUsernameChange,
     onPasswordChange,
     onRememberMeChange,

@@ -8,6 +8,11 @@ export interface LoginUser {
   readonly mannerTemp: number;
   readonly avatarUrl: string | null;
   readonly online: boolean;
+  /**
+   * 프로필(선호 게임·플레이 스타일)을 아직 한 번도 저장하지 않았으면 true.
+   * 이 값이 true 인 동안은 프로필 수정 화면 말고는 쓸 수 없습니다 (ProfileSetupGuard). 이전 버전에서 저장된 세션에는 없을 수 있습니다.
+   */
+  readonly profileSetupRequired?: boolean;
 }
 
 interface LoginResult {

@@ -136,6 +136,12 @@ function createMemberRepository(pool) {
     );
   }
 
+  /** 선호 게임이 하나라도 등록돼 있는지. 프로필 수정은 선호 게임 1개 이상이 필수라, 없으면 프로필을 한 번도 설정하지 않은 회원입니다. */
+  async function hasGameProfile(memberId) {
+    const [rows] = await pool.query('SELECT 1 FROM member_game_profile WHERE member_id = ? LIMIT 1', [memberId]);
+    return rows.length > 0;
+  }
+
   async function saveRefreshToken({ memberId, tokenHash, expiresAt }) {
     await pool.query('INSERT INTO refresh_token (member_id, token_hash, expires_at) VALUES (?, ?, ?)', [
       memberId,
@@ -255,6 +261,7 @@ function createMemberRepository(pool) {
     findActiveRestriction,
     recordLoginFailure,
     recordLoginSuccess,
+    hasGameProfile,
     saveRefreshToken,
     findRefreshToken,
     revokeRefreshToken,
