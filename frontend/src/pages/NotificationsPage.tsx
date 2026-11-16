@@ -32,16 +32,31 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = () => {
             )}
           </div>
           {n.loggedIn && (
-            <div role="group" aria-label={notificationText.filterAriaLabel} className="flex gap-2">
-              <button type="button" aria-pressed={!n.unreadOnly} onClick={() => n.setUnreadOnly(false)} className={n.unreadOnly ? tabOff : tabOn}>
-                {notificationText.filterAll}
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => void n.markAllRead()}
+                disabled={n.unreadCount === 0 || n.markingAll}
+                className="text-sm font-medium text-mercury-light hover:underline disabled:opacity-40 disabled:no-underline disabled:cursor-default"
+              >
+                {notificationText.markAllRead}
               </button>
-              <button type="button" aria-pressed={n.unreadOnly} onClick={() => n.setUnreadOnly(true)} className={n.unreadOnly ? tabOn : tabOff}>
-                {notificationText.filterUnread}
-              </button>
+              <div role="group" aria-label={notificationText.filterAriaLabel} className="flex gap-2">
+                <button type="button" aria-pressed={!n.unreadOnly} onClick={() => n.setUnreadOnly(false)} className={n.unreadOnly ? tabOff : tabOn}>
+                  {notificationText.filterAll}
+                </button>
+                <button type="button" aria-pressed={n.unreadOnly} onClick={() => n.setUnreadOnly(true)} className={n.unreadOnly ? tabOn : tabOff}>
+                  {notificationText.filterUnread}
+                </button>
+              </div>
             </div>
           )}
         </header>
+        {n.actionError && (
+          <p role="alert" className="text-sm text-rose-300">
+            {n.actionError}
+          </p>
+        )}
 
         {!n.loggedIn ? (
           <div className="bg-night-surface border border-night-border rounded-2xl p-10 text-center text-sm text-fog-sub">
@@ -69,7 +84,7 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = () => {
               className={`bg-night-surface border border-night-border rounded-2xl overflow-hidden transition-opacity ${n.loading ? 'opacity-60' : ''}`}
             >
               {n.items.map((item) => (
-                <NotificationRow key={item.id} notification={item} />
+                <NotificationRow key={item.id} notification={item} onOpen={n.open} onMarkRead={n.markRead} onDelete={n.remove} />
               ))}
             </ul>
             {n.pager.pages.length > 1 && (

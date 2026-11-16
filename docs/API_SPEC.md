@@ -493,6 +493,7 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 | GET | `/api/notifications/unread-count` | 안 읽은 알림 수 `{ count }` (헤더 배지 폴링용) |
 | PATCH | `/api/notifications/{notificationId}/read` | 알림 하나를 읽음 처리 → `204` (이미 읽은 알림도 `204`) |
 | PATCH | `/api/notifications/read-all` | 내 안 읽은 알림을 모두 읽음 처리 → `204` |
+| DELETE | `/api/notifications/{notificationId}` | 알림 하나를 삭제 → `204` (복구 불가. 없는 알림·이미 지운 알림은 `404`) |
 
 ```json
 {

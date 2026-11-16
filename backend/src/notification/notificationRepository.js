@@ -34,7 +34,13 @@ function createNotificationRepository(pool) {
     await pool.query('UPDATE notification SET is_read = TRUE WHERE member_id = ? AND is_read = FALSE', [memberId]);
   }
 
-  return { findPage, countUnread, markRead, markAllRead };
+  /** 내 알림 하나를 삭제합니다. 내 알림이 아니거나 없으면 false */
+  async function remove(memberId, notificationId) {
+    const [result] = await pool.query('DELETE FROM notification WHERE id = ? AND member_id = ?', [notificationId, memberId]);
+    return result.affectedRows > 0;
+  }
+
+  return { findPage, countUnread, markRead, markAllRead, remove };
 }
 
 module.exports = { createNotificationRepository };

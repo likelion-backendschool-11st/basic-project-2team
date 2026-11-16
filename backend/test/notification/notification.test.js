@@ -27,6 +27,11 @@ function createFakeRepository() {
       if (row) row.isRead = 1;
       return Boolean(row);
     },
+    async remove(memberId, id) {
+      const index = state.rows.findIndex((r) => r.id === id && r.memberId === memberId);
+      if (index >= 0) state.rows.splice(index, 1);
+      return index >= 0;
+    },
     async markAllRead(memberId) {
       mine(memberId).forEach((r) => {
         r.isRead = 1;
@@ -119,6 +124,23 @@ describe('notification inbox API', () => {
     assert.equal(repo.state.rows.find((r) => r.id === 4).isRead, 0);
   });
 
+  it('알림을 삭제하면 204 이고 목록·안 읽은 수에서 빠진다', async () => {
+    assert.equal((await call('DELETE', '/2')).status, 204);
+    const { data } = await json(await call('GET', ''));
+    assert.deepEqual(data.items.map((n) => n.id), [3, 1]);
+    assert.equal(data.unreadCount, 1);
+  });
+
+  it('남의 알림·없는 알림·이미 지운 알림·형식이 틀린 id 삭제는 404 이고 아무것도 지워지지 않는다', async () => {
+    const before = repo.state.rows.length;
+    for (const id of ['4', '999', 'abc', '0', '-1']) {
+      const res = await call('DELETE', `/${id}`);
+      assert.equal(res.status, 404, id);
+      assert.equal((await json(res)).error.code, 'NOTIFICATION_NOT_FOUND', id);
+    }
+    assert.equal(repo.state.rows.length, before);
+  });
+
   it('read-all 은 내 알림만 모두 읽음 처리한다', async () => {
     assert.equal((await call('PATCH', '/read-all')).status, 204);
     assert.deepEqual((await json(await call('GET', '/unread-count'))).data, { count: 0 });
@@ -126,7 +148,7 @@ describe('notification inbox API', () => {
   });
 
   it('로그인하지 않으면 모두 401', async () => {
-    for (const [method, path] of [['GET', ''], ['GET', '/unread-count'], ['PATCH', '/1/read'], ['PATCH', '/read-all']]) {
+    for (const [method, path] of [['GET', ''], ['GET', '/unread-count'], ['PATCH', '/1/read'], ['PATCH', '/read-all'], ['DELETE', '/1']]) {
       assert.equal((await call(method, path, null)).status, 401, `${method} ${path}`);
     }
   });
