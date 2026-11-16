@@ -369,6 +369,13 @@ describe('member login API', () => {
     assert.equal((await accessAsRefresh.json()).error.code, 'INVALID_REFRESH_TOKEN');
   });
 
+  it('만료된 Refresh Token 을 Access Token 자리에 쓰면 TOKEN_EXPIRED 가 아니라 UNAUTHORIZED', async () => {
+    const expiredRefresh = jwt.sign({ typ: 'refresh', exp: Math.floor(Date.now() / 1000) - 10 }, AUTH.jwtSecret, { subject: '1' });
+    const res = await request('/logout', {}, { Authorization: `Bearer ${expiredRefresh}` });
+    assert.equal(res.status, 401);
+    assert.equal((await res.json()).error.code, 'UNAUTHORIZED');
+  });
+
   it('refresh: 서명이 맞지 않는 Refresh Token 은 DB 에 같은 해시가 있어도 401', async () => {
     const forged = jwt.sign({ typ: 'refresh' }, 'other-secret', { subject: '1', expiresIn: 3600 });
     await repo.saveRefreshToken({

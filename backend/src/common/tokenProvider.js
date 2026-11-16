@@ -67,7 +67,9 @@ function createTokenProvider({ jwtSecret, accessTokenTtlSeconds, refreshTokenTtl
       return payload.sub;
     } catch (err) {
       const error = new Error(`invalid ${type} token`, { cause: err });
-      error.expired = err instanceof jwt.TokenExpiredError;
+      // jwt.verify 는 서명 다음에 만료를 보므로, 만료된 다른 종류의 토큰도 TokenExpiredError 가 됩니다.
+      // 종류가 다르면 만료가 아니라 잘못된 토큰으로 다룹니다 (재발급을 시도하게 만들지 않도록).
+      error.expired = err instanceof jwt.TokenExpiredError && jwt.decode(token)?.typ === type;
       throw error;
     }
   }
