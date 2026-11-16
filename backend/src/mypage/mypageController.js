@@ -27,6 +27,14 @@ function createMypageController(mypageService) {
     return sendSuccess(res, 200, await mypageService.getMemberProfile(memberId, req.auth?.memberId ?? null));
   }
 
+  async function listMemberPosts(req, res) {
+    return sendSuccess(res, 200, await mypageService.listMemberPosts(requireMemberIdParam(req), req.query));
+  }
+
+  async function getMannerHistory(req, res) {
+    return sendSuccess(res, 200, await mypageService.getMannerHistory(requireMemberIdParam(req), req.query));
+  }
+
   async function listMyPosts(req, res) {
     return sendSuccess(res, 200, await mypageService.listMyPosts(req.auth.memberId, req.query));
   }
@@ -61,6 +69,8 @@ function createMypageController(mypageService) {
     getMySummary,
     getMyLevel,
     getMemberProfile,
+    listMemberPosts,
+    getMannerHistory,
     listMyPosts,
     listMyApplications,
     listMyComments,

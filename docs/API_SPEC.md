@@ -812,6 +812,8 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 | GET | `/api/members/me/favorites` | 즐겨찾는 유저 목록 | 🔒 |
 | POST / DELETE | `/api/members/me/favorites/{memberId}` | 즐겨찾기 추가 / 해제 → `204` | 🔒 |
 | GET | `/api/members/{memberId}` | 회원 프로필 (로그인하면 `viewer` 포함) | |
+| GET | `/api/members/{memberId}/posts?page=&size=` | 그 회원이 쓴 공고 (삭제되지 않은 공고, 최신순). 아이템은 `/me/posts` 에서 `canComplete`·`review` 를 뺀 형태 | |
+| GET | `/api/members/{memberId}/manner-history?days=` | 최근 N일(기본 30, 최대 90, 가입한 지 N일이 안 됐으면 가입일부터) 매너 온도 변화 → `{ days, current, points: [{ date, temp, reviewCount }] }` | |
 | GET | `/api/rankings/manner?limit=` | 매너 랭킹 (메인 명예의 전당) | |
 
 구현: `backend/src/mypage/` (`/api/members` 에 마운트), 랭킹은 `backend/src/ranking/`
@@ -1102,3 +1104,5 @@ node -e "console.log(require('bcryptjs').hashSync('비밀번호', 10))"
 ```sql
 INSERT INTO admin_account (login_id, password_hash, name) VALUES ('master', '$2b$10$...', '관리자 마스터');
 ```
+
+**매너 온도 변화 (`/manner-history`)** — 온도 이력 테이블이 없어서 서버가 계산합니다. 현재 온도에서 기간 안에 받은 평가(`review`)를 거꾸로 빼 기간 시작 온도를 구하고, 그 평가를 시간순으로 다시 반영해 한국 시간(KST) 날짜별 하루 끝 온도를 만듭니다. `points` 는 기간의 모든 날짜를 오래된 순으로 담고(평가가 없던 날은 앞날 온도 그대로), `reviewCount` 는 그날 받은 평가 수입니다. 0.0·99.9℃ 상·하한에 닿은 구간은 거꾸로 빼기가 정확하지 않을 수 있습니다. 탈퇴·없는 회원은 404, `days` 범위 오류는 400.

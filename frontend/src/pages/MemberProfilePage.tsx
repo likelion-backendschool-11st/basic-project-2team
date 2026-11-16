@@ -2,6 +2,8 @@ import React, { useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toProfileSummary } from '../api/mypageApi';
 import ReportDialog from '../components/comments/ReportDialog';
+import MannerTempChart from '../components/mypage/MannerTempChart';
+import MemberPostsSection from '../components/mypage/MemberPostsSection';
 import ProfileSummaryCard from '../components/mypage/ProfileSummaryCard';
 import LoggedInLayout from '../components/user/LoggedInLayout';
 import Toast from '../components/ui/Toast';
@@ -76,6 +78,8 @@ export const MemberProfilePage: React.FC = () => {
                 </ul>
               )}
             </section>
+            <MannerTempChart memberId={profile.id} />
+            <MemberPostsSection memberId={profile.id} />
           </>
         ) : (
           <div className="bg-night-surface border border-night-borderLight rounded-2xl p-10 text-center text-sm text-slate-400">

@@ -2,8 +2,9 @@
 
 const { ApiError } = require('../common/ApiError');
 const { levelProgress } = require('../common/activityPoint');
-const { TOP_TAG_LIMIT, RECENT_RATING_LIMIT, mypageMessages } = require('./mypageConstants');
-const { parsePageQuery, parseApplicationQuery } = require('./mypageValidator');
+const { KST_OFFSET_HOURS, TOP_TAG_LIMIT, RECENT_RATING_LIMIT, mypageMessages } = require('./mypageConstants');
+const { RATING_DELTA_TENTHS, applyRatings } = require('../review/mannerTemp');
+const { parsePageQuery, parseApplicationQuery, parseHistoryQuery } = require('./mypageValidator');
 
 const WITHDRAWN = 'WITHDRAWN';
 const POST_STATUS_COMPLETED = 'COMPLETED';
@@ -188,6 +189,67 @@ function createMypageService({ mypageRepository, now = () => new Date() }) {
     return { ...profile, viewer };
   }
 
+  /** 탈퇴했거나 없는 회원이면 404 */
+  async function requireVisibleMember(memberId) {
+    const member = await mypageRepository.findMember(memberId);
+    if (!member || member.status === WITHDRAWN) throw memberNotFound();
+    return member;
+  }
+
+  /** GET /api/members/{memberId}/posts — 다른 회원이 쓴 공고 (로그인 없이 조회) */
+  async function listMemberPosts(memberId, query) {
+    await requireVisibleMember(memberId);
+    const paging = parsePageQuery(query);
+    const result = await mypageRepository.findMemberPostPage({ memberId, limit: paging.size, offset: (paging.page - 1) * paging.size });
+    return toPage(result, paging, (row) => ({
+      ...toPostSummary(row),
+      views: row.viewCount,
+      commentCount: row.commentCount,
+      createdAt: toIso(row.createdAt),
+    }));
+  }
+
+  /**
+   * GET /api/members/{memberId}/manner-history — 최근 N일(기본 30일, 한국 시간 날짜별) 매너 온도 변화.
+   * 온도 이력 테이블이 없어서, 현재 온도에서 기간 안에 받은 평가를 거꾸로 빼 기간 시작 직전 온도를 구한 뒤
+   * 그 평가를 시간순으로 다시 반영해 날짜별 하루 끝 온도를 만듭니다. 기간 안에 평가가 없으면 평평한 선이고,
+   가입한 지 days 일이 안 된 회원은 가입일부터 시작합니다.
+   */
+  async function getMannerHistory(memberId, query) {
+    const { days } = parseHistoryQuery(query);
+    const member = await requireVisibleMember(memberId);
+    const current = round1(member.mannerTemp);
+
+    const dayMs = 86_400_000;
+    const kstDate = (date) => new Date(date.getTime() + KST_OFFSET_HOURS * 3_600_000).toISOString().slice(0, 10);
+    const todayKst = kstDate(now());
+    const windowStart = kstDate(new Date(new Date(`${todayKst}T00:00:00Z`).getTime() - (days - 1) * dayMs));
+    // 가입한 지 days 일이 안 됐으면 가입일부터 (ISO 날짜 문자열은 사전순 비교가 날짜순)
+    const joinedDay = kstDate(new Date(member.createdAt));
+    const firstDay = joinedDay > windowStart ? joinedDay : windowStart;
+    const length = Math.round((new Date(`${todayKst}T00:00:00Z`) - new Date(`${firstDay}T00:00:00Z`)) / dayMs) + 1;
+    const since = new Date(new Date(`${firstDay}T00:00:00Z`).getTime() - KST_OFFSET_HOURS * 3_600_000);
+
+    const reviews = await mypageRepository.findRatingsSince(memberId, since);
+    const ratingsByDay = new Map();
+    for (const review of reviews) {
+      const key = kstDate(new Date(review.createdAt));
+      ratingsByDay.set(key, [...(ratingsByDay.get(key) ?? []), review.rating]);
+    }
+
+    // ponytail: 상·하한(0~99.9℃)에 닿은 구간은 거꾸로 빼기가 정확하지 않을 수 있습니다. 온도 이력 테이블을 두면 정확해집니다.
+    const deltaTenths = reviews.reduce((sum, r) => sum + RATING_DELTA_TENTHS[r.rating], 0);
+    let temp = Math.min(999, Math.max(0, Math.round(current * 10) - deltaTenths)) / 10;
+
+    const points = Array.from({ length }, (_, i) => {
+      const date = kstDate(new Date(new Date(`${firstDay}T00:00:00Z`).getTime() + i * dayMs));
+      const ratings = ratingsByDay.get(date) ?? [];
+      temp = applyRatings(temp, ratings);
+      return { date, temp, reviewCount: ratings.length };
+    });
+    return { days, current, points };
+  }
+
   /** GET /api/members/me/posts — 내가 작성한 공고 */
   async function listMyPosts(memberId, query) {
     const paging = parsePageQuery(query);
@@ -258,6 +320,8 @@ function createMypageService({ mypageRepository, now = () => new Date() }) {
     getMySummary,
     getMyLevel,
     getMemberProfile,
+    listMemberPosts,
+    getMannerHistory,
     listMyPosts,
     listMyApplications,
     listMyComments,
