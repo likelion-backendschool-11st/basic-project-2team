@@ -109,6 +109,7 @@ function createFakeRepository() {
       state.comments.find((x) => x.id === commentId).acceptedReplyId = replyId;
     },
     async updateCommentContent(commentId, content) {
+      for (const c of state.comments) if (c.acceptedReplyId === commentId) c.acceptedReplyId = null;
       state.comments.find((x) => x.id === commentId).content = content;
     },
     async deleteCommentWithReplies({ commentId, postId, deletedAt }) {
@@ -627,6 +628,21 @@ describe('댓글 API /api/posts/:postId/comments', () => {
       assert.equal((await accept(999)).status, 404);
       assert.equal((await accept('abc')).status, 404);
       assert.deepEqual(events.log, []);
+    });
+
+    it('채택된 답글을 작성자가 고치면 채택이 풀리고(응답도 accepted false), 다른 답글을 고쳐도 채택은 그대로다', async () => {
+      const { first, second } = thread();
+      await accept(second);
+      const other = await send('PATCH', `/api/comments/${first}`, { text: '다른 답글 수정' }, HOST_ID);
+      assert.equal(other.status, 200);
+      assert.equal((await replies()).acceptedReplyId, second);
+
+      const edited = await send('PATCH', `/api/comments/${second}`, { text: '채택 뒤에 내용을 바꿈' }, BOB);
+      assert.equal(edited.status, 200);
+      assert.equal(edited.body.data.accepted, false);
+      const item = await replies();
+      assert.equal(item.acceptedReplyId, null);
+      assert.deepEqual(item.replies.map((r) => r.accepted), [false, false]);
     });
 
     it('채택된 답글이 가려지거나 삭제되면 채택이 없는 것으로 내려간다', async () => {

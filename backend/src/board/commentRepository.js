@@ -146,9 +146,16 @@ function createCommentRepository(pool) {
     await pool.query('UPDATE comment SET accepted_reply_id = ? WHERE id = ?', [replyId, commentId]);
   }
 
-  /** 댓글 본문 수정 */
+  /**
+   * 댓글 본문 수정. 채택된 답글을 고치면 채택한 사람이 확인하지 못한 내용이 채택된 채로 남지 않도록 같은 트랜잭션에서 채택을 먼저 풉니다.
+   * @returns {Promise<boolean>} 채택이 풀렸으면 true
+   */
   async function updateCommentContent(commentId, content) {
-    await pool.query('UPDATE comment SET content = ? WHERE id = ?', [content, commentId]);
+    return inTransaction(async (connection) => {
+      const [cleared] = await connection.query('UPDATE comment SET accepted_reply_id = NULL WHERE accepted_reply_id = ?', [commentId]);
+      await connection.query('UPDATE comment SET content = ? WHERE id = ?', [content, commentId]);
+      return cleared.affectedRows > 0;
+    });
   }
 
   /**

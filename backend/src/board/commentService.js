@@ -172,7 +172,7 @@ function createCommentService({ commentRepository, postEvents = NO_EVENTS, now =
     }
     assertCanWrite(await commentRepository.findMemberStatus(memberId), now());
 
-    await commentRepository.updateCommentContent(commentId, text);
+    await commentRepository.updateCommentContent(commentId, text); // 채택된 답글이면 채택도 함께 풀림
     commentsChanged(comment.postId);
     return toComment(
       { ...comment, content: text },
@@ -180,7 +180,6 @@ function createCommentService({ commentRepository, postEvents = NO_EVENTS, now =
         viewerId: memberId,
         postAuthorId: comment.postAuthorId,
         parentAuthorId: comment.parentAuthorId ?? null,
-        accepted: comment.parentId !== null && comment.parentAcceptedReplyId === comment.id && comment.status === COMMENT_STATUS.visible,
       },
     );
   }
