@@ -75,8 +75,6 @@ export const notificationText = {
   empty: '받은 알림이 없습니다.',
   emptyUnread: '안 읽은 알림이 없습니다.',
   justNow: '방금 전',
-  loginRequired: '로그인 후 알림을 확인할 수 있습니다.',
-  goLogin: '로그인하러 가기',
   settings: '알림 설정',
   settingsTitle: '관심 게임 알림',
   settingsDesc: '관심 있는 게임(또는 레이드 등 상세 분류)의 새 공고가 올라오면 알림을 받습니다. 항목별로 켜고 끌 수 있습니다.',

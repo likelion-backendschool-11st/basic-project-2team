@@ -1,10 +1,8 @@
 import { useEffect, useRef, useState, type ChangeEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { deleteAvatar, getMe, uploadAvatar } from '../api/accountApi';
 import { updateStoredUser } from '../api/authApi';
 import { ApiRequestError, assetUrl, errorMessageOf } from '../api/http';
 import { avatarText } from '../data/accountData';
-import { ROUTES } from '../data/routes';
 
 export interface AccountProfile {
   readonly nickname: string;
@@ -17,22 +15,16 @@ export interface AccountProfile {
 
 /**
  * 계정 관리 화면 좌측 프로필 (GET /api/members/me)과 프로필 이미지 변경 (PUT·DELETE /api/members/me/avatar).
- * 로그인이 풀렸으면 로그인 화면으로 보냅니다.
+ * 로그인이 풀렸으면 로그인 안내 모달이 뜹니다(api/http.ts).
  */
 export function useAccountProfile() {
-  const navigate = useNavigate();
   const [profile, setProfile] = useState<AccountProfile | null>(null);
   const [uploading, setUploading] = useState(false);
   const [avatarError, setAvatarError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const goLoginIfExpired = (err: unknown) => {
-    if (err instanceof ApiRequestError && err.status === 401) {
-      navigate(ROUTES.login, { replace: true });
-      return true;
-    }
-    return false;
-  };
+  // 로그인이 풀렸으면(401) http.ts 가 로그인 안내 모달을 띄우므로 오류 문구는 따로 보여주지 않습니다.
+  const loginExpired = (err: unknown) => err instanceof ApiRequestError && err.status === 401;
 
   useEffect(() => {
     let cancelled = false;
@@ -47,13 +39,12 @@ export function useAccountProfile() {
         });
       })
       .catch((err: unknown) => {
-        if (cancelled) return;
-        if (err instanceof ApiRequestError && err.status === 401) navigate(ROUTES.login, { replace: true });
+        void err; // 로그인이 풀렸으면 http.ts 가 로그인 안내 모달을 띄웁니다.
       });
     return () => {
       cancelled = true;
     };
-  }, [navigate]);
+  }, []);
 
   /** 화면과 헤더 등에 저장된 로그인 정보의 프로필 이미지를 함께 바꿉니다. */
   const applyAvatar = (serverUrl: string | null) => {
@@ -80,7 +71,7 @@ export function useAccountProfile() {
       const { avatarUrl } = await uploadAvatar(file);
       applyAvatar(avatarUrl);
     } catch (err) {
-      if (!goLoginIfExpired(err)) setAvatarError(errorMessageOf(err, avatarText.failed));
+      if (!loginExpired(err)) setAvatarError(errorMessageOf(err, avatarText.failed));
     } finally {
       setUploading(false);
     }
@@ -94,7 +85,7 @@ export function useAccountProfile() {
       await deleteAvatar();
       applyAvatar(null);
     } catch (err) {
-      if (!goLoginIfExpired(err)) setAvatarError(errorMessageOf(err, avatarText.failed));
+      if (!loginExpired(err)) setAvatarError(errorMessageOf(err, avatarText.failed));
     } finally {
       setUploading(false);
     }

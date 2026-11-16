@@ -1,11 +1,9 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
 import LoggedInLayout from '../components/user/LoggedInLayout';
 import Pagination from '../components/board/Pagination';
 import NotificationRow from '../components/notification/NotificationRow';
 import NotificationSettingsPanel from '../components/notification/NotificationSettingsPanel';
 import { notificationText } from '../data/notificationData';
-import { ROUTES } from '../data/routes';
 import { useNotifications } from '../hooks/useNotifications';
 
 interface NotificationsPageProps {
@@ -70,14 +68,7 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = () => {
           </p>
         )}
 
-        {!n.loggedIn ? (
-          <div className="bg-night-surface border border-night-border rounded-2xl p-10 text-center text-sm text-fog-sub">
-            {notificationText.loginRequired}
-            <Link to={ROUTES.login} className="ml-3 text-mercury-light font-semibold hover:underline">
-              {notificationText.goLogin}
-            </Link>
-          </div>
-        ) : n.error ? (
+        {n.error ? (
           <div role="alert" className="bg-night-surface border border-night-border rounded-2xl p-10 text-center text-sm text-rose-300">
             {n.error}
             <button type="button" onClick={n.reload} className="ml-3 text-mercury-light font-semibold hover:underline">

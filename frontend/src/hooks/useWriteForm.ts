@@ -136,8 +136,8 @@ export function useWriteForm(postId?: string) {
       const saved = await saveDraftApi(draft);
       setSavedAt(clock(new Date(saved.savedAt)));
       toast.show('임시저장 되었습니다.');
-    } catch (err) {
-      toast.show(err instanceof ApiRequestError && err.status === 401 ? writeText.draftNeedLogin : writeText.draftSaveFailed);
+    } catch {
+      toast.show(writeText.draftSaveFailed);
     }
   };
 

@@ -62,16 +62,12 @@ export function useProfileForm() {
       })
       .catch((err: unknown) => {
         if (cancelled) return;
-        if (err instanceof ApiRequestError && err.status === 401) {
-          navigate(ROUTES.login, { replace: true });
-          return;
-        }
         setLoadError(errorMessageOf(err, profileText.loadFailed));
       });
     return () => {
       cancelled = true;
     };
-  }, [navigate]);
+  }, []);
 
   const onNicknameChange = (e: ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value.slice(0, profileText.maxNickname);

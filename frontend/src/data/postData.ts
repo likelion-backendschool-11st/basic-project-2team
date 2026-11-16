@@ -104,7 +104,6 @@ export const postText = {
   deleted: '공고를 삭제했습니다.',
   followAdded: '작성자를 즐겨찾기에 추가했습니다.',
   followRemoved: '즐겨찾기를 해제했습니다.',
-  loginRequired: '로그인 후 이용할 수 있습니다.',
   applySuccess: '참가 신청이 완료되었습니다.',
   applyCanceled: '참가 신청을 취소했습니다.',
   leftParty: '파티에서 탈퇴했습니다.',
