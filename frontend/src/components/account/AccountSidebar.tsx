@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { accountNav, accountNotes, type AccountNavItem } from '../../data/accountData';
+import { accountNav, accountNotes, avatarText, type AccountNavItem } from '../../data/accountData';
 import { useAccountProfile } from '../../hooks/useAccountProfile';
 
 interface AccountSidebarProps {
@@ -16,21 +16,52 @@ const noteTone = {
 export const AccountSidebar: React.FC<AccountSidebarProps> = ({ active }) => {
   const note = accountNotes[active];
   const tone = noteTone[note.tone];
-  const profile = useAccountProfile();
+  const { profile, uploading, avatarError, fileInputRef, pickAvatar, onAvatarFileChange, resetAvatar } = useAccountProfile();
   return (
     <aside className="w-full lg:w-72 shrink-0 flex flex-col gap-4">
       <div className="bg-night-surface border border-night-borderLight rounded-3xl p-5 shadow-card-subtle">
         <div className="flex flex-col items-center gap-2 pb-5 border-b border-night-borderLight">
           <div className="relative">
-            <div className="w-20 h-20 rounded-2xl border-2 border-mercury bg-night-base flex items-center justify-center overflow-hidden text-3xl font-bold text-mercury-light">
-              {profile?.avatarUrl ? <img src={profile.avatarUrl} alt="" className="w-full h-full object-cover" /> : profile?.initial}
-            </div>
-            <span className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-night-card border border-night-borderLight flex items-center justify-center text-fog-sub text-[11px]">
+            <button
+              type="button"
+              onClick={pickAvatar}
+              disabled={!profile || uploading}
+              aria-label={avatarText.changeLabel}
+              title={avatarText.changeLabel}
+              className="group block w-20 h-20 rounded-2xl border-2 border-mercury bg-night-base overflow-hidden disabled:cursor-wait"
+            >
+              <span className="w-full h-full flex items-center justify-center text-3xl font-bold text-mercury-light">
+                {profile?.avatarUrl ? <img src={profile.avatarUrl} alt="" className="w-full h-full object-cover" /> : profile?.initial}
+              </span>
+              {uploading && (
+                <span className="absolute inset-0 rounded-2xl bg-night-base/70 flex items-center justify-center text-mercury-light">
+                  <i className="fa-solid fa-spinner fa-spin" />
+                </span>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={pickAvatar}
+              disabled={!profile || uploading}
+              aria-label={avatarText.changeLabel}
+              className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-night-card border border-night-borderLight flex items-center justify-center text-fog-sub text-[11px] hover:text-white hover:border-mercury transition-colors"
+            >
               <i className="fa-solid fa-camera" />
-            </span>
+            </button>
+            <input ref={fileInputRef} type="file" accept={avatarText.accept} onChange={onAvatarFileChange} className="hidden" />
           </div>
           <div className="min-h-6 text-base font-bold text-white">{profile?.nickname}</div>
           <div className="min-h-4 text-xs text-fog-muted font-mono">{profile?.userId}</div>
+          {profile?.avatarUrl && (
+            <button type="button" onClick={resetAvatar} disabled={uploading} className="text-[11px] text-fog-muted hover:text-white underline-offset-2 hover:underline">
+              {avatarText.resetLabel}
+            </button>
+          )}
+          {avatarError && (
+            <p role="alert" className="text-[11px] text-rose-300 text-center">
+              {avatarError}
+            </p>
+          )}
         </div>
         <nav aria-label="계정 관리" className="pt-4 flex flex-col gap-1.5">
           {accountNav.map((item) => {

@@ -11,7 +11,7 @@ const {
   SANCTION_TYPES,
   accountMessages,
 } = require('./accountConstants');
-const { validateProfileUpdate, validatePasswordChange, validateWithdraw } = require('./accountValidator');
+const { validateProfileUpdate, validatePasswordChange, validateWithdraw, validateAvatar } = require('./accountValidator');
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -71,11 +71,21 @@ function planWithdrawal(sanctionTypes, now) {
  * 내 정보 조회 · 프로필 수정 · 비밀번호 변경 · 회원 탈퇴 비즈니스 로직.
  * @param {{
  *   accountRepository: ReturnType<typeof import('./accountRepository').createAccountRepository>,
+ *   avatarStorage: ReturnType<typeof import('./avatarStorage').createAvatarStorage>,
  *   bcryptRounds: number,
  *   now?: () => Date,
  * }} deps
  */
-function createAccountService({ accountRepository, bcryptRounds, now = () => new Date() }) {
+function createAccountService({ accountRepository, avatarStorage, bcryptRounds, now = () => new Date() }) {
+  /** 더 쓰지 않는 이미지 파일 정리. 실패해도(파일 잠김 등) 요청은 성공으로 두고 로그만 남깁니다. */
+  async function discardAvatarFile(avatarUrl) {
+    try {
+      await avatarStorage.remove(avatarUrl);
+    } catch (err) {
+      console.error('프로필 이미지 파일을 지우지 못했습니다.', avatarUrl, err);
+    }
+  }
+
   /** 토큰은 유효하지만 탈퇴한(또는 없는) 회원이면 401 */
   async function findActiveAccount(memberId) {
     const account = await accountRepository.findAccount(memberId);
@@ -165,9 +175,38 @@ function createAccountService({ accountRepository, bcryptRounds, now = () => new
       now: current,
     });
     if (!withdrawn) throw unauthorized();
+    await discardAvatarFile(account.avatarUrl);
   }
 
-  return { getMe, updateProfile, changePassword, withdraw };
+  /** PUT /api/members/me/avatar — 새 이미지를 저장하고 주소를 바꾼 뒤, 이전 이미지 파일을 지웁니다. */
+  async function updateAvatar(memberId, body) {
+    const { buffer, extension } = validateAvatar(body);
+    const account = await findActiveAccount(memberId);
+    const avatarUrl = await avatarStorage.save(memberId, buffer, extension);
+    let updated;
+    try {
+      updated = await accountRepository.updateAvatar(memberId, avatarUrl);
+    } catch (err) {
+      await discardAvatarFile(avatarUrl);
+      throw err;
+    }
+    if (!updated) {
+      await discardAvatarFile(avatarUrl);
+      throw unauthorized();
+    }
+    await discardAvatarFile(account.avatarUrl);
+    return { avatarUrl };
+  }
+
+  /** DELETE /api/members/me/avatar — 기본 이미지로 되돌립니다. 이미 기본 이미지면 아무것도 하지 않습니다. */
+  async function deleteAvatar(memberId) {
+    const account = await findActiveAccount(memberId);
+    if (!account.avatarUrl) return;
+    if (!(await accountRepository.updateAvatar(memberId, null))) throw unauthorized();
+    await discardAvatarFile(account.avatarUrl);
+  }
+
+  return { getMe, updateProfile, changePassword, withdraw, updateAvatar, deleteAvatar };
 }
 
 module.exports = { createAccountService };

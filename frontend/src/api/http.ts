@@ -4,6 +4,12 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080
 /** API 경로를 전체 주소로 바꿉니다(EventSource 처럼 fetch 를 거치지 않는 요청용). */
 export const apiUrl = (path: string) => `${API_BASE_URL}${path}`;
 
+/**
+ * 서버가 준 파일 주소(예: 프로필 이미지 `/uploads/avatars/…`)를 <img src> 에 쓸 수 있는 주소로 바꿉니다.
+ * `/` 로 시작하는 서버 경로만 API 서버 주소를 붙이고, 전체 URL·null 은 그대로 둡니다.
+ */
+export const assetUrl = (url: string | null) => (url && url.startsWith('/') ? apiUrl(url) : url);
+
 /** 회원 로그인 정보를 저장하는 localStorage 키와, 로그인 상태가 바뀌었을 때 보내는 이벤트 이름 */
 export const ACCESS_TOKEN_KEY = 'accessToken';
 export const REFRESH_TOKEN_KEY = 'refreshToken';
@@ -78,12 +84,17 @@ export interface RequestOptions {
   readonly tokenKey?: string;
 }
 
+/** 파일(Blob)은 그 형식 그대로, 나머지는 JSON 으로 보냅니다. */
 const send = async (method: string, path: string, body: unknown, token: string | null) => {
+  const isFile = body instanceof Blob;
   try {
     return await fetch(`${API_BASE_URL}${path}`, {
       method,
-      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-      body: body === undefined ? undefined : JSON.stringify(body),
+      headers: {
+        'Content-Type': isFile ? body.type : 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: body === undefined ? undefined : isFile ? body : JSON.stringify(body),
     });
   } catch {
     throw new ApiRequestError(0, 'NETWORK_ERROR', '서버에 연결할 수 없습니다. 잠시 후 다시 시도해주세요.');
@@ -128,6 +139,7 @@ const refreshOnce = () => (refreshInFlight ??= refreshAccessToken().finally(() =
 
 /**
  * JSON 요청을 보내고 `data` 를 돌려줍니다. 실패하면 ApiRequestError 를 던집니다. 204 응답이면 undefined 입니다.
+ * body 가 File·Blob 이면 JSON 대신 파일 바이트를 그 Content-Type 으로 보냅니다(프로필 이미지 업로드).
  * 회원 Access Token 이 만료(401 TOKEN_EXPIRED)되면 Refresh Token 으로 재발급받아 원래 요청을 한 번 다시 보냅니다.
  */
 export async function request<T>(method: string, path: string, body?: unknown, { tokenKey = ACCESS_TOKEN_KEY }: RequestOptions = {}): Promise<T> {

@@ -26,6 +26,11 @@ const SANCTION_REJOIN_BLOCK_MONTHS = 6;
 const PERMANENT_BLOCK_UNTIL = new Date('9999-12-31T00:00:00Z');
 const SANCTION_TYPES = Object.freeze({ warning: 'WARNING', suspend: 'SUSPEND', ban: 'BAN' });
 
+/** 프로필 이미지: 최대 크기, 받는 Content-Type, 공개 주소 접두사 (app.js 가 이 경로로 파일을 서빙) */
+const AVATAR_MAX_BYTES = 2 * 1024 * 1024;
+const AVATAR_CONTENT_TYPES = Object.freeze(['image/png', 'image/jpeg', 'image/gif', 'image/webp']);
+const AVATAR_URL_PREFIX = '/uploads/avatars/';
+
 const accountMessages = Object.freeze({
   invalidInput: '입력값을 확인해주세요.',
   unauthorized: '로그인이 필요합니다.',
@@ -41,6 +46,8 @@ const accountMessages = Object.freeze({
   samePassword: '현재 비밀번호와 다른 비밀번호를 입력해주세요.',
   reasonInvalid: `탈퇴 사유는 ${WITHDRAW_REASON_MAX_LENGTH}자 이하로 입력해주세요.`,
   activePartyExists: '진행 중인 파티가 있어 탈퇴할 수 없습니다. 모집 중인 공고를 마감·완료하거나 참여 중인 파티를 정리한 뒤 다시 시도해주세요.',
+  avatarInvalid: 'PNG, JPG, GIF, WEBP 이미지 파일만 올릴 수 있습니다.',
+  avatarTooLarge: `프로필 이미지는 ${AVATAR_MAX_BYTES / 1024 / 1024}MB 이하만 올릴 수 있습니다.`,
 });
 
 module.exports = {
@@ -54,5 +61,8 @@ module.exports = {
   SANCTION_REJOIN_BLOCK_MONTHS,
   PERMANENT_BLOCK_UNTIL,
   SANCTION_TYPES,
+  AVATAR_MAX_BYTES,
+  AVATAR_CONTENT_TYPES,
+  AVATAR_URL_PREFIX,
   accountMessages,
 };

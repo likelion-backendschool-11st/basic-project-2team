@@ -27,3 +27,6 @@ pnpm-debug.log*
 *.tsbuildinfo
 .cache/
 .eslintcache
+
+# uploaded files (profile images)
+backend/uploads/

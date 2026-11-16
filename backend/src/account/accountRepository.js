@@ -212,9 +212,19 @@ function createAccountRepository(pool) {
     });
   }
 
+  /** 프로필 이미지 주소를 바꿉니다 (null 이면 기본 이미지). 탈퇴한 회원이면 바꾸지 않고 false */
+  async function updateAvatar(memberId, avatarUrl) {
+    const [result] = await pool.query("UPDATE member SET avatar_url = ? WHERE id = ? AND status <> 'WITHDRAWN'", [
+      avatarUrl,
+      memberId,
+    ]);
+    return result.affectedRows > 0;
+  }
+
   return {
     findAccount,
     findGameProfiles,
+    updateAvatar,
     findGameIdsByCodes,
     existsNicknameOfOther,
     updateProfile,

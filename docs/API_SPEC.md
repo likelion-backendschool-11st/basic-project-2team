@@ -54,6 +54,8 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 | PATCH | `/api/members/me` | 프로필 수정 (닉네임, 소개, 나이대·공개 여부, 선호 게임·대표 게임, 플레이 스타일) | 🔒 |
 | PATCH | `/api/members/me/password` | 비밀번호 변경 `{ currentPassword, newPassword }` → `204` | 🔒 |
 | DELETE | `/api/members/me` | 회원 탈퇴 `{ password, reason? }` → `204` | 🔒 |
+| PUT | `/api/members/me/avatar` | 프로필 이미지 변경 (본문: 이미지 바이트, 2MB 이하) → `{ avatarUrl }` | 🔒 |
+| DELETE | `/api/members/me/avatar` | 프로필 이미지 삭제(기본 이미지로) → `204` | 🔒 |
 | GET | `/api/members/{memberId}` | 다른 회원 프로필 (닉네임, 레벨, 매너 온도, 상위 태그) — 응답은 8절 | |
 
 **회원가입 요청 예시**
@@ -271,7 +273,16 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 | `playStyle` | `hard` · `casual` · `newbie` · `any` (공고와 같은 값) 또는 `null`. 선호 게임 전체에 적용 |
 
 - `mainGame`·`playStyle` 은 `games` 와 함께 보내야 합니다(없으면 400 `games`).
-- 이메일·휴대폰 번호·아바타 변경은 이번 범위에 없습니다.
+- 이메일·휴대폰 번호 변경은 이번 범위에 없습니다. 프로필 이미지는 아래 「프로필 이미지 변경」으로 바꿉니다.
+
+**프로필 이미지 변경 (`PUT /api/members/me/avatar`)** → `200 { "avatarUrl": "/uploads/avatars/1-….png" }`
+
+- 본문은 JSON 이 아니라 **이미지 파일 바이트 그대로** 보냅니다. `Content-Type` 은 `image/png` · `image/jpeg` · `image/gif` · `image/webp` 중 하나, 최대 2MB.
+- 형식은 파일 앞부분(시그니처)으로 판별하고 확장자도 그것으로 정합니다. SVG 등 다른 형식은 400 `INVALID_IMAGE`, 2MB 초과는 413 `PAYLOAD_TOO_LARGE`.
+- 파일은 서버 폴더(`UPLOAD_DIR`, 기본 `backend/uploads`)의 `avatars/` 에 저장하고, `avatarUrl` 은 API 서버 기준 경로(`/uploads/avatars/{파일}`)입니다. 화면에서는 API 서버 주소를 붙여 씁니다(프론트 `assetUrl`).
+- 새 이미지로 바꾸면 이전 파일을 지웁니다.
+
+**프로필 이미지 삭제 (`DELETE /api/members/me/avatar`)** → `204` — 기본 이미지(`avatarUrl: null`)로 되돌리고 파일을 지웁니다. 이미 기본이면 그대로 `204`.
 
 **비밀번호 변경 (`PATCH /api/members/me/password`)** → `204`
 
@@ -284,6 +295,7 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
   - `member`: `status = WITHDRAWN`, 아이디·닉네임·이메일·휴대폰·이름·비밀번호·소개·나이대·아바타를 `NULL` 로 비움. 공고·댓글·리뷰는 남고 "탈퇴한 회원"으로 표시
   - `member_withdrawal`: 휴대폰·이메일의 SHA-256 해시, 사유, 재가입 제한, 파기 예정일 보관. 제재 이력 없음 → 제한 없음·30일 뒤 파기 / 경고·기간 정지 이력 → 6개월 재가입 제한 / 영구 정지 이력 → 영구 제한 (6절 결정 사항 10·11)
   - 대기 중(`PENDING`) 신청은 `CANCELED`, 게이머 프로필·즐겨찾기(양방향)·스크랩·임시저장·알림 설정 삭제, 모든 Refresh Token·재설정 토큰 폐기
+  - 트랜잭션이 끝나면 업로드한 프로필 이미지 파일도 지웁니다.
 
 **내 계정 관리 에러 코드**
 
@@ -292,7 +304,9 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 | 400 | `INVALID_INPUT` | 입력 규칙 위반 (`fields` 에 필드별 오류) |
 | 400 | `INVALID_PASSWORD` | 비밀번호 변경의 현재 비밀번호, 탈퇴의 비밀번호가 틀림 |
 | 400 | `SAME_PASSWORD` | 새 비밀번호가 지금 비밀번호와 같음 |
+| 400 | `INVALID_IMAGE` | 프로필 이미지가 PNG·JPG·GIF·WEBP 가 아니거나 비어 있음 |
 | 401 | `UNAUTHORIZED` · `TOKEN_EXPIRED` | 토큰 없음·만료, 탈퇴한 회원 |
+| 413 | `PAYLOAD_TOO_LARGE` | 프로필 이미지가 2MB 초과 |
 | 409 | `DUPLICATE_NICKNAME` | 다른 회원이 쓰는 닉네임 |
 | 409 | `ACTIVE_PARTY_EXISTS` | 진행 중인 파티가 있어 탈퇴 불가 |
 
