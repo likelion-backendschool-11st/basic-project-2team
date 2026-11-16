@@ -323,7 +323,7 @@ describe('마이페이지 API (/api/members)', () => {
       );
     });
 
-    it('출발 시간 전이면 canComplete 가 false 다 (일정 미정은 시간 조건 없음)', async () => {
+    it('출발 시간과 상관없이 canComplete 가 true 다', async () => {
       const base = { ...repo.state.posts[0], postStatus: 'OPEN', reviewTargetCount: 3, reviewedCount: 0 };
       repo.state.posts = [
         { ...base, postId: 1, scheduleAt: new Date('2026-11-17T00:00:00Z') },
@@ -331,7 +331,7 @@ describe('마이페이지 API (/api/members)', () => {
         { ...base, postId: 3, scheduleAt: null },
       ];
       const { data } = await (await get('/me/posts', as(ME))).json();
-      assert.deepEqual(data.items.map((item) => item.canComplete), [false, true, true]);
+      assert.deepEqual(data.items.map((item) => item.canComplete), [true, true, true]);
     });
 
     it('page·size 로 offset 을 계산한다', async () => {

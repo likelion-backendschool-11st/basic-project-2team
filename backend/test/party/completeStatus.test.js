@@ -71,10 +71,10 @@ describe('partyRepository.changePostStatus — 활동 완료 트랜잭션', () =
     assert.equal(wrote(fake.log), false);
   });
 
-  it('출발 전이면 NOT_STARTED 이고 점수도 지급하지 않는다', async () => {
+  it('출발 전이어도 완료 처리되고 점수를 지급한다', async () => {
     const fake = createFakePool({ scheduleAt: new Date('2026-11-15T00:00:00Z') });
-    assert.equal((await change(fake.pool, 'COMPLETED')).result, 'NOT_STARTED');
-    assert.equal(wrote(fake.log) || awards(fake.log).length > 0, false);
+    assert.equal((await change(fake.pool, 'COMPLETED')).result, 'OK');
+    assert.equal(awards(fake.log).length, 2);
   });
 
   it('이미 완료된 공고는 COMPLETED, 같은 상태면 OK (점수 중복 지급 없음)', async () => {

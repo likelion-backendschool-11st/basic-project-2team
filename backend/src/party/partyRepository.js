@@ -191,9 +191,9 @@ function createPartyRepository(pool) {
 
   /**
    * 작성자가 공고의 모집 상태를 바꿉니다. 완료(COMPLETED)된 공고는 되돌릴 수 없고, 정원이 찬 공고는 다시 열 수 없습니다.
-   * 완료 처리는 승인된 파티원(탈퇴 제외)이 있고 출발 시간이 지난 뒤(일정 미정이면 제외)에만 가능합니다.
+   * 완료 처리는 승인된 파티원(탈퇴 제외)이 있으면 출발 시간과 상관없이 가능합니다.
    * 완료하면 같은 트랜잭션에서 파티장과 승인된 파티원에게 활동 점수(PARTY_COMPLETE)를 지급합니다.
-   * @returns {Promise<{ result: 'OK' | 'NOT_FOUND' | 'COMPLETED' | 'FULL' | 'NOT_PAUSABLE' | 'NO_MEMBERS' | 'NOT_STARTED', status?: string, current?: number, max?: number }>}
+   * @returns {Promise<{ result: 'OK' | 'NOT_FOUND' | 'COMPLETED' | 'FULL' | 'NOT_PAUSABLE' | 'NO_MEMBERS', status?: string, current?: number, max?: number }>}
    */
   async function changePostStatus({ postId, status, now, notice }) {
     return inTransaction(async (connection) => {
@@ -212,7 +212,6 @@ function createPartyRepository(pool) {
       if (status === POST_STATUS.completed) {
         [accepted] = await connection.query(ACCEPTED_MEMBERS_SQL, [postId]);
         if (accepted.length === 0) return { result: 'NO_MEMBERS' };
-        if (post.scheduleAt && new Date(post.scheduleAt) > now) return { result: 'NOT_STARTED' };
       }
       await connection.query('UPDATE post SET status = ? WHERE id = ?', [status, postId]);
       if (status === POST_STATUS.completed) {

@@ -46,16 +46,13 @@ const toPostSummary = (row) => ({
   status: row.postStatus,
 });
 
-/** 출발 시간이 지났거나(일정 미정 포함) 완료 처리할 수 있는 시점인지 */
-const hasStarted = (row, now) => !row.scheduleAt || new Date(row.scheduleAt) <= now;
-
-const toMyPost = (now) => (row) => ({
+const toMyPost = (row) => ({
   ...toPostSummary(row),
   views: row.viewCount,
   commentCount: row.commentCount,
   createdAt: toIso(row.createdAt),
-  // 「활동 완료」 버튼: 아직 완료 전이고 승인된 파티원이 있으며 출발 시간이 지났을 때 (PATCH /api/posts/{postId}/status 의 완료 조건과 같음)
-  canComplete: COMPLETABLE_POST_STATUSES.includes(row.postStatus) && Number(row.reviewTargetCount) > 0 && hasStarted(row, now),
+  // 「활동 완료」 버튼: 아직 완료 전이고 승인된 파티원이 있을 때 (출발 시간과 무관, PATCH /api/posts/{postId}/status 의 완료 조건과 같음)
+  canComplete: COMPLETABLE_POST_STATUSES.includes(row.postStatus) && Number(row.reviewTargetCount) > 0,
   review: toReviewProgress(row, row.postStatus === POST_STATUS_COMPLETED),
 });
 
@@ -185,7 +182,7 @@ function createMypageService({ mypageRepository, now = () => new Date() }) {
       limit: paging.size,
       offset: (paging.page - 1) * paging.size,
     });
-    return toPage(result, paging, toMyPost(now()));
+    return toPage(result, paging, toMyPost);
   }
 
   /** GET /api/members/me/applications — 내가 신청한 공고 (신청 상태 포함) */
