@@ -228,7 +228,7 @@ function createAdminRepository(pool) {
     // ───────── 공고
 
     const postListSelect = `p.id, p.created_at AS createdAt, p.category_code AS category, g.name AS gameName,
-      p.game_id AS gameId, g.code AS gameCode, p.party_type AS partyType, gc.name AS contentName, p.title,
+      p.game_id AS gameId, g.code AS gameCode, p.party_type AS partyType, COALESCE(gc.name, p.custom_detail) AS contentName, p.title,
       p.author_id AS authorId,
       m.nickname AS authorNickname, p.current_count AS currentCount, p.headcount, p.status,
       (SELECT COUNT(*) FROM report r WHERE r.target_type = 'POST' AND r.target_id = p.id) AS reportCount`;

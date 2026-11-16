@@ -105,6 +105,30 @@ describe('POST /api/posts', () => {
     assert.ok(message.length <= 200);
   });
 
+  it('상세 분류를 직접 입력하면 game_content 없이 그 글자를 저장한다 (공백은 다듬음)', async () => {
+    const { detail: _omit, ...rest } = validBody();
+    const res = await post({ ...rest, headcount: 12, customDetail: '  신규 레이드 하드  ' });
+    assert.equal(res.status, 201);
+    const saved = repo.state.posts[0];
+    assert.equal(saved.gameContentId, null);
+    assert.equal(saved.customDetail, '신규 레이드 하드');
+  });
+
+  it('직접 입력과 목록 선택(detail)을 함께 보내거나 50자를 넘기면 400 (customDetail)', async () => {
+    for (const body of [{ ...validBody(), customDetail: '직접' }, { ...validBody(), detail: undefined, customDetail: '가'.repeat(51) }, { ...validBody(), detail: undefined, customDetail: 3 }]) {
+      const res = await post(body);
+      assert.equal(res.status, 400);
+      assert.deepEqual((await res.json()).error.fields.map((f) => f.field), ['customDetail']);
+    }
+    assert.equal(repo.state.posts.length, 0);
+  });
+
+  it('직접 입력은 목록 선택 상한(maxHeadcount)이 없고 전체 상한(16)만 따른다', async () => {
+    const { detail: _omit, ...rest } = validBody();
+    assert.equal((await post({ ...rest, headcount: 16, customDetail: '아무거나' })).status, 201);
+    assert.equal((await post({ ...rest, headcount: 17, customDetail: '아무거나' })).status, 400);
+  });
+
   it('일정 미정이면 schedule 없이도 저장된다', async () => {
     const { schedule: _omit, ...rest } = validBody();
     const res = await post({ ...rest, scheduleTbd: true });

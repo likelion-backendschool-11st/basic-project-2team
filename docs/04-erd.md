@@ -240,6 +240,7 @@ erDiagram
         varchar(20) category_code FK
         bigint game_id FK
         bigint game_content_id FK "NULL 허용"
+        varchar custom_detail "상세 분류 직접 입력, NULL 허용"
         varchar(20) party_type
         varchar(100) title "2~100자"
         text body "마크다운"

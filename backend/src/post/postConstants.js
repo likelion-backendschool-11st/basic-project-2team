@@ -11,6 +11,8 @@ const MAX_TAGS = 5;
 const TAG_MAX_LENGTH = 20;
 
 /** 모집 유형은 game_content.content_type(RANK/NORMAL/DUNGEON/RAID)을 소문자로 쓴 값, 플레이 스타일은 frontend writeData.ts 기준 */
+/** 상세 분류 직접 입력(customDetail) 최대 글자 수 (post.custom_detail VARCHAR(50)) */
+const DETAIL_CUSTOM_MAX_LENGTH = 50;
 const PARTY_TYPES = Object.freeze(['raid', 'dungeon', 'rank', 'normal']);
 const PLAY_STYLES = Object.freeze(['hard', 'casual', 'newbie', 'any']);
 
@@ -22,6 +24,7 @@ const DRAFT_STRING_FIELDS = Object.freeze({
   game: 50,
   type: 20,
   detail: 50,
+  customDetail: DETAIL_CUSTOM_MAX_LENGTH,
   style: 20,
   date: 10,
   time: 5,
@@ -61,6 +64,8 @@ const postMessages = Object.freeze({
   gameRequired: '게임을 선택해주세요.',
   typeInvalid: `모집 유형은 ${PARTY_TYPES.join(', ')} 중 하나여야 합니다.`,
   detailInvalid: '상세 분류 형식이 올바르지 않습니다.',
+  customDetailInvalid: `직접 입력한 상세 분류는 ${DETAIL_CUSTOM_MAX_LENGTH}자 이하로 입력해주세요.`,
+  detailAndCustom: '상세 분류는 목록에서 고르거나 직접 입력 중 하나만 보낼 수 있습니다.',
   headcountInvalid: `모집 인원은 ${HEADCOUNT_MIN}~${HEADCOUNT_MAX}명의 정수여야 합니다.`,
   styleInvalid: `플레이 스타일은 ${PLAY_STYLES.join(', ')} 중 하나여야 합니다.`,
   scheduleRequired: '플레이 일정을 입력하거나 일정 미정을 선택해주세요.',
@@ -78,6 +83,7 @@ const postMessages = Object.freeze({
 module.exports = {
   TITLE_MIN_LENGTH,
   TITLE_MAX_LENGTH,
+  DETAIL_CUSTOM_MAX_LENGTH,
   BODY_MAX_LENGTH,
   PARTY_NAME_MAX_LENGTH,
   HEADCOUNT_MIN,

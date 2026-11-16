@@ -87,14 +87,15 @@ function createPostRepository(pool) {
     try {
       await connection.beginTransaction();
       const [result] = await connection.query(
-        `INSERT INTO post (author_id, category_code, game_id, game_content_id, party_type, title, body,
+        `INSERT INTO post (author_id, category_code, game_id, game_content_id, custom_detail, party_type, title, body,
                            party_name, play_style, headcount, schedule_at, voice_required)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           post.authorId,
           post.categoryCode,
           post.gameId,
           post.gameContentId,
+          post.customDetail,
           post.partyType,
           post.title,
           post.body,
@@ -162,7 +163,7 @@ function createPostRepository(pool) {
     try {
       await connection.beginTransaction();
       const [[row]] = await connection.query(
-        `SELECT status, current_count AS currentCount, schedule_at AS scheduleAt, game_id AS gameId, game_content_id AS gameContentId FROM post
+        `SELECT status, current_count AS currentCount, schedule_at AS scheduleAt, game_id AS gameId, game_content_id AS gameContentId, custom_detail AS customDetail FROM post
           WHERE id = ? AND deleted_at IS NULL AND status <> '${POST_STATUS_DELETED}' FOR UPDATE`,
         [postId],
       );
@@ -180,13 +181,14 @@ function createPostRepository(pool) {
       }
       const status = row.status === POST_STATUS_OPEN && post.headcount === row.currentCount ? POST_STATUS_CLOSED : row.status;
       await connection.query(
-        `UPDATE post SET category_code = ?, game_id = ?, game_content_id = ?, party_type = ?, title = ?, body = ?,
+        `UPDATE post SET category_code = ?, game_id = ?, game_content_id = ?, custom_detail = ?, party_type = ?, title = ?, body = ?,
                          party_name = ?, play_style = ?, headcount = ?, schedule_at = ?, voice_required = ?, status = ?
           WHERE id = ?`,
         [
           post.categoryCode,
           post.gameId,
           post.gameContentId,
+          post.customDetail,
           post.partyType,
           post.title,
           post.body,
@@ -204,7 +206,7 @@ function createPostRepository(pool) {
       // DATETIME 은 초 단위로 반올림해 저장하므로 같은 초로 맞춰 비교합니다(밀리초 차이로 "일정 변경"이 되지 않게).
       const time = (date) => (date ? Math.round(new Date(date).getTime() / 1000) : null);
       const changed =
-        time(row.scheduleAt) !== time(post.scheduleAt) || row.gameId !== post.gameId || row.gameContentId !== post.gameContentId;
+        time(row.scheduleAt) !== time(post.scheduleAt) || row.gameId !== post.gameId || row.gameContentId !== post.gameContentId || (row.customDetail ?? null) !== (post.customDetail ?? null);
       if (notice && changed) await notifyApplicants(connection, { postId, linkPostId: postId, notice });
       await connection.commit();
       return { result: 'OK' };

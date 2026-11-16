@@ -246,6 +246,7 @@ CREATE TABLE post (
   category_code        VARCHAR(20)      NOT NULL COMMENT 'game에서 알 수 있지만 목록 조회용으로 중복 저장',
   game_id              BIGINT UNSIGNED  NOT NULL,
   game_content_id      BIGINT UNSIGNED  NULL,
+  custom_detail        VARCHAR(50)      NULL COMMENT '상세 분류 직접 입력. game_content_id 와 함께 쓰지 않음',
   party_type           VARCHAR(20)      NOT NULL,
   title                VARCHAR(100)     NOT NULL COMMENT '2~100자',
   body                 TEXT             NOT NULL COMMENT '마크다운',
