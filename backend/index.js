@@ -1,5 +1,7 @@
 'use strict';
 
+require('express');
+
 const { env } = require('./src/config/env');
 const { pool } = require('./src/config/db');
 const { createApp } = require('./src/app');
