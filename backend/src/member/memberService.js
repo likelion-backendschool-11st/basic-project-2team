@@ -56,13 +56,14 @@ function restrictionError(type, sanction) {
 }
 
 /** 로그인 응답의 user (프론트 `LoggedInUser`, docs/API_SPEC.md 2절) */
-const toLoggedInUser = (member) => ({
+const toLoggedInUser = (member, { profileSetupRequired }) => ({
   id: member.id,
   nickname: member.nickname,
   level: member.level,
   mannerTemp: member.mannerTemp,
   avatarUrl: member.avatarUrl,
   online: true,
+  profileSetupRequired,
 });
 
 /** member_withdrawal 의 phone_hash / email_hash 와 같은 방식(SHA-256 hex) */
@@ -195,6 +196,8 @@ function createMemberService({ memberRepository, tokenProvider, bcryptRounds, no
     const restriction = restrictionOf(member, current);
     if (restriction) throw restrictionError(restriction, await describeRestriction(member, restriction));
 
+    // 프로필(선호 게임·플레이 스타일)을 한 번도 저장하지 않았으면 프론트가 프로필 설정 화면으로 보냅니다.
+    const profileSetupRequired = !(await memberRepository.hasGameProfile(member.id));
     await memberRepository.recordLoginSuccess({ memberId: member.id, now: current });
     const refreshToken = tokenProvider.createRefreshToken({
       memberId: member.id,
@@ -202,7 +205,7 @@ function createMemberService({ memberRepository, tokenProvider, bcryptRounds, no
       now: current,
     });
     const tokens = await issueTokens(member.id, refreshToken);
-    return { ...tokens, user: toLoggedInUser(member) };
+    return { ...tokens, user: toLoggedInUser(member, { profileSetupRequired }) };
   }
 
   /**

@@ -88,6 +88,12 @@ export const profileText = {
   ageRangeNone: '선택 안 함',
   ageRangePublic: '다른 회원에게 나이대 공개',
   ageRangePublicHint: '공개하지 않으면 내 프로필에서만 보여요.',
+  /** 프로필 미설정 회원(신규 가입 등)이 처음 설정할 때 폼 위에 보이는 안내 */
+  setupNotice: {
+    icon: 'fa-solid fa-id-card',
+    title: '프로필 설정을 완료해 주세요',
+    body: '선호하는 게임과 플레이 스타일을 선택하고 저장하면 OurParty 의 모든 기능을 이용할 수 있어요.',
+  },
 };
 
 /** 나이대 선택지 (member.age_range VARCHAR(10) — 서버는 10자 이하 문자열이면 받습니다) */

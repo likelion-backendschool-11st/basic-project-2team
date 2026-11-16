@@ -85,6 +85,45 @@ export const loginText = {
 } as const;
 
 /* ------------------------------------------------------------------ */
+/* 로그인 — 프로필 설정 필수 안내 모달 (프로필 미설정 회원)            */
+/* ------------------------------------------------------------------ */
+
+export interface ProfileSetupBenefit {
+  readonly id: string;
+  readonly icon: string;
+  readonly label: string;
+}
+
+export const profileSetupPromptText = {
+  ariaLabel: '프로필 설정 안내',
+  icon: 'fa-solid fa-id-card',
+  title: '프로필 설정이 필요해요',
+  /** "(닉네임)님, OurParty 에 오신 것을 환영합니다!" */
+  welcome: (nickname: string) => `${nickname}님, OurParty 에 오신 것을 환영합니다!`,
+  body: '파티원들은 프로필을 보고 서로의 조건과 플레이 스타일을 확인해요. 원활한 파티 매칭을 위해 프로필을 설정해야 서비스를 이용할 수 있습니다.',
+  benefits: [
+    { id: 'avatar', icon: 'fa-solid fa-camera', label: '프로필 사진과 자기소개' },
+    { id: 'games', icon: 'fa-solid fa-gamepad', label: '선호 게임과 대표 게임' },
+    { id: 'style', icon: 'fa-solid fa-people-group', label: '플레이 스타일 (즐겜 · 빡겜 등)' },
+  ] satisfies readonly ProfileSetupBenefit[],
+  confirm: '프로필 설정하러 가기',
+  confirmIcon: 'fa-solid fa-arrow-right',
+  requiredHint: '선호 게임과 플레이 스타일은 필수 항목이에요.',
+  confirmRedirect: ROUTES.profileEdit,
+} as const;
+
+/** 프로필 미설정 회원이 머물 수 있는 화면 (나머지는 프로필 수정 화면으로 보냅니다 — useProfileSetupGuard) */
+export const profileSetupGuard: {
+  readonly redirectTo: string;
+  readonly allowedPaths: readonly string[];
+  readonly allowedPrefixes: readonly string[];
+} = {
+  redirectTo: ROUTES.profileEdit,
+  allowedPaths: [ROUTES.profileEdit, ROUTES.login, ROUTES.terms, ROUTES.privacy, ROUTES.support],
+  allowedPrefixes: [ROUTES.admin],
+};
+
+/* ------------------------------------------------------------------ */
 /* 로그인 — 정지 회원 안내 모달                                         */
 /* ------------------------------------------------------------------ */
 

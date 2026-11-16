@@ -14,8 +14,8 @@ import {
   getRelatedPosts,
   removeScrap,
 } from '../api/postApi';
-import { getPostDetail, toPostDetail } from '../api/postDetailApi';
-import { postDetailText, postText, type Participant, type PostDetail, type PostStatus, type RelatedPost } from '../data/postData';
+import { getPostDetail, toHostProfile, toPostDetail } from '../api/postDetailApi';
+import { postDetailText, postText, type HostProfile, type Participant, type PostDetail, type PostStatus, type RelatedPost } from '../data/postData';
 import { paths, ROUTES } from '../data/routes';
 import { useModal } from './useModal';
 import { useToast } from './useToast';
@@ -58,6 +58,8 @@ export function usePostDetail(postId: string) {
   const [version, setVersion] = useState(0);
   const [related, setRelated] = useState<readonly RelatedPost[]>([]);
   const [following, setFollowing] = useState(false);
+  /** 공대장 프로필 카드용 작성자 공개 프로필 (불러오기 전·실패 시 null — 카드는 해당 줄을 비워 둡니다) */
+  const [hostProfile, setHostProfile] = useState<HostProfile | null>(null);
   const [applicants, setApplicants] = useState<readonly Applicant[]>([]);
   const [participants, setParticipants] = useState<readonly Participant[]>([]);
   const toast = useToast();
@@ -153,12 +155,17 @@ export function usePostDetail(postId: string) {
     };
   }, [postId, version]);
 
-  // 파티원 화면: 작성자를 이미 즐겨찾기했는지. 비로그인이면 401 이라 false 로 둡니다.
+  // 파티원 화면: 공대장 프로필 카드에 보일 작성자의 공개 프로필과, 이미 즐겨찾기했는지(비로그인이면 viewer 가 없어 false).
   useEffect(() => {
     if (isOwner || hostId === undefined) return;
     let cancelled = false;
+    setHostProfile(null);
     getMemberProfile(hostId)
-      .then((p) => !cancelled && setFollowing(p.viewer?.favorited ?? false))
+      .then((p) => {
+        if (cancelled) return;
+        setHostProfile(toHostProfile(p));
+        setFollowing(p.viewer?.favorited ?? false);
+      })
       .catch(() => !cancelled && setFollowing(false));
     return () => {
       cancelled = true;
@@ -232,7 +239,7 @@ export function usePostDetail(postId: string) {
     detail, loading, error, related, refresh: reload,
     applied: accepted || detail?.applicationStatus === 'PENDING', accepted,
     apply, scrapped, toggleScrap, copyLink,
-    following, toggleFollow, state, togglePause: () => setStatus(state === 'open' ? 'PAUSED' : 'OPEN'),
+    hostProfile, following, toggleFollow, state, togglePause: () => setStatus(state === 'open' ? 'PAUSED' : 'OPEN'),
     applicants, resolveApplicant, applicantsDialog, participants,
     filled, percent: detail ? Math.round((filled / detail.max) * 100) : 0, toast,
     remove, disband, leave, closeRecruit, confirmLeave, confirmRemove, confirmDisband, confirmClose,

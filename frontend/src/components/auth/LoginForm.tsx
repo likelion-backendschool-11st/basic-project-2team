@@ -4,6 +4,7 @@ import FormAlert from './FormAlert';
 import RememberMeCheckbox from './RememberMeCheckbox';
 import PrimaryButton from './PrimaryButton';
 import SanctionNoticeModal from './SanctionNoticeModal';
+import ProfileSetupPromptModal from './ProfileSetupPromptModal';
 import { useLoginForm } from '../../hooks/useLoginForm';
 import { loginText } from '../../data/authData';
 
@@ -53,6 +54,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ className = '' }) => {
         shape="pill"
       />
       <SanctionNoticeModal onClose={form.closeSanction} sanction={form.sanction} />
+      <ProfileSetupPromptModal nickname={form.profilePromptNickname} onConfirm={form.goToProfileSetup} />
     </form>
   );
 };

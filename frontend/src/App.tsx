@@ -1,4 +1,5 @@
 import { Navigate, useRoutes } from 'react-router-dom';
+import ProfileSetupGuard from './components/auth/ProfileSetupGuard';
 import { ROUTES } from './data/routes';
 import { adminRoutes } from './routes/adminRoutes';
 import { authRoutes } from './routes/authRoutes';
@@ -12,7 +13,7 @@ import { myPageRoutes } from './routes/myPageRoutes';
  * 새 도메인 파일을 만들 때만 아래 목록에 한 줄을 더합니다.
  */
 export default function App() {
-  return useRoutes([
+  const routes = useRoutes([
     ...mainRoutes,
     ...boardRoutes,
     ...authRoutes,
@@ -21,4 +22,6 @@ export default function App() {
     ...infoRoutes,
     { path: '*', element: <Navigate to={ROUTES.home} replace /> },
   ]);
+  // 프로필 미설정 회원은 설정을 마칠 때까지 프로필 수정 화면으로 보냅니다.
+  return <ProfileSetupGuard>{routes}</ProfileSetupGuard>;
 }

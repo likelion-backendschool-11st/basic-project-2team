@@ -140,10 +140,13 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
   "data": {
     "accessToken": "eyJhbGciOiJIUzI1NiIs...",
     "refreshToken": "eyJhbGciOiJIUzI1NiIs...",
-    "user": { "id": 1, "nickname": "빛나는힐러", "level": 48, "mannerTemp": 98.4, "avatarUrl": null, "online": true }
+    "user": { "id": 1, "nickname": "빛나는힐러", "level": 48, "mannerTemp": 98.4, "avatarUrl": null, "online": true, "profileSetupRequired": false }
   }
 }
 ```
+
+- `user.profileSetupRequired` — 프로필을 한 번도 저장하지 않은 회원(선호 게임 `member_game_profile` 이 0개, 신규 가입 회원 포함)이면 `true`. 프로필 수정 화면은 선호 게임을 1개 이상 골라야 저장(`PATCH /api/members/me`)되므로, 한 번 저장하면 `false` 가 됩니다.
+  프론트는 `true` 이면 로그인 직후 프로필 설정 안내 모달(`frontend/src/components/auth/ProfileSetupPromptModal.tsx`, 건너뛰기 없음)을 띄우고, 저장할 때까지 다른 화면 접근을 프로필 수정 화면으로 돌립니다(`ProfileSetupGuard`).
 
 **토큰 재발급** `POST /api/auth/refresh` — 요청 `{ "refreshToken": "eyJhbGciOiJIUzI1NiIs..." }`
 

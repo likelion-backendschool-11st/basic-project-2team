@@ -19,7 +19,7 @@ export interface PostDetail {
   readonly title: string;
   readonly current: number;
   readonly max: number;
-  readonly host: { readonly id: number; readonly name: string; readonly avatarUrl?: string | null; readonly level: number; readonly record: string; readonly manner: string };
+  readonly host: { readonly id: number; readonly name: string; readonly avatarUrl?: string | null; readonly level: number; readonly record: string; readonly manner: string; readonly mannerTemp: number };
   readonly views: number;
   readonly postedAgo: string;
   readonly tiles: readonly { readonly icon: string; readonly label: string; readonly value: string; readonly note: string; readonly noteTone: 'good' | 'muted' }[];
@@ -39,6 +39,17 @@ export interface PostDetail {
   /** 로그인한 사용자 기준 (비로그인이면 false / null) */
   readonly scrapped: boolean;
   readonly applicationStatus: ApplicationStatus | null;
+}
+
+/**
+ * 공대장 프로필 카드에 쓰는 작성자의 공개 프로필 (GET /api/members/{memberId}).
+ * 프로필을 설정하지 않아 값이 없으면 null 이고, 카드는 그 줄을 비워 둡니다.
+ */
+export interface HostProfile {
+  /** "로스트아크 · 빡겜 / 클리어 지향 · 주말 저녁" — 대표 게임(없으면 첫 선호 게임)·플레이 스타일·플레이 시간대 */
+  readonly gameLine: string | null;
+  /** 자기소개 */
+  readonly bio: string | null;
 }
 
 export interface RelatedPost {
@@ -115,9 +126,7 @@ export const postText = {
   cancelApply: '신청 취소',
   guarantee: '클린 파티 보증제 적용 - 고의 탈주/비매너 신고 시 100% 영구 감점 및 패널티 부과',
   hostProfile: '공대장 프로필',
-  topLeader: 'TOP LEADER',
   mannerTemp: '매너온도',
-  hostQuote: '"실수해도 괜찮습니다. 공략 브리핑 끝까지 차분히 도와드려요!"',
   hostFollow: '공대장 파티 알림받기',
   followOn: '알림 받는 중',
   related: '비슷한 추천 공고',
