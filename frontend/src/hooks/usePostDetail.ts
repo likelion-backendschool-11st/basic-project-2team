@@ -172,7 +172,7 @@ export function usePostDetail(postId: string) {
     };
   }, [isOwner, hostId]);
 
-  /** API 호출 → 성공 문구 → 상세 다시 불러오기. 실패하면 서버 문구(401 은 로그인 안내)를 토스트로 보여줍니다. */
+  /** API 호출 → 성공 문구 → 상세 다시 불러오기. 실패하면 서버 문구를 토스트로 보여줍니다(401 은 로그인 안내 모달이 대신 뜹니다). */
   const run = async (action: () => Promise<unknown>, success: string, { refresh = true } = {}) => {
     try {
       await action();
@@ -180,7 +180,7 @@ export function usePostDetail(postId: string) {
       if (refresh) reload();
       return true;
     } catch (err) {
-      toast.show(err instanceof ApiRequestError && err.status === 401 ? postText.loginRequired : errorMessageOf(err, postText.actionFailed));
+      toast.show(errorMessageOf(err, postText.actionFailed));
       return false;
     }
   };

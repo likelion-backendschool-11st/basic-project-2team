@@ -1,3 +1,5 @@
+import { promptLogin } from './loginPrompt';
+
 /** API 서버 주소. 배포 환경에서는 VITE_API_BASE_URL 로 바꿉니다. */
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080';
 
@@ -155,6 +157,8 @@ export async function request<T>(method: string, path: string, body?: unknown, {
 
   if (res.status === 204) return undefined as T;
   if (!res.ok || !json?.success) {
+    // 로그인하지 않았거나 로그인이 풀려 권한이 없으면 어느 화면이든 같은 로그인 안내 모달을 띄웁니다 (로그인·재발급 같은 인증 API 와 관리자 API 는 제외).
+    if (res.status === 401 && tokenKey === ACCESS_TOKEN_KEY && !path.startsWith('/api/auth/')) promptLogin();
     const { code = 'UNKNOWN', message = '요청에 실패했습니다.', fields, ...details } = json?.error ?? {};
     throw new ApiRequestError(res.status, code, message, fields, details);
   }

@@ -1,4 +1,5 @@
 import { Navigate, useRoutes } from 'react-router-dom';
+import LoginPromptHost from './components/auth/LoginPromptHost';
 import ProfileSetupGuard from './components/auth/ProfileSetupGuard';
 import { ROUTES } from './data/routes';
 import { adminRoutes } from './routes/adminRoutes';
@@ -23,5 +24,10 @@ export default function App() {
     { path: '*', element: <Navigate to={ROUTES.home} replace /> },
   ]);
   // 프로필 미설정 회원은 설정을 마칠 때까지 프로필 수정 화면으로 보냅니다.
-  return <ProfileSetupGuard>{routes}</ProfileSetupGuard>;
+  return (
+    <ProfileSetupGuard>
+      {routes}
+      <LoginPromptHost />
+    </ProfileSetupGuard>
+  );
 }

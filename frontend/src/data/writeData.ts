@@ -32,7 +32,6 @@ export const writeText = {
   draftButton: '임시저장',
   draftLoaded: '임시저장된 글을 불러왔습니다.',
   draftSaveFailed: '임시저장에 실패했습니다. 잠시 후 다시 시도해주세요.',
-  draftNeedLogin: '임시저장은 로그인 후 사용할 수 있습니다.',
   leave: '나가기',
   titleLabel: '공고글 제목',
   titlePlaceholder: '예) [카멘 1-3관] 1620+ 숙련 랏서폿 1분 모십니다',
