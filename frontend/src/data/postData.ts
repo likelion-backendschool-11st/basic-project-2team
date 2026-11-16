@@ -142,6 +142,9 @@ export const postText = {
       ? '대기 중인 신청자가 없습니다.'
       : `${names.slice(0, 3).join(', ')}${names.length > 3 ? ` 외 ${names.length - 3}명` : ''}님이 승인 대기 중입니다.`,
   manageApplicants: '신청자 목록 관리 / 승인',
+  applicantMannerTemp: (temp: number) => `매너온도 ${temp.toFixed(1)}℃`,
+  applicantReviewCount: (n: number) => `평가 ${n}건`,
+  applicantNoTags: '아직 받은 평가 태그가 없어요',
   participantsTitle: '파티 참가자 명단',
   emptySlot: '모집 중',
   conditionsTitle: '파티 모집 상세 조건',
