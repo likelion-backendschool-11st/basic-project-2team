@@ -17,12 +17,24 @@ interface PasswordChangePageProps {
 export const PasswordChangePage: React.FC<PasswordChangePageProps> = () => {
   const form = usePasswordChangeForm();
   const text = accountPanelText.password;
-  const verifyMsg =
-    form.verify === 'ok'
-      ? { tone: 'success' as const, message: passwordText.verifyOk }
-      : form.verify === 'fail'
-        ? { tone: 'error' as const, message: passwordText.verifyFail }
-        : { tone: 'hint' as const, message: passwordText.verifyHint };
+  const currentMsg =
+    form.error?.field === 'current'
+      ? { tone: 'error' as const, message: form.error.message }
+      : { tone: 'hint' as const, message: passwordText.currentHint };
+
+  if (form.done) {
+    return (
+      <AccountShell active="password" title={text.title} description={text.description}>
+        <div className="flex flex-col items-center gap-5 py-10 text-center">
+          <FieldStatusMessage tone="success" message={passwordText.done} />
+          <Link to={ROUTES.login} replace className="h-12 px-7 inline-flex items-center gap-2 rounded-xl text-sm font-bold text-white bg-mercury hover:bg-mercury-light shadow-lg shadow-mercury/30">
+            <i className="fa-solid fa-right-to-bracket" />
+            {passwordText.goLogin}
+          </Link>
+        </div>
+      </AccountShell>
+    );
+  }
 
   return (
     <AccountShell active="password" title={text.title} description={text.description}>
@@ -35,24 +47,14 @@ export const PasswordChangePage: React.FC<PasswordChangePageProps> = () => {
               </span>
               <span className="text-xs text-fog-muted">{f.side}</span>
             </div>
-            <div className="flex gap-3 items-start">
-              <div className="flex-1">
-                <PasswordField
-                  field={{ key: 'password', id: f.id, label: '', type: 'password', placeholder: f.placeholder, autoComplete: f.autoComplete }}
-                  value={form.values[f.id]}
-                  onChange={form.onChange(f.id)}
-                  showLabel={passwordText.showLabel}
-                  hideLabel={passwordText.hideLabel}
-                />
-              </div>
-              {f.id === 'current' && (
-                <button type="button" onClick={form.verifyCurrent} className="h-12 px-6 rounded-xl border border-night-borderLight text-sm font-semibold text-white hover:bg-white/5 flex items-center gap-2 shrink-0">
-                  <i className="fa-regular fa-circle-check text-mercury-light" />
-                  {passwordText.verifyButton}
-                </button>
-              )}
-            </div>
-            {f.id === 'current' && <FieldStatusMessage tone={verifyMsg.tone} message={verifyMsg.message} />}
+            <PasswordField
+              field={{ key: 'password', id: f.id, label: '', type: 'password', placeholder: f.placeholder, autoComplete: f.autoComplete }}
+              value={form.values[f.id]}
+              onChange={form.onChange(f.id)}
+              showLabel={passwordText.showLabel}
+              hideLabel={passwordText.hideLabel}
+            />
+            {f.id === 'current' && <FieldStatusMessage tone={currentMsg.tone} message={currentMsg.message} />}
           </div>
         ))}
 
@@ -77,7 +79,13 @@ export const PasswordChangePage: React.FC<PasswordChangePageProps> = () => {
           <span>{passwordText.forgotNote}</span>
         </div>
 
-        <FormActions submitLabel={passwordText.submit} submitIcon="fa-shield-halved" disabled={!form.canSubmit} />
+        {form.error?.field === 'form' && <FieldStatusMessage tone="error" message={form.error.message} />}
+
+        <FormActions
+          submitLabel={form.submitting ? passwordText.submitting : passwordText.submit}
+          submitIcon="fa-shield-halved"
+          disabled={!form.canSubmit}
+        />
       </form>
     </AccountShell>
   );

@@ -1,40 +1,57 @@
 import { useMemo, useState, type ChangeEvent, type FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { changePassword } from '../api/accountApi';
+import { logout } from '../api/authApi';
+import { ApiRequestError, errorMessageOf } from '../api/http';
 import { passwordText } from '../data/accountData';
-import { ROUTES } from '../data/routes';
+import { PASSWORD_PATTERN } from '../data/authData';
 
 type Values = Readonly<Record<'current' | 'next' | 'confirm', string>>;
-export type VerifyStatus = 'idle' | 'ok' | 'fail';
 
-const PATTERN = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,16}$/;
+/** 서버 오류를 어느 칸 아래에 보여줄지: 현재 비밀번호가 틀리면 current, 그 밖에는 폼 전체 */
+interface SubmitError {
+  readonly field: 'current' | 'form';
+  readonly message: string;
+}
 
 export function usePasswordChangeForm() {
-  const navigate = useNavigate();
   const [values, setValues] = useState<Values>({ current: '', next: '', confirm: '' });
-  const [verify, setVerify] = useState<VerifyStatus>('idle');
+  const [error, setError] = useState<SubmitError | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [done, setDone] = useState(false);
 
   const onChange = (key: keyof Values) => (e: ChangeEvent<HTMLInputElement>) => {
     const { value } = e.target;
     setValues((prev) => ({ ...prev, [key]: value }));
-    if (key === 'current') setVerify('idle');
+    setError(null);
   };
 
-  const verifyCurrent = () => setVerify(values.current === passwordText.mockCurrent ? 'ok' : 'fail');
-
-  const patternOk = PATTERN.test(values.next);
+  const patternOk = PASSWORD_PATTERN.test(values.next);
   const matchOk = values.confirm.length > 0 && values.next === values.confirm;
   const strength = useMemo(() => {
     if (!values.next) return 0;
     if (!patternOk) return 1;
-    return values.next.length >= 12 ? 3 : 2;
+    return values.next.length >= 11 ? 3 : 2;
   }, [values.next, patternOk]);
 
-  const canSubmit = verify === 'ok' && patternOk && matchOk;
+  const canSubmit = values.current.length > 0 && patternOk && matchOk && !submitting && !done;
 
-  const onSubmit = (e: FormEvent) => {
+  /** PATCH /api/members/me/password — 성공하면 서버가 모든 Refresh Token 을 폐기하므로 이 브라우저도 로그아웃합니다. */
+  const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (canSubmit) navigate(ROUTES.myPage);
+    if (!canSubmit) return;
+    setSubmitting(true);
+    try {
+      await changePassword(values.current, values.next);
+      await logout();
+      setValues({ current: '', next: '', confirm: '' });
+      setDone(true);
+    } catch (err) {
+      const field = err instanceof ApiRequestError && err.code === 'INVALID_PASSWORD' ? 'current' : 'form';
+      setError({ field, message: errorMessageOf(err, passwordText.failed) });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  return { values, verify, patternOk, matchOk, strength, canSubmit, onChange, verifyCurrent, onSubmit };
+  return { values, error, submitting, done, patternOk, matchOk, strength, canSubmit, onChange, onSubmit };
 }

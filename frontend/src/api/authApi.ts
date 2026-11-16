@@ -83,6 +83,21 @@ export function loginSanctionOf(err: unknown): LoginSanction | null {
   return (type === 'SUSPEND' || type === 'BAN') && typeof nickname === 'string' ? (sanction as LoginSanction) : null;
 }
 
+/** 이 브라우저의 로그인 정보만 지웁니다 (회원 탈퇴처럼 서버가 이미 토큰을 폐기한 경우). */
+export const clearSession = () => saveSession(null, null, null);
+
+/** 프로필 수정 뒤 헤더 등에 보이는 저장된 회원 정보(닉네임 등)를 맞춥니다. */
+export function updateStoredUser(patch: Partial<LoginUser>) {
+  const json = getStoredUserJson();
+  if (!json) return;
+  try {
+    storage.set(USER_KEY, JSON.stringify({ ...(JSON.parse(json) as LoginUser), ...patch }));
+    window.dispatchEvent(new Event(AUTH_CHANGE_EVENT));
+  } catch {
+    // 저장된 값이 깨졌으면 다음 로그인 때 다시 저장됩니다.
+  }
+}
+
 /** 서버 로그아웃은 실패해도(토큰 만료 등) 이 브라우저의 로그인 정보는 지웁니다. */
 export async function logout() {
   try {
