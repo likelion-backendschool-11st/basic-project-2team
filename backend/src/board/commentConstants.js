@@ -42,6 +42,7 @@ const COMMENT_HIDE_REPORT_COUNT = 5;
 const commentMessages = Object.freeze({
   invalidInput: '입력값을 확인해주세요.',
   textRequired: '댓글 내용을 입력해주세요.',
+  profanity: '댓글에 부적절한 표현이 포함되어 있습니다. 바른 표현으로 수정해주세요.',
   textTooLong: `댓글은 ${COMMENT_MAX_LENGTH}자 이하로 입력해주세요.`,
   secretInvalid: 'secret 은 true/false 여야 합니다.',
   parentIdInvalid: 'parentId 는 1 이상의 정수여야 합니다.',

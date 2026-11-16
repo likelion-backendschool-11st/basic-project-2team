@@ -213,6 +213,13 @@ describe('댓글 API /api/posts/:postId/comments', () => {
   });
 
   describe('댓글 달기', () => {
+    it('욕설이 들어 있으면 400 (text 필드), 저장하지 않는다', async () => {
+      const { status, body } = await write({ text: '개새끼들 ㅋㅋ' });
+      assert.equal(status, 400);
+      assert.deepEqual(body.error.fields.map((f) => f.field), ['text']);
+      assert.equal(repo.state.comments.length, 0);
+    });
+
     it('댓글을 저장하고 201 과 작성된 댓글을 돌려준다', async () => {
       const { status, body } = await write({ text: '  극신속 홀나 1625입니다.  ' });
       assert.equal(status, 201);
@@ -442,6 +449,13 @@ describe('댓글 API /api/posts/:postId/comments', () => {
   };
 
   describe('댓글 수정', () => {
+    it('수정 내용에 욕설이 있으면 400, 기존 내용은 그대로', async () => {
+      const id = repo.seed({ authorId: ALICE, content: '처음 내용' });
+      const { status } = await send('PATCH', `/api/comments/${id}`, { text: '시.발 고침' });
+      assert.equal(status, 400);
+      assert.equal(repo.state.comments[0].content, '처음 내용');
+    });
+
     it('본인 댓글을 고치고 수정된 댓글을 돌려준다', async () => {
       const id = repo.seed({ authorId: ALICE, content: '처음 내용' });
       const { status, body } = await send('PATCH', `/api/comments/${id}`, { text: '  고친 내용 ' });

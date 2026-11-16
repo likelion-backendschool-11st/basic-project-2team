@@ -440,7 +440,7 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 
 - `current` / `max` 는 파티장 포함 현재 인원 / 정원입니다. 탈퇴한 작성자는 `author` 가 `"탈퇴한 회원"` 입니다. 일정 미정이면 `schedule: null`, `scheduleTbd: true` 입니다.
 
-**욕설 필터** — 공고 작성(`POST /api/posts`)·수정(`PUT /api/posts/{postId}`) 때 `title`·`body`·`partyName`·`customDetail` 에 욕설이 있으면 400 `INVALID_INPUT` 과 함께 해당 필드의 `error.fields` 에 "○○에 부적절한 표현이 포함되어 있습니다." 를 담습니다 (임시저장은 검사하지 않음). 글자·숫자·공백만 남기고 비교하므로 `시.발` 같은 기호 우회도 막지만, 띄어쓰기 우회(`시 발`)는 `10시 발로란트` 같은 정상 글을 막지 않으려고 허용합니다. 단어 목록은 `backend/src/common/profanityFilter.js`.
+**욕설 필터** — 댓글 작성(`POST /api/posts/{postId}/comments`)·수정(`PATCH /api/comments/{commentId}`)도 `text` 에 같은 검사를 하며 400 `INVALID_INPUT` 의 `error.fields` 에 "댓글에 부적절한 표현이 포함되어 있습니다." 를 담습니다. 공고 작성(`POST /api/posts`)·수정(`PUT /api/posts/{postId}`) 때 `title`·`body`·`partyName`·`customDetail` 에 욕설이 있으면 400 `INVALID_INPUT` 과 함께 해당 필드의 `error.fields` 에 "○○에 부적절한 표현이 포함되어 있습니다." 를 담습니다 (임시저장은 검사하지 않음). 글자·숫자·공백만 남기고 비교하므로 `시.발` 같은 기호 우회도 막지만, 띄어쓰기 우회(`시 발`)는 `10시 발로란트` 같은 정상 글을 막지 않으려고 허용합니다. 단어 목록은 `backend/src/common/profanityFilter.js`.
 
 ## 4. 파티 참가 (Application)
 
