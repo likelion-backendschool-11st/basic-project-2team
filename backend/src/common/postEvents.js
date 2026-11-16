@@ -6,6 +6,8 @@ const POST_EVENT = Object.freeze({
   post: 'post',
   /** 댓글이 작성·수정·삭제·가림·복구됨 */
   comments: 'comments',
+  /** 파티 의견 조율 투표가 생성·편집·투표·고정·확정됨 */
+  poll: 'poll',
 });
 
 /**

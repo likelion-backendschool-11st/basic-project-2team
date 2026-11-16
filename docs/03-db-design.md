@@ -27,6 +27,7 @@ OurParty 서비스의 테이블 설계안입니다. [요구사항 명세](./02-r
 | 공고 | `post`, `post_tag`, `post_draft`, `post_scrap` | 공고, 공고-태그 연결, 임시저장, 공고 즐겨찾기(스크랩) |
 | 파티 | `post_application` | 신청·승인·취소. 승인된 신청이 곧 파티원입니다. |
 | 댓글 | `comment` | 댓글과 대댓글(1단계) |
+| 투표 | `poll`, `poll_option`, `poll_vote` | 공대장이 댓글 영역에 올리는 파티 의견 조율 투표, 항목, 투표 기록 |
 | 평가 | `review`, `review_tag_map` | 별점, 한 줄 평, 태그 |
 | 즐겨찾기 | `favorite_member` | 사용자 즐겨찾기 |
 | 알림 | `notification`, `notification_subscription` | 알림함, 관심 알림 설정 |
@@ -191,6 +192,55 @@ API의 `level`은 **서비스 활동 레벨**(`member.level`)입니다. 공고 �
 | report_count | INT UNSIGNED | 기본 0 | REPORT-004. 5건 이상이면 status를 `HIDDEN`으로 자동 변경 (같은 사람의 중복 신고는 report UNIQUE로 막히므로 서로 다른 신고자 수) |
 | deleted_at | DATETIME | | |
 
+### 2.10.1 파티 의견 조율 투표 (`poll` · `poll_option` · `poll_vote`)
+
+공대장(공고 작성자)이 출발 시간처럼 파티원 의견을 모아야 할 때 만드는 투표입니다. 공고 하나에 투표를 여러 번 만들 수 있지만 **진행 중인 투표는 하나**만 둡니다 (화면은 가장 최근 투표를 보여줌).
+
+상태 컬럼은 두지 않고 계산합니다: `closed_at`이 있으면 `CONFIRMED`(공대장이 결과 확정), `closes_at`이 지났으면 `ENDED`, 아니면 `OPEN`.
+
+**`poll`** — 투표
+
+| 컬럼 | 타입 | 제약 | 비고 |
+| --- | --- | --- | --- |
+| id | BIGINT UNSIGNED | PK | |
+| post_id | BIGINT UNSIGNED | FK → post | INDEX(post_id, id) — 공고의 최근 투표 조회 |
+| author_id | BIGINT UNSIGNED | FK → member | 만든 공대장(공고 작성자) |
+| title | VARCHAR(40) | NOT NULL | 1~40자 |
+| description | VARCHAR(100) | NULL 가능 | 공대장 안내 문구 |
+| is_multiple | BOOLEAN | 기본 FALSE | 복수 선택 |
+| commenters_only | BOOLEAN | 기본 FALSE | 이 공고에 댓글을 남긴 공대원만 투표 |
+| is_pinned | BOOLEAN | 기본 TRUE | 상단 공지로 고정 |
+| closes_at | DATETIME | NOT NULL | 마감 시각. 만들 때 지금 이후 30일 이내 |
+| final_option_id | BIGINT UNSIGNED | NULL 가능, FK 없음 | 확정한 항목. poll_option이 poll을 참조하는 순환이라 FK 없이 애플리케이션에서 같은 투표의 항목인지 검증 |
+| notice | VARCHAR(200) | NULL 가능 | 결과 확정 공지 메시지 |
+| closed_at | DATETIME | NULL 가능 | 공대장이 결과를 확정한 시각. NULL이면 미확정 |
+| reminded_at | DATETIME | NULL 가능 | 마지막 미투표자 알림 시각 (10분 간격 제한) |
+| created_at / updated_at | DATETIME | | |
+
+**`poll_option`** — 투표 항목
+
+| 컬럼 | 타입 | 제약 | 비고 |
+| --- | --- | --- | --- |
+| id | BIGINT UNSIGNED | PK | |
+| poll_id | BIGINT UNSIGNED | FK → poll (CASCADE) | INDEX(poll_id, sort_order) |
+| label | VARCHAR(30) | NOT NULL | 1~30자, 같은 투표 안에서 중복 불가 (애플리케이션 검증) |
+| sort_order | TINYINT UNSIGNED | NOT NULL | 1~5. 투표당 항목 2~5개 |
+| created_at | DATETIME | | 항목은 고치지 않고 지우고 다시 넣으므로 updated_at 없음 |
+
+**`poll_vote`** — 투표 기록
+
+| 컬럼 | 타입 | 제약 | 비고 |
+| --- | --- | --- | --- |
+| id | BIGINT UNSIGNED | PK | |
+| poll_id | BIGINT UNSIGNED | FK → poll (CASCADE) | option_id로 알 수 있지만 회원별 조회·삭제를 위해 중복 저장. INDEX(poll_id, member_id) |
+| option_id | BIGINT UNSIGNED | FK → poll_option (CASCADE) | UQ(option_id, member_id) — 같은 항목 중복 투표 방지 |
+| member_id | BIGINT UNSIGNED | FK → member (CASCADE) | 복수 선택이면 한 회원이 여러 행 |
+| created_at | DATETIME | | 투표 시각(참여자 현황의 「n분 전 투표」). 투표를 바꾸면 행을 지우고 다시 넣으므로 updated_at 없음 |
+
+- 편집: 아무도 투표하지 않았을 때만 내용을 고치고, 항목은 지우고 다시 넣습니다(항목 id가 바뀜).
+- 투표 자격: 파티장 + 수락(`ACCEPTED`)된 파티원. `commenters_only`면 그중 이 공고에 삭제되지 않은 댓글을 남긴 사람만 (파티장은 항상 가능).
+- 결과 확정 시 선택하면 공대장 이름의 안내 댓글(`comment`)과 공대원 알림(`notification`, type `POLL_CONFIRMED`)을 같은 트랜잭션으로 넣습니다. 미투표자 알림(`POLL_REMINDER`)은 `reminded_at` 기준 10분에 한 번입니다.
+
 ### 2.11 평가 · 즐겨찾기
 
 | 테이블 | 컬럼 | 제약 | 비고 |
@@ -205,7 +255,7 @@ API의 `level`은 **서비스 활동 레벨**(`member.level`)입니다. 공고 �
 
 | 테이블 | 컬럼 | 비고 |
 | --- | --- | --- |
-| `notification` | id, member_id FK, type VARCHAR(30), message VARCHAR(200), post_id FK NULL, is_read BOOLEAN, created_at | type 예: APPLICATION_RECEIVED, APPLICATION_RESULT, APPLICATION_CANCELED, POST_UPDATED, INTEREST_POST, POST_DELETED, SANCTION |
+| `notification` | id, member_id FK, type VARCHAR(30), message VARCHAR(200), post_id FK NULL, is_read BOOLEAN, created_at | type 예: APPLICATION_RECEIVED, APPLICATION_RESULT, APPLICATION_CANCELED, POST_UPDATED, INTEREST_POST, POST_DELETED, SANCTION, POLL_CONFIRMED, POLL_REMINDER |
 | `notification_subscription` | id, member_id FK, game_id FK, game_content_id FK NULL, enabled BOOLEAN | NOTI-001 관심 게임·레이드 |
 
 ### 2.13 신고 · 관리
@@ -225,11 +275,13 @@ API의 `level`은 **서비스 활동 레벨**(`member.level`)입니다. 공고 �
 | member | member_agreement, member_game_profile, post_draft, refresh_token, password_reset_token, notification, notification_subscription, activity_point_log | 1:N | CASCADE | 회원에게만 딸린 데이터 |
 | member | favorite_member, post_scrap | N:M | CASCADE | |
 | category, game, game_content, tag, review_tag | 이 마스터 테이블을 참조하는 모든 FK (game, game_content, post, member_game_profile, post_tag, review_tag_map, notification_subscription) | 1:N | RESTRICT | 마스터 데이터. 사용 중인 행은 지우지 않고 `is_active=false`로 숨김 |
-| post | post_application, comment, review, report | 1:N | RESTRICT | 공고는 소프트 삭제라 함께 보존 |
+| post | post_application, comment, review, report, poll | 1:N | RESTRICT | 공고는 소프트 삭제라 함께 보존 |
 | post | post_tag, post_scrap | 1:N | CASCADE | |
 | post | notification | 1:N | SET NULL | 알림은 공고 링크가 없어도 문구만으로 의미가 있습니다. |
 | comment | comment (parent_id) | 1:N, 자기 참조 | RESTRICT | 소프트 삭제 시 "삭제된 댓글입니다"로 표시 |
 | review | review_tag_map | 1:N | CASCADE | |
+| poll | poll_option, poll_vote | 1:N | CASCADE | 투표에만 딸린 데이터. poll_option → poll_vote 도 CASCADE |
+| member | poll(author_id) / poll_vote | 1:N | RESTRICT / CASCADE | 만든 사람 기록은 보존, 투표 기록은 회원에게만 딸린 데이터 |
 | report | sanction | 1:0..1 | SET NULL | 신고 없이 내린 제재도 있습니다. |
 | admin_account | report.handled_by, sanction, admin_action_log, post.deleted_by_admin_id | 1:N | RESTRICT | 처리자 기록 보존 |
 
@@ -257,6 +309,9 @@ PK와 UNIQUE는 그 자체가 인덱스라서, 중복되는 인덱스는 따로 
 | comment | (post_id, parent_id, created_at) | 루트 댓글 페이징, 대댓글 묶기 | 공고 상세에서 매번 실행되는 쿼리 |
 | comment | (author_id, created_at) | 내 댓글 | |
 | comment | (status, created_at) | 관리자 댓글 목록 | |
+| poll | (post_id, id) | 공고의 최근 투표, 진행 중인 투표 확인 | post_id FK 인덱스도 겸함 |
+| poll_option | (poll_id, sort_order) | 항목을 순서대로 조회 | |
+| poll_vote | UQ(option_id, member_id) / (poll_id, member_id) | 같은 항목 중복 투표 방지 / 회원의 투표 바꾸기·집계 | |
 | review | UQ(post_id, reviewer_id, target_id) | 중복 평가 방지 | |
 | review | (target_id, created_at) | 매너 온도 재계산, 이달의 파티장 (MAIN-010) | 특정 회원이 기간 안에 받은 평가만 범위로 조회 |
 | review_tag_map | (review_tag_id) | 태그 통계 | |
@@ -280,6 +335,7 @@ PK와 UNIQUE는 그 자체가 인덱스라서, 중복되는 인덱스는 따로 
 | 회원 탈퇴 | 소프트 삭제 + 개인정보 제거 | 행은 남기고 status를 `WITHDRAWN`으로 바꿉니다. login_id·nickname·email·phone·name은 NULL로 비우고 화면에는 "탈퇴한 회원"으로 표시합니다. 재가입 제한과 법령상 보관에 필요한 최소 정보만 `member_withdrawal`에 해시로 옮깁니다. MYPAGE-003(즉시 삭제)과 WITHDRAW-003(분리 보관)의 충돌을 이 방식으로 절충했습니다. |
 | 공고 | 소프트 삭제 | status를 `DELETED`로 바꾸고 deleted_at을 기록합니다. 신청·댓글·리뷰는 그대로 둡니다. |
 | 댓글 | 소프트 삭제 | API의 "대댓글 함께 삭제"는 **대댓글도 DELETED 상태로 바꾸는 것**으로 해석했습니다. |
+| 투표 | 삭제하지 않음 (투표 변경은 하드 삭제) | 투표는 공고와 함께 보존하고 마감·확정만 기록합니다. 회원이 투표를 바꾸거나 취소하면 그 회원의 `poll_vote` 행을 지우고 다시 넣고, 편집하면 `poll_option`을 지우고 다시 넣습니다(투표가 없을 때만). |
 | 신청 취소 | 상태 변경 | 행을 지우지 않고 CANCELED로 바꿉니다. 노쇼와 구분해 기록하려면 이력이 남아야 합니다. |
 | 신고, 제재, 관리 이력, 리뷰, 활동 점수 이력 | 삭제하지 않음 | 증빙과 감사 기록. 활동 점수는 회수할 때도 행을 지우지 않고 음수 행을 추가합니다. |
 | 스크랩, 즐겨찾기, 태그 연결 | 하드 삭제 | 지워도 남겨야 할 이력이 아닙니다. |
@@ -309,3 +365,4 @@ PK와 UNIQUE는 그 자체가 인덱스라서, 중복되는 인덱스는 따로 
 | 13 | 재신청 | `CANCELED`만 같은 공고에 재신청 가능, `REJECTED`·`NO_SHOW`는 불가 | 거절된 사람이 반복 신청하는 것을 막습니다. |
 | 14 | 카테고리 | `mmorpg`, `fps`, `aos`, `steam`, `etc` 5개 | 프론트·API와 동일 |
 | 15 | 마스터 데이터 FK | category·game·game_content·tag·review_tag를 참조하는 FK는 모두 RESTRICT | 쓰이는 마스터 행은 지우지 않고 `is_active`로 숨깁니다. |
+| 16 | 파티 의견 조율 투표 | 공고당 진행 중 투표 1개, 항목 2~5개, 공대원(파티장+수락된 파티원)만 투표, 투표 전까지만 편집, 마감 시각이 지나도 공대장이 확정해야 `CONFIRMED` | Stitch 투표 화면(생성·편집·결과 확정·참여자 현황) 기준. 출발 10분 전 미투표자 자동 배정은 배치가 필요해 뒤로 미룹니다. |

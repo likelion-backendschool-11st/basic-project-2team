@@ -19,6 +19,7 @@ const { createMypageModule } = require('./mypage');
 const { createAccountModule } = require('./account');
 const { createReviewModule } = require('./review');
 const { createRankingModule } = require('./ranking');
+const { createPollModule } = require('./poll');
 
 /**
  * Express 앱을 만듭니다. 서버 실행(server.js)과 분리해 테스트에서 DB 없이 띄울 수 있게 합니다.
@@ -37,6 +38,7 @@ const { createRankingModule } = require('./ranking');
  *   accountRepository?: object,
  *   reviewRepository?: object,
  *   rankingRepository?: object,
+ *   pollRepository?: object,
  *   postEvents?: ReturnType<typeof createPostEvents>,
  *   corsOrigins: string[],
  *   bcryptRounds: number,
@@ -59,6 +61,7 @@ function createApp({
   accountRepository,
   reviewRepository,
   rankingRepository,
+  pollRepository,
   postEvents = createPostEvents(),
   corsOrigins,
   bcryptRounds,
@@ -89,6 +92,10 @@ function createApp({
   app.use('/api/posts', review.postReviewRouter);
   app.use('/api/review-tags', review.tagRouter);
   app.use('/api/rankings', createRankingModule({ pool, rankingRepository }).router);
+
+  const poll = createPollModule({ pool, pollRepository, postEvents, requireAuth, optionalAuth, now });
+  app.use('/api/posts', poll.postRouter);
+  app.use('/api/polls', poll.router);
 
   // GET /api/posts/:postId 를 잡으므로 /api/posts 아래 고정 경로(popular, urgent …)는 이보다 먼저 마운트된 라우터에 둡니다.
   const board = createBoardModule({
