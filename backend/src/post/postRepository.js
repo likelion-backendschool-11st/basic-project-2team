@@ -49,8 +49,21 @@ function createPostRepository(pool) {
     );
   }
 
-  /** 공고와 태그 연결을 한 트랜잭션으로 저장하고 새 공고 id 를 반환합니다. */
-  async function createPost({ post, tags }) {
+  /** 작성자를 즐겨찾기한 회원(탈퇴 회원 제외)에게 새 공고 알림을 한 번에 보냅니다. 작성자 본인은 대상이 아닙니다. */
+  async function notifyFavoriteFollowers(connection, { authorId, postId, notice }) {
+    const [[author]] = await connection.query('SELECT nickname FROM member WHERE id = ?', [authorId]);
+    if (!author?.nickname) return;
+    await connection.query(
+      `INSERT INTO notification (member_id, type, message, post_id)
+       SELECT fm.member_id, ?, ?, ?
+         FROM favorite_member fm JOIN member m ON m.id = fm.member_id
+        WHERE fm.target_member_id = ? AND fm.member_id <> ? AND m.status <> 'WITHDRAWN'`,
+      [notice.type, notice.message(author.nickname), postId, authorId, authorId],
+    );
+  }
+
+  /** 공고와 태그 연결을 한 트랜잭션으로 저장하고 새 공고 id 를 반환합니다. 즐겨찾기한 회원 알림도 같은 트랜잭션입니다. */
+  async function createPost({ post, tags, notice }) {
     const connection = await pool.getConnection();
     try {
       await connection.beginTransaction();
@@ -76,6 +89,7 @@ function createPostRepository(pool) {
       const postId = result.insertId;
 
       await attachTags(connection, postId, tags);
+      if (notice) await notifyFavoriteFollowers(connection, { authorId: post.authorId, postId, notice });
 
       // 공고 작성 +10 (하루 3회까지, docs/03-db-design.md 결정 사항 8-1)
       await awardDailyLimitedPoints(connection, { memberId: post.authorId, actionType: 'POST_CREATE', refId: postId });

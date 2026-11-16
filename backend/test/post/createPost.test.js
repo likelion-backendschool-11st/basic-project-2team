@@ -25,8 +25,8 @@ function createFakeRepository() {
       if (gameId !== 1) return null;
       return { kamen: { id: 10, type: 'raid', maxHeadcount: 8 }, ranked: { id: 11, type: 'rank', maxHeadcount: 5 } }[code] ?? null;
     },
-    async createPost({ post, tags }) {
-      state.posts.push({ ...post, tags });
+    async createPost({ post, tags, notice }) {
+      state.posts.push({ ...post, tags, notice });
       return state.posts.length;
     },
   };
@@ -84,6 +84,16 @@ describe('POST /api/posts', () => {
     assert.equal(saved.categoryCode, 'mmorpg');
     assert.equal(saved.gameContentId, 10);
     assert.deepEqual(saved.tags, ['숙련', '디코필수']);
+  });
+
+  it('즐겨찾기한 회원에게 보낼 알림 유형과 문구(닉네임은 repository 가 채움)를 넘긴다', async () => {
+    const longTitle = `[카멘] ${'가'.repeat(60)}`;
+    await post({ ...validBody(), title: longTitle });
+    const { notice } = repo.state.posts[0];
+    assert.equal(notice.type, 'FAVORITE_AUTHOR_POST');
+    const message = notice.message('길드장');
+    assert.match(message, /^즐겨찾기한 '길드장'님이 새 공고를 올렸습니다: '\[카멘\] 가+…'$/);
+    assert.ok(message.length <= 200);
   });
 
   it('일정 미정이면 schedule 없이도 저장된다', async () => {

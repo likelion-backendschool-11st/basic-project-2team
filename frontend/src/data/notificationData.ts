@@ -6,6 +6,7 @@ export type NotificationType =
   | 'APPLICATION_CANCELED'
   | 'POST_UPDATED'
   | 'POST_DELETED'
+  | 'FAVORITE_AUTHOR_POST'
   | 'SANCTION';
 
 export interface NotificationView {
@@ -35,6 +36,7 @@ export const notificationTypes: Readonly<Record<NotificationType, { label: strin
   APPLICATION_CANCELED: { label: '신청 취소', icon: 'fa-solid fa-user-minus', tone: toneMuted },
   POST_UPDATED: { label: '공고 변경', icon: 'fa-solid fa-pen-to-square', tone: toneWarn },
   POST_DELETED: { label: '공고 삭제', icon: 'fa-solid fa-trash', tone: toneDanger },
+  FAVORITE_AUTHOR_POST: { label: '즐겨찾기 새 공고', icon: 'fa-solid fa-star', tone: toneBrand },
   SANCTION: { label: '제재 안내', icon: 'fa-solid fa-triangle-exclamation', tone: toneDanger },
 };
 

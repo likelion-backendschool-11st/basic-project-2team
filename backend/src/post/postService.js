@@ -54,7 +54,12 @@ function createPostService({ postRepository, postEvents = NO_EVENTS, now = () =>
   async function createPost(authorId, body) {
     const input = validateCreatePost(body, now());
     const fields = await resolvePostFields(input);
-    const id = await postRepository.createPost({ post: { authorId, ...fields }, tags: input.tags });
+    // 이 작성자를 즐겨찾기한 회원에게 알립니다(repository 가 같은 트랜잭션에서 보내며 닉네임을 채웁니다).
+    const notice = {
+      type: NOTIFICATION_TYPE.favoriteAuthorPosted,
+      message: (nickname) => postMessages.notice.favoriteAuthorPosted(nickname, clipTitle(input.title)),
+    };
+    const id = await postRepository.createPost({ post: { authorId, ...fields }, tags: input.tags, notice });
     return { id };
   }
 
