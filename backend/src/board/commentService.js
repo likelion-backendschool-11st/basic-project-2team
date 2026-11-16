@@ -281,16 +281,6 @@ function createCommentService({ commentRepository, postEvents = NO_EVENTS, now =
     commentsChanged(reply.postId);
   }
 
-  /**
-   * POST /api/reports — targetType 에 따라 댓글 또는 공고를 신고합니다.
-   * @param {number} memberId
-   * @param {object} body
-   */
-  async function createReport(memberId, body) {
-    const input = validateCreateReport(body);
-    return input.targetType === REPORT_TARGET_TYPES.post ? reportPost(memberId, input) : reportComment(memberId, input);
-  }
-
   /** 공고 신고 (REQ-REPORT-003). 같은 공고는 한 번만, 본인 공고는 신고할 수 없습니다. */
   async function reportPost(memberId, input) {
     const post = await commentRepository.findPost(input.targetId);
@@ -328,7 +318,25 @@ function createCommentService({ commentRepository, postEvents = NO_EVENTS, now =
     return { id };
   }
 
-  return { listComments, createComment, updateComment, deleteComment, acceptComment, cancelAcceptance, createReport };
+  /** 회원 신고: 탈퇴한 회원은 대상이 아니고, 본인은 신고할 수 없습니다. */
+  async function reportMember(memberId, input) {
+    const target = await commentRepository.findMemberStatus(input.targetId);
+    if (!target || target.status === MEMBER_STATUS.withdrawn) throw new ApiError(404, 'MEMBER_NOT_FOUND', commentMessages.memberNotFound);
+    if (input.targetId === memberId) throw new ApiError(400, 'CANNOT_REPORT_SELF', commentMessages.cannotReportSelfMember);
+    const id = await commentRepository.createMemberReport({ reporterId: memberId, targetMemberId: input.targetId, reasonCode: input.reason, detail: input.detail });
+    if (id === null) throw new ApiError(409, 'ALREADY_REPORTED', commentMessages.alreadyReportedMember);
+    return { id };
+  }
+
+  /** POST /api/reports: targetType 에 따라 댓글·회원·공고 신고로 보냅니다. */
+  async function report(memberId, body) {
+    const input = validateCreateReport(body);
+    if (input.targetType === REPORT_TARGET_TYPES.member) return reportMember(memberId, input);
+    if (input.targetType === REPORT_TARGET_TYPES.post) return reportPost(memberId, input);
+    return reportComment(memberId, input);
+  }
+
+  return { listComments, createComment, updateComment, deleteComment, acceptComment, cancelAcceptance, report };
 }
 
 module.exports = { createCommentService };

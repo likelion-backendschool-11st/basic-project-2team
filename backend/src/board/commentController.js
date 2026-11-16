@@ -54,7 +54,7 @@ function createCommentController(commentService) {
   }
 
   async function report(req, res) {
-    const data = await commentService.createReport(req.auth.memberId, req.body);
+    const data = await commentService.report(req.auth.memberId, req.body);
     return sendSuccess(res, 201, data);
   }
 

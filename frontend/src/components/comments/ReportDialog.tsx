@@ -4,7 +4,7 @@ import Modal from '../ui/Modal';
 
 interface ReportDialogProps {
   readonly isOpen: boolean;
-  /** 모달 제목 (기본값: 댓글 신고) */
+  /** 제목 (기본: 댓글 신고) */
   readonly title?: string;
   /** 선택한 사유와 상세 내용(선택, 비어 있을 수 있음) */
   readonly onConfirm: (reason: string, detail: string) => void;

@@ -78,8 +78,6 @@ export const loginText = {
   meta: {
     securityIcon: 'fa-solid fa-shield-halved',
     security: 'SSL 256-bit 보안 암호화 적용',
-    onlineCount: '9,420명',
-    onlineSuffix: '동시 접속 중',
   },
   successRedirect: ROUTES.homeLoggedIn,
 } as const;

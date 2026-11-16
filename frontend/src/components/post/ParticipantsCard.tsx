@@ -1,4 +1,6 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
+import { paths } from '../../data/routes';
 import type { Participant } from '../../data/postData';
 import { postText } from '../../data/postData';
 import { Avatar } from '../ui/Avatar';
@@ -18,8 +20,16 @@ export const ParticipantsCard: React.FC<ParticipantsCardProps> = ({ participants
     <ul className="grid grid-cols-4 gap-3 text-center">
       {participants.map((p) => (
         <li key={`${p.leader ? 'host' : 'member'}-${p.name}`}>
-          <Avatar url={p.avatarUrl} name={p.name} className={`mx-auto w-12 h-12 rounded-full bg-night-card flex items-center justify-center text-sm font-bold text-white border-2 ${p.leader ? 'border-amberAccent' : 'border-night-borderLight'}`} />
-          <div className="text-[11px] text-white mt-1.5 truncate">{p.name}</div>
+          {/* 이름·아바타를 누르면 그 회원의 프로필 페이지로 이동합니다. */}
+          {(() => {
+            const body = (
+              <>
+                <Avatar url={p.avatarUrl} name={p.name} className={`mx-auto w-12 h-12 rounded-full bg-night-card flex items-center justify-center text-sm font-bold text-white border-2 ${p.leader ? 'border-amberAccent' : 'border-night-borderLight'}`} />
+                <div className="text-[11px] text-white mt-1.5 truncate">{p.name}</div>
+              </>
+            );
+            return p.id === undefined ? body : <Link to={paths.memberProfile(p.id)} className="block hover:opacity-80">{body}</Link>;
+          })()}
           <div className="text-[10px] text-fog-muted">{p.role}</div>
         </li>
       ))}

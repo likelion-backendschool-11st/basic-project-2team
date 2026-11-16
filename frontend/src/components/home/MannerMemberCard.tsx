@@ -1,4 +1,6 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
+import { paths } from '../../data/routes';
 import type { MannerMember } from '../../data/homeData';
 import { avatarStyles, tagStyles } from '../../data/accentStyles';
 
@@ -14,7 +16,7 @@ export const MannerMemberCard: React.FC<MannerMemberCardProps> = ({ member }) =>
       </div>
       <div>
         <div className="flex items-center gap-1.5">
-          <span className="text-sm font-semibold text-fog-headline">{member.name}</span>
+          <Link to={paths.memberProfile(member.id)} className="text-sm font-semibold text-fog-headline hover:text-mercury-light hover:underline">{member.name}</Link>
           <span className={`text-[10px] px-1.5 rounded font-semibold ${tagStyles[member.accent]}`}>{member.role}</span>
         </div>
         <p className="text-[11px] text-fog-muted">{member.comment}</p>

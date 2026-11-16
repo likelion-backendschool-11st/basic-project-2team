@@ -244,6 +244,24 @@ function createCommentRepository(pool) {
   }
 
   /**
+   * 회원 신고를 저장합니다 (target_id 는 신고 대상 회원 id). 같은 사람이 이미 신고했으면(report UNIQUE) null.
+   * @returns {Promise<number | null>} 새 신고 id
+   */
+  async function createMemberReport({ reporterId, targetMemberId, reasonCode, detail }) {
+    try {
+      const [result] = await pool.query(
+        `INSERT INTO report (reporter_id, target_type, target_id, target_member_id, post_id, reason_code, detail)
+         VALUES (?, 'MEMBER', ?, ?, NULL, ?, ?)`,
+        [reporterId, targetMemberId, targetMemberId, reasonCode, detail],
+      );
+      return result.insertId;
+    } catch (err) {
+      if (err && err.code === 'ER_DUP_ENTRY') return null;
+      throw err;
+    }
+  }
+
+  /**
    * 공고 신고를 저장합니다. 공고는 자동 가림 없이 관리자 신고 목록에서 처리합니다.
    * 같은 사람이 이미 신고했으면(report UNIQUE) null 을 돌려줍니다.
    * @returns {Promise<number | null>} 새 신고 id
@@ -287,6 +305,7 @@ function createCommentRepository(pool) {
     updateCommentContent,
     deleteCommentWithReplies,
     createCommentReport,
+    createMemberReport,
     createPostReport,
     findReportedCommentIds,
   };
