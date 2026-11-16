@@ -8,6 +8,7 @@ export const ROUTES = {
   search: '/search',
   notifications: '/notifications',
   myPage: '/mypage',
+  memberProfile: '/members/:memberId',
   profileEdit: '/mypage/profile',
   passwordChange: '/mypage/password',
   withdraw: '/mypage/withdraw',
@@ -37,6 +38,7 @@ export const ROUTES = {
 export const paths = {
   postDetail: (postId: string) => `/board/${postId}`,
   postEdit: (postId: string) => `/board/${postId}/edit`,
+  memberProfile: (memberId: number | string) => `/members/${memberId}`,
   adminReportDetail: (reportId: string) => `/admin/reports/${reportId}`,
   adminPostDetail: (postId: string) => `/admin/posts/${postId}`,
   adminMemberDetail: (memberId: string) => `/admin/members/${memberId}`,

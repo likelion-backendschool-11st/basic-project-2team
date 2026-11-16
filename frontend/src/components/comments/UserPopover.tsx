@@ -1,5 +1,8 @@
 import React, { useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { toProfileSummary } from '../../api/mypageApi';
+import { memberProfileText } from '../../data/myPageData';
+import { paths } from '../../data/routes';
 import { commentText } from '../../data/commentData';
 import type { CommentAuthorProfile } from '../../hooks/useComments';
 import ProfileSummaryCard from '../mypage/ProfileSummaryCard';
@@ -31,7 +34,12 @@ export const UserPopover: React.FC<UserPopoverProps> = ({ profile, onAction, onC
           {profile === 'error' ? t.loadFailed : t.loading}
         </p>
       )}
-      <div className="mt-4 flex justify-end">
+      <div className="mt-4 flex items-center justify-end gap-2">
+        {typeof profile === 'object' && (
+          <Link to={paths.memberProfile(profile.id)} className="flex items-center gap-2 rounded-lg border border-night-borderLight px-4 py-2 text-xs font-semibold text-fog-sub hover:text-white hover:bg-white/5">
+            <i className="fa-regular fa-id-card" />{memberProfileText.viewProfile}
+          </Link>
+        )}
         {/* 초대 API 가 아직 없어 안내 토스트만 띄웁니다. */}
         <button
           type="button"

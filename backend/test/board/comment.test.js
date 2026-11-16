@@ -134,6 +134,11 @@ function createFakeRepository() {
       c.reportCount += 1;
       return state.reports.length;
     },
+    async createMemberReport({ reporterId, targetMemberId, reasonCode, detail }) {
+      if (state.reports.some((r) => r.reporterId === reporterId && r.targetType === 'MEMBER' && r.targetId === targetMemberId)) return null;
+      state.reports.push({ id: state.reports.length + 1, reporterId, targetType: 'MEMBER', targetId: targetMemberId, targetMemberId, postId: null, reasonCode, detail });
+      return state.reports.length;
+    },
     async findReportedCommentIds(memberId, commentIds) {
       return new Set(
         state.reports.filter((r) => r.reporterId === memberId && commentIds.includes(r.targetId)).map((r) => r.targetId),
@@ -535,6 +540,18 @@ describe('댓글 API /api/posts/:postId/comments', () => {
       assert.equal((await list('', as(BOB))).body.data.items[0].reported, true);
       assert.equal((await list('', as(HOST_ID))).body.data.items[0].reported, false);
       assert.equal((await list()).body.data.items[0].reported, false);
+    });
+
+    it('회원을 신고하면 201 { id }, 같은 회원 재신고 409, 본인 400, 탈퇴·없는 회원 404', async () => {
+      const body = (targetId) => ({ targetType: 'MEMBER', targetId, reason: '욕설 및 비하 발언', detail: ' 채팅 욕설 ' });
+      const ok = await report(body(ALICE));
+      assert.equal(ok.status, 201);
+      assert.deepEqual(repo.state.reports[0], { id: 1, reporterId: BOB, targetType: 'MEMBER', targetId: ALICE, targetMemberId: ALICE, postId: null, reasonCode: '욕설 및 비하 발언', detail: '채팅 욕설' });
+      assert.equal((await report(body(ALICE))).body.error.code, 'ALREADY_REPORTED');
+      assert.equal((await report(body(BOB))).body.error.code, 'CANNOT_REPORT_SELF');
+      repo.state.members.get(HOST_ID).status = 'WITHDRAWN';
+      assert.equal((await report(body(HOST_ID))).status, 404);
+      assert.equal((await report(body(999))).body.error.code, 'MEMBER_NOT_FOUND');
     });
 
     it('같은 댓글을 다시 신고하면 409 ALREADY_REPORTED, 본인 댓글은 400 CANNOT_REPORT_SELF', async () => {

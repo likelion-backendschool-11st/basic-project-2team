@@ -3,7 +3,7 @@
 const { ApiError } = require('../common/ApiError');
 const { POST_EVENT, NO_EVENTS } = require('../common/postEvents');
 const { boardMessages } = require('./boardConstants');
-const { COMMENT_CHANNELS, COMMENT_STATUS, MEMBER_STATUS, commentMessages } = require('./commentConstants');
+const { COMMENT_CHANNELS, COMMENT_STATUS, MEMBER_STATUS, REPORT_TARGET_TYPES, commentMessages } = require('./commentConstants');
 const {
   parseCommentListQuery,
   validateCreateComment,
@@ -286,8 +286,7 @@ function createCommentService({ commentRepository, postEvents = NO_EVENTS, now =
    * @param {number} memberId
    * @param {object} body
    */
-  async function reportComment(memberId, body) {
-    const input = validateCreateReport(body);
+  async function reportComment(memberId, input) {
     const comment = await loadComment(input.targetId);
     if (comment.authorId === memberId) {
       throw new ApiError(400, 'CANNOT_REPORT_SELF', commentMessages.cannotReportSelf);
@@ -306,7 +305,23 @@ function createCommentService({ commentRepository, postEvents = NO_EVENTS, now =
     return { id };
   }
 
-  return { listComments, createComment, updateComment, deleteComment, acceptComment, cancelAcceptance, reportComment };
+  /** 회원 신고: 탈퇴한 회원은 대상이 아니고, 본인은 신고할 수 없습니다. */
+  async function reportMember(memberId, input) {
+    const target = await commentRepository.findMemberStatus(input.targetId);
+    if (!target || target.status === MEMBER_STATUS.withdrawn) throw new ApiError(404, 'MEMBER_NOT_FOUND', commentMessages.memberNotFound);
+    if (input.targetId === memberId) throw new ApiError(400, 'CANNOT_REPORT_SELF', commentMessages.cannotReportSelfMember);
+    const id = await commentRepository.createMemberReport({ reporterId: memberId, targetMemberId: input.targetId, reasonCode: input.reason, detail: input.detail });
+    if (id === null) throw new ApiError(409, 'ALREADY_REPORTED', commentMessages.alreadyReportedMember);
+    return { id };
+  }
+
+  /** POST /api/reports: targetType 에 따라 댓글 또는 회원 신고로 보냅니다. */
+  async function report(memberId, body) {
+    const input = validateCreateReport(body);
+    return input.targetType === REPORT_TARGET_TYPES.member ? reportMember(memberId, input) : reportComment(memberId, input);
+  }
+
+  return { listComments, createComment, updateComment, deleteComment, acceptComment, cancelAcceptance, report };
 }
 
 module.exports = { createCommentService };

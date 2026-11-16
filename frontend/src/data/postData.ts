@@ -5,6 +5,8 @@ export type PostStatus = 'OPEN' | 'PAUSED' | 'CLOSED' | 'COMPLETED';
 export type ApplicationStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'CANCELED' | 'NO_SHOW';
 
 export interface Participant {
+  /** 회원 id (프로필 페이지 링크용) */
+  readonly id?: number;
   readonly name: string;
   readonly avatarUrl?: string | null;
   readonly role: string;

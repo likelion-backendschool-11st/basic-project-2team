@@ -72,6 +72,10 @@ export const deleteComment = (commentId: number) => request<void>('DELETE', `/ap
 export const reportComment = (commentId: number, reason: string, detail?: string) =>
   request<{ readonly id: number }>('POST', '/api/reports', { targetType: 'COMMENT', targetId: commentId, reason, ...(detail ? { detail } : {}) });
 
+/** POST /api/reports — 회원(프로필 페이지) 신고. 사유 문구는 댓글 신고와 같습니다. */
+export const reportMember = (memberId: number, reason: string, detail?: string) =>
+  request<{ readonly id: number }>('POST', '/api/reports', { targetType: 'MEMBER', targetId: memberId, reason, ...(detail ? { detail } : {}) });
+
 /** PUT /api/comments/{replyId}/accept — 그 답글이 달린 댓글의 작성자만. 이미 채택한 답글이 있으면 이 답글로 바뀝니다. */
 export const acceptReply = (replyId: number) => request<{ readonly commentId: number; readonly acceptedReplyId: number }>('PUT', `/api/comments/${replyId}/accept`);
 

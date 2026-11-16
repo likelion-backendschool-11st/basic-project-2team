@@ -1,4 +1,6 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
+import { paths } from '../../data/routes';
 import type { MannerLeader } from '../../data/homeData';
 import { avatarStyles, rankBadgeStyles, tagStyles } from '../../data/accentStyles';
 import { Avatar } from '../ui/Avatar';
@@ -26,7 +28,7 @@ export const MannerLeaderCard: React.FC<MannerLeaderCardProps> = ({ leader }) =>
       </div>
       <div>
         <div className="flex items-center gap-1.5">
-          <span className="text-sm font-semibold text-fog-headline">{leader.name}</span>
+          <Link to={paths.memberProfile(leader.id)} className="text-sm font-semibold text-fog-headline hover:text-mercury-light hover:underline">{leader.name}</Link>
           <span className={`text-[10px] px-1.5 rounded font-medium ${tagStyles[leader.accent]}`}>{leader.game}</span>
         </div>
         <p className="text-[11px] text-fog-muted">{leader.comment}</p>

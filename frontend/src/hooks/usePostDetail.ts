@@ -147,7 +147,7 @@ export function usePostDetail(postId: string) {
     getParticipants(postId)
       .then((items) => {
         if (cancelled) return;
-        setParticipants(items.map((p) => ({ name: p.nickname, avatarUrl: p.avatarUrl, role: p.isHost ? postDetailText.leaderRole : (p.role ?? postDetailText.slotRole), leader: p.isHost })));
+        setParticipants(items.map((p) => ({ id: p.id, name: p.nickname, avatarUrl: p.avatarUrl, role: p.isHost ? postDetailText.leaderRole : (p.role ?? postDetailText.slotRole), leader: p.isHost })));
       })
       .catch(() => !cancelled && setParticipants([]));
     return () => {

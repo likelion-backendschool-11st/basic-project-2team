@@ -142,6 +142,24 @@ export const profileText = {
   retry: '다시 시도',
 };
 
+/** 다른 회원의 프로필 페이지 (/members/:memberId) */
+export const memberProfileText = {
+  back: '뒤로가기',
+  gamesTitle: '게이머 프로필',
+  gamesEmpty: '등록한 게임이 없습니다.',
+  mainBadge: '대표',
+  favorite: '즐겨찾기',
+  favorited: '즐겨찾는 중',
+  favoriteAdded: '즐겨찾는 유저에 추가했습니다.',
+  favoriteRemoved: '즐겨찾기를 해제했습니다.',
+  actionFailed: '요청을 처리하지 못했습니다.',
+  notFound: '존재하지 않거나 탈퇴한 회원입니다.',
+  viewProfile: '프로필 보기',
+  report: '신고',
+  reportTitle: '회원 신고',
+  reported: '신고가 접수되었습니다. 운영팀이 검토 후 조치합니다.',
+};
+
 /** 게임 코드별 배지 색 (없는 게임은 blue) */
 export const gameAccents: Readonly<Record<string, GameAccent>> = {
   lostark: 'amber',
