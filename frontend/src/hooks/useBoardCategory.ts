@@ -4,7 +4,7 @@ import { getCategories, type CategorySummary } from '../api/boardApi';
 import { boardCategories, DEFAULT_BOARD_CATEGORY, type BoardCategory } from '../data/boardData';
 import { ROUTES } from '../data/routes';
 
-/** Reads `?category=` (mmorpg|fps|aos|steam|etc|all), defaulting to MMORPG. 카테고리별 공고 수는 서버에서 불러옵니다. */
+/** Reads `?category=` (mmorpg|fps|aos|steam|etc|all), defaulting to 전체(all). 카테고리별 공고 수는 서버에서 불러옵니다. */
 export function useBoardCategory() {
   const [params] = useSearchParams();
   const navigate = useNavigate();

@@ -52,7 +52,7 @@ export interface FilterChip {
   readonly value: string;
 }
 
-export const DEFAULT_BOARD_CATEGORY: BoardCategoryId = 'mmorpg';
+export const DEFAULT_BOARD_CATEGORY: BoardCategoryId = 'all';
 export const BOARD_PAGE_SIZE = 8;
 
 export const boardCategories: readonly BoardCategory[] = [
