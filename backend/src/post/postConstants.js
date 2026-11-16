@@ -34,7 +34,7 @@ const POST_STATUS_CLOSED = 'CLOSED';
 const POST_STATUS_COMPLETED = 'COMPLETED';
 
 /** notification.type — 파티 모듈(NOTIFICATION_TYPE)·관리자 삭제 알림과 같은 값입니다. */
-const NOTIFICATION_TYPE = Object.freeze({ postUpdated: 'POST_UPDATED', postDeleted: 'POST_DELETED', favoriteAuthorPosted: 'FAVORITE_AUTHOR_POST' });
+const NOTIFICATION_TYPE = Object.freeze({ postUpdated: 'POST_UPDATED', postDeleted: 'POST_DELETED', favoriteAuthorPosted: 'FAVORITE_AUTHOR_POST', interestPost: 'INTEREST_POST' });
 /** 공고 제목이 길면 이 글자 수에서 줄임표로 잘라 알림 문구(VARCHAR 200)에 넣습니다. */
 const NOTICE_TITLE_MAX = 40;
 /** 공고 수정·삭제를 알리는 대상: 대기 중·수락된 신청자 */
@@ -44,6 +44,7 @@ const postMessages = Object.freeze({
   notice: Object.freeze({
     updated: (title) => `'${title}' 공고의 일정 또는 모집 내용이 수정되었습니다.`,
     favoriteAuthorPosted: (nickname, title) => `즐겨찾기한 '${nickname}'님이 새 공고를 올렸습니다: '${title}'`,
+    interestPost: (gameName, title) => `관심 게임 '${gameName}'에 새 공고가 올라왔습니다: '${title}'`,
     deleted: (title) => `'${title}' 공고가 작성자에 의해 삭제되었습니다.`,
   }),
   invalidInput: '입력값을 확인해주세요.',

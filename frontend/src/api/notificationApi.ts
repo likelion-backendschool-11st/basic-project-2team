@@ -1,4 +1,11 @@
-import { notificationText, notificationTypes, unknownNotificationType, type NotificationType, type NotificationView } from '../data/notificationData';
+import {
+  notificationText,
+  notificationTypes,
+  unknownNotificationType,
+  type NotificationType,
+  type NotificationView,
+  type SubscriptionView,
+} from '../data/notificationData';
 import { request } from './http';
 
 /** GET /api/notifications 아이템 (docs/API_SPEC.md 4절 알림함) */
@@ -42,6 +49,28 @@ export const deleteNotification = (id: string) => request<void>('DELETE', `/api/
 
 /** PATCH /api/notifications/read-all → 204 */
 export const markAllNotificationsRead = () => request<void>('PATCH', '/api/notifications/read-all');
+
+/** GET /api/notifications/subscriptions 아이템 (docs/API_SPEC.md 4절 알림함) */
+export interface SubscriptionItem {
+  readonly id: number;
+  readonly game: string;
+  readonly gameName: string;
+  readonly detail: string | null;
+  readonly detailName: string | null;
+  readonly enabled: boolean;
+}
+
+export const getSubscriptions = () => request<readonly SubscriptionItem[]>('GET', '/api/notifications/subscriptions');
+export const addSubscription = (game: string, detail: string | null) =>
+  request<{ readonly id: number }>('POST', '/api/notifications/subscriptions', detail ? { game, detail } : { game });
+export const setSubscriptionEnabled = (id: number, enabled: boolean) => request<void>('PATCH', `/api/notifications/subscriptions/${id}`, { enabled });
+export const deleteSubscription = (id: number) => request<void>('DELETE', `/api/notifications/subscriptions/${id}`);
+
+export const toSubscriptionView = (item: SubscriptionItem): SubscriptionView => ({
+  id: item.id,
+  name: item.detailName ? `${item.gameName} · ${item.detailName}` : item.gameName,
+  enabled: item.enabled,
+});
 
 const MINUTE = 60_000;
 

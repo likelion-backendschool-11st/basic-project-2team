@@ -59,7 +59,12 @@ function createPostService({ postRepository, postEvents = NO_EVENTS, now = () =>
       type: NOTIFICATION_TYPE.favoriteAuthorPosted,
       message: (nickname) => postMessages.notice.favoriteAuthorPosted(nickname, clipTitle(input.title)),
     };
-    const id = await postRepository.createPost({ post: { authorId, ...fields }, tags: input.tags, notice });
+    // 관심 게임(·상세 분류)으로 알림을 켜 둔 회원에게도 알립니다. 게임 이름은 repository 가 채웁니다.
+    const interestNotice = {
+      type: NOTIFICATION_TYPE.interestPost,
+      message: (gameName) => postMessages.notice.interestPost(gameName, clipTitle(input.title)),
+    };
+    const id = await postRepository.createPost({ post: { authorId, ...fields }, tags: input.tags, notice, interestNotice });
     return { id };
   }
 

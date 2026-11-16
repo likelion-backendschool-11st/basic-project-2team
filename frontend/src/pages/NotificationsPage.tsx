@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import LoggedInLayout from '../components/user/LoggedInLayout';
 import Pagination from '../components/board/Pagination';
 import NotificationRow from '../components/notification/NotificationRow';
+import NotificationSettingsPanel from '../components/notification/NotificationSettingsPanel';
 import { notificationText } from '../data/notificationData';
 import { ROUTES } from '../data/routes';
 import { useNotifications } from '../hooks/useNotifications';
@@ -18,6 +19,7 @@ const tabOff = `${tabBase} bg-night-base border-night-border text-fog-sub hover:
 /** 알림 페이지. Route: /notifications (서버: GET /api/notifications) */
 export const NotificationsPage: React.FC<NotificationsPageProps> = () => {
   const n = useNotifications();
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   return (
     <LoggedInLayout>
@@ -41,6 +43,15 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = () => {
               >
                 {notificationText.markAllRead}
               </button>
+              <button
+                type="button"
+                aria-expanded={settingsOpen}
+                onClick={() => setSettingsOpen((open) => !open)}
+                className="text-sm font-medium text-fog-sub hover:text-white flex items-center gap-1.5"
+              >
+                <i className="fa-solid fa-gear text-xs" aria-hidden="true" />
+                {notificationText.settings}
+              </button>
               <div role="group" aria-label={notificationText.filterAriaLabel} className="flex gap-2">
                 <button type="button" aria-pressed={!n.unreadOnly} onClick={() => n.setUnreadOnly(false)} className={n.unreadOnly ? tabOff : tabOn}>
                   {notificationText.filterAll}
@@ -52,6 +63,7 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = () => {
             </div>
           )}
         </header>
+        {n.loggedIn && settingsOpen && <NotificationSettingsPanel onClose={() => setSettingsOpen(false)} />}
         {n.actionError && (
           <p role="alert" className="text-sm text-rose-300">
             {n.actionError}

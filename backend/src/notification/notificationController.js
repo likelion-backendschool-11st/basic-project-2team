@@ -29,7 +29,25 @@ function createNotificationController(notificationService) {
     return res.status(204).end();
   }
 
-  return { list, unreadCount, markRead, markAllRead, remove };
+  async function listSubscriptions(req, res) {
+    return sendSuccess(res, 200, await notificationService.listSubscriptions(memberId(req)));
+  }
+
+  async function addSubscription(req, res) {
+    return sendSuccess(res, 201, await notificationService.addSubscription(memberId(req), req.body));
+  }
+
+  async function setSubscriptionEnabled(req, res) {
+    await notificationService.setSubscriptionEnabled(memberId(req), req.params.subscriptionId, req.body);
+    return res.status(204).end();
+  }
+
+  async function removeSubscription(req, res) {
+    await notificationService.removeSubscription(memberId(req), req.params.subscriptionId);
+    return res.status(204).end();
+  }
+
+  return { list, unreadCount, markRead, markAllRead, remove, listSubscriptions, addSubscription, setSubscriptionEnabled, removeSubscription };
 }
 
 module.exports = { createNotificationController };

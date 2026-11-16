@@ -62,8 +62,27 @@ function createPostRepository(pool) {
     );
   }
 
+  /**
+   * 이 공고의 게임(상세 분류를 지정했다면 그 분류)을 관심 알림으로 켜 둔 회원에게 알립니다.
+   * 작성자 본인·탈퇴 회원은 제외하고, 같은 공고로 이미 「즐겨찾기 새 공고」 알림을 받는 회원에게는 중복으로 보내지 않습니다.
+   */
+  async function notifyInterestedMembers(connection, { post, postId, notice }) {
+    const [[game]] = await connection.query('SELECT name FROM game WHERE id = ?', [post.gameId]);
+    if (!game) return;
+    await connection.query(
+      `INSERT INTO notification (member_id, type, message, post_id)
+       SELECT DISTINCT s.member_id, ?, ?, ?
+         FROM notification_subscription s JOIN member m ON m.id = s.member_id
+        WHERE s.enabled = TRUE AND s.game_id = ?
+          AND (s.game_content_id IS NULL OR s.game_content_id <=> ?)
+          AND s.member_id <> ? AND m.status <> 'WITHDRAWN'
+          AND s.member_id NOT IN (SELECT fm.member_id FROM favorite_member fm WHERE fm.target_member_id = ?)`,
+      [notice.type, notice.message(game.name), postId, post.gameId, post.gameContentId, post.authorId, post.authorId],
+    );
+  }
+
   /** 공고와 태그 연결을 한 트랜잭션으로 저장하고 새 공고 id 를 반환합니다. 즐겨찾기한 회원 알림도 같은 트랜잭션입니다. */
-  async function createPost({ post, tags, notice }) {
+  async function createPost({ post, tags, notice, interestNotice }) {
     const connection = await pool.getConnection();
     try {
       await connection.beginTransaction();
@@ -90,6 +109,7 @@ function createPostRepository(pool) {
 
       await attachTags(connection, postId, tags);
       if (notice) await notifyFavoriteFollowers(connection, { authorId: post.authorId, postId, notice });
+      if (interestNotice) await notifyInterestedMembers(connection, { post, postId, notice: interestNotice });
 
       // 공고 작성 +10 (하루 3회까지, docs/03-db-design.md 결정 사항 8-1)
       await awardDailyLimitedPoints(connection, { memberId: post.authorId, actionType: 'POST_CREATE', refId: postId });

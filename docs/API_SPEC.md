@@ -482,6 +482,7 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 | 작성자가 마감(`CLOSED`)·완료(`COMPLETED`) 처리 (재개는 알리지 않음) | 대기 중·수락된 신청자 | `POST_UPDATED` |
 | 작성자가 공고 수정(`PUT`)에서 **일정 · 게임 · 상세 분류를 바꿈** (제목·본문·태그만 고치면 알리지 않음) | 대기 중·수락된 신청자 | `POST_UPDATED` |
 | 작성자가 공고 삭제(`DELETE`) | 대기 중·수락된 신청자 | `POST_DELETED` (공고가 사라지므로 `postId` 는 `null`) |
+| 새 공고 등록(`POST /api/posts`) — 그 공고의 **게임**(또는 **상세 분류**)을 관심 알림으로 **켜 둔** 회원(작성자 본인·탈퇴 회원 제외, 아래 즐겨찾기 알림을 받는 회원은 중복 제외) | 관심 알림 설정 회원 | `INTEREST_POST` (`postId` 는 새 공고) |
 | 즐겨찾기한 작성자가 새 공고 등록(`POST /api/posts`) (수정·임시저장은 알리지 않음) | 그 작성자를 즐겨찾기한 회원(탈퇴 회원 제외) | `FAVORITE_AUTHOR_POST` (`postId` 는 새 공고) — `backend/src/post` 의 `postMessages.notice.favoriteAuthorPosted` |
 
 ### 알림함 (Notification)
@@ -495,6 +496,10 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 | PATCH | `/api/notifications/{notificationId}/read` | 알림 하나를 읽음 처리 → `204` (이미 읽은 알림도 `204`) |
 | PATCH | `/api/notifications/read-all` | 내 안 읽은 알림을 모두 읽음 처리 → `204` |
 | DELETE | `/api/notifications/{notificationId}` | 알림 하나를 삭제 → `204` (복구 불가. 없는 알림·이미 지운 알림은 `404`) |
+| GET | `/api/notifications/subscriptions` | 내 관심 알림 설정 목록 `[{ id, game, gameName, detail, detailName, enabled }]` (`detail` 은 상세 분류 코드, 게임 전체면 `null`) |
+| POST | `/api/notifications/subscriptions` | 관심 알림 등록 `{ game, detail? }` → `201 { id }` |
+| PATCH | `/api/notifications/subscriptions/{subscriptionId}` | 항목별 켜기·끄기 `{ enabled }` → `204` |
+| DELETE | `/api/notifications/subscriptions/{subscriptionId}` | 관심 알림 삭제 → `204` |
 
 ```json
 {
@@ -504,6 +509,7 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 ```
 
 - `postId` 는 연결된 공고가 없거나 공고가 삭제돼 연결이 끊어지면 `null` 입니다. `unreadCount` 는 `unread` 필터와 상관없이 내 전체 안 읽은 알림 수입니다.
+- **관심 알림 설정**(REQ-NOTI-001): 회원당 최대 20개, 같은 대상(게임 + 상세 분류)은 한 번만 등록합니다. 오류: 400 `INVALID_INPUT`(`game` · `detail` · `enabled`), 404 `GAME_NOT_FOUND` · `GAME_CONTENT_NOT_FOUND` · `SUBSCRIPTION_NOT_FOUND`(없음, 남의 설정, 형식이 틀린 id), 409 `SUBSCRIPTION_EXISTS` · `SUBSCRIPTION_LIMIT`.
 - 오류: 400 `INVALID_INPUT`(`page` · `size` · `unread`), 401 `UNAUTHORIZED`, 404 `NOTIFICATION_NOT_FOUND`(없음, 남의 알림, 형식이 틀린 id — 남의 알림은 존재 여부를 알리지 않으려고 404).
 
 ## 5. 댓글 (Comment)
