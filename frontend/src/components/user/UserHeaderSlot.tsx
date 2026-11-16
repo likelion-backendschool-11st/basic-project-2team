@@ -3,8 +3,10 @@ import { Link } from 'react-router-dom';
 import type { LoginUser } from '../../api/authApi';
 import { formatTemperature } from '../../api/mypageApi';
 import { userMenuText } from '../../data/userData';
+import { useMyLevel } from '../../hooks/useMyLevel';
 import { useUserMenu } from '../../hooks/useUserMenu';
 import { Avatar } from '../ui/Avatar';
+import ExpGauge from '../ui/ExpGauge';
 
 interface UserHeaderSlotProps {
   readonly user: LoginUser;
@@ -13,6 +15,7 @@ interface UserHeaderSlotProps {
 /** Logged-in replacement for the header's login/signup pills (pass as AppLayout `headerRightSlot`). */
 export const UserHeaderSlot: React.FC<UserHeaderSlotProps> = ({ user }) => {
   const { onLogout } = useUserMenu();
+  const exp = useMyLevel(user.level);
   return (
     <div className="flex items-center gap-3">
       <Link
@@ -37,6 +40,7 @@ export const UserHeaderSlot: React.FC<UserHeaderSlotProps> = ({ user }) => {
             {userMenuText.mannerPrefix}
             {formatTemperature(user.mannerTemp)}
           </span>
+          {exp && <ExpGauge exp={exp} size="sm" className="mt-0.5 w-full min-w-[64px]" />}
         </div>
       </Link>
       <button

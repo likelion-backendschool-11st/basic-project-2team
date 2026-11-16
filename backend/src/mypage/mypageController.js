@@ -18,6 +18,10 @@ function createMypageController(mypageService) {
     return sendSuccess(res, 200, await mypageService.getMySummary(req.auth.memberId));
   }
 
+  async function getMyLevel(req, res) {
+    return sendSuccess(res, 200, await mypageService.getMyLevel(req.auth.memberId));
+  }
+
   async function getMemberProfile(req, res) {
     const memberId = requireMemberIdParam(req);
     return sendSuccess(res, 200, await mypageService.getMemberProfile(memberId, req.auth?.memberId ?? null));
@@ -55,6 +59,7 @@ function createMypageController(mypageService) {
 
   return {
     getMySummary,
+    getMyLevel,
     getMemberProfile,
     listMyPosts,
     listMyApplications,

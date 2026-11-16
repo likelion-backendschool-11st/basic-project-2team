@@ -9,6 +9,7 @@ const { Router } = require('express');
 function createMypageRouter(mypageController, { requireAuth, optionalAuth }) {
   const router = Router();
   router.get('/me/summary', requireAuth, mypageController.getMySummary);
+  router.get('/me/level', requireAuth, mypageController.getMyLevel);
   router.get('/me/posts', requireAuth, mypageController.listMyPosts);
   router.get('/me/applications', requireAuth, mypageController.listMyApplications);
   router.get('/me/comments', requireAuth, mypageController.listMyComments);

@@ -12,6 +12,7 @@ import {
 } from '../data/myPageData';
 import type { ApplicationStatus, PostStatus } from '../data/postData';
 import { paths } from '../data/routes';
+import { expText, type ExpGaugeView } from '../data/userData';
 import { styleChoices } from '../data/writeData';
 import { assetUrl, request } from './http';
 
@@ -48,6 +49,19 @@ export interface MySummaryResponse {
   readonly topTags: readonly { readonly rank: number; readonly code: string; readonly label: string; readonly count: number; readonly percent: number }[];
   readonly createdAt: string;
   readonly ageRangePublic: boolean;
+  /** 이번 레벨의 경험치 진행도 (내 요약에만 옵니다) */
+  readonly exp: LevelExp;
+}
+
+/** 경험치 진행도 (docs/API_SPEC.md 8절). 최고 레벨이면 required 는 null, percent 는 100 */
+export interface LevelExp {
+  /** 누적 활동 점수 */
+  readonly activityPoint: number;
+  /** 이번 레벨에서 모은 점수 */
+  readonly current: number;
+  /** 다음 레벨까지 필요한 점수 폭 */
+  readonly required: number | null;
+  readonly percent: number;
 }
 
 /** 「별점 평가」 진행 상황. 평가할 수 있는 공고가 아니면 null */
@@ -127,9 +141,27 @@ const pageQuery = (page: number, size: number) => `page=${page}&size=${size}`;
 
 export const getMySummary = () => request<MySummaryResponse>('GET', '/api/members/me/summary');
 
+/** GET /api/members/me/level — 헤더 간략 프로필의 레벨 배지·경험치 게이지용 */
+export interface MyLevelResponse {
+  readonly level: number;
+  readonly exp: LevelExp;
+}
+
+export const getMyLevel = () => request<MyLevelResponse>('GET', '/api/members/me/level');
+
+/** 경험치 응답 → 게이지 표시값 */
+export function toExpGauge(exp: LevelExp): ExpGaugeView {
+  if (exp.required === null) return { percent: 100, label: expText.max, description: expText.maxDescription };
+  return {
+    percent: Math.min(100, Math.max(0, exp.percent)),
+    label: expText.progress(exp.current, exp.required),
+    description: expText.remaining(exp.required - exp.current),
+  };
+}
+
 /** GET /api/members/{memberId} — 다른 회원의 공개 프로필 (내 요약과 같은 필드, 비공개 항목 제외) */
 /** GET /api/members/{memberId}. viewer 는 로그인했을 때만 옵니다(favorited: 내가 즐겨찾기한 회원인지). */
-export type MemberProfileResponse = Omit<MySummaryResponse, 'ageRangePublic'> & {
+export type MemberProfileResponse = Omit<MySummaryResponse, 'ageRangePublic' | 'exp'> & {
   readonly viewer?: { readonly isMe: boolean; readonly favorited: boolean } | null;
 };
 
@@ -165,7 +197,8 @@ const toShortDate = (iso: string) => {
 
 export const formatTemperature = (mannerTemp: number) => `${mannerTemp.toFixed(1)}${profileText.temperatureSuffix}`;
 
-export function toProfileSummary(res: MemberProfileResponse): ProfileSummary {
+/** 내 요약(MySummaryResponse)을 넘기면 경험치 게이지도 채웁니다. 다른 회원 프로필에는 exp 가 없어 null 입니다. */
+export function toProfileSummary(res: MemberProfileResponse & { readonly exp?: LevelExp }): ProfileSummary {
   const t = profileText;
   const mainGame = res.games.find((g) => g.isMain) ?? res.games[0];
   const style = mainGame ? [styleLabel(mainGame.playStyle), mainGame.playTimeSlot].filter(Boolean).join(' / ') : '';
@@ -173,6 +206,7 @@ export function toProfileSummary(res: MemberProfileResponse): ProfileSummary {
     avatarUrl: assetUrl(res.avatarUrl),
     nickname: res.nickname,
     levelLabel: `${t.levelPrefix}${res.level}`,
+    exp: res.exp ? toExpGauge(res.exp) : null,
     mainGameBadge: mainGame ? `${t.mainGamePrefix}${mainGame.name}` : null,
     fields: [
       { id: 'games', label: t.gamesLabel, value: res.games.length > 0 ? res.games.map((g) => g.name).join(', ') : t.noGames },

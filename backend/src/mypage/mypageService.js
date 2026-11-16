@@ -1,6 +1,7 @@
 'use strict';
 
 const { ApiError } = require('../common/ApiError');
+const { levelProgress } = require('../common/activityPoint');
 const { TOP_TAG_LIMIT, RECENT_RATING_LIMIT, mypageMessages } = require('./mypageConstants');
 const { parsePageQuery, parseApplicationQuery } = require('./mypageValidator');
 
@@ -152,7 +153,20 @@ function createMypageService({ mypageRepository, now = () => new Date() }) {
       throw new ApiError(401, 'UNAUTHORIZED', mypageMessages.unauthorized);
     }
     const profile = await buildProfile(member, { includePrivate: true });
-    return { ...profile, ageRangePublic: Boolean(member.ageRangePublic) };
+    return {
+      ...profile,
+      ageRangePublic: Boolean(member.ageRangePublic),
+      exp: levelProgress(member.level, member.activityPoint),
+    };
+  }
+
+  /** GET /api/members/me/level — 헤더 간략 프로필의 레벨 배지·경험치 게이지 */
+  async function getMyLevel(memberId) {
+    const member = await mypageRepository.findLevel(memberId);
+    if (!member || member.status === WITHDRAWN) {
+      throw new ApiError(401, 'UNAUTHORIZED', mypageMessages.unauthorized);
+    }
+    return { level: member.level, exp: levelProgress(member.level, member.activityPoint) };
   }
 
   /**
@@ -242,6 +256,7 @@ function createMypageService({ mypageRepository, now = () => new Date() }) {
 
   return {
     getMySummary,
+    getMyLevel,
     getMemberProfile,
     listMyPosts,
     listMyApplications,

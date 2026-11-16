@@ -777,7 +777,8 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 
 | Method | URI | 설명 | 인증 |
 | --- | --- | --- | --- |
-| GET | `/api/members/me/summary` | 내 프로필 요약 (매너 온도, 평균 별점, 게시글·완료 파티 수, 상위 태그 Top3) | 🔒 |
+| GET | `/api/members/me/summary` | 내 프로필 요약 (매너 온도, 평균 별점, 게시글·완료 파티 수, 상위 태그 Top3, 경험치) | 🔒 |
+| GET | `/api/members/me/level` | 내 레벨·경험치 진행도 (헤더 간략 프로필 게이지) → `{ level, exp }` | 🔒 |
 | GET | `/api/members/me/posts?page=&size=` | 내가 쓴 공고 | 🔒 |
 | GET | `/api/members/me/applications?status=&page=&size=` | 내가 신청한 공고 (신청 상태 포함) | 🔒 |
 | GET | `/api/members/me/comments?page=&size=` | 내가 쓴 댓글 | 🔒 |
@@ -821,6 +822,7 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
   "topTags": [{ "rank": 1, "code": "kind", "label": "#친절함", "count": 28, "percent": 93 }],
   "createdAt": "2026-10-01T00:00:00.000Z",
   "ageRangePublic": false,
+  "exp": { "activityPoint": 57000, "current": 600, "required": 2400, "percent": 25 },
   "viewer": { "isMe": false, "favorited": true }
 }
 ```
@@ -830,7 +832,18 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 - `topTags`: 받은 평가 태그 상위 3개. `percent` = 그 태그를 고른 평가 수 ÷ 받은 평가 수 × 100 (반올림).
 - `games`: 게이머 프로필(`member_game_profile`), 대표 게임이 먼저 옵니다.
 - `ageRange`: 비공개(`ageRangePublic: false`)면 본인 외에는 `null`.
-- `ageRangePublic` 은 `me/summary` 에만, `viewer` 는 `{memberId}` 에만 있습니다. `viewer` 는 비로그인이면 `null`.
+- `ageRangePublic`·`exp` 는 `me/summary` 에만, `viewer` 는 `{memberId}` 에만 있습니다. `viewer` 는 비로그인이면 `null`.
+- `exp`: 이번 레벨의 경험치 진행도 (구현: `backend/src/common/activityPoint.js` 의 `levelProgress`). 레벨 L 에 도달하는 누적 점수는 `25 × L × (L − 1)` 입니다.
+  - `activityPoint`: 누적 활동 점수, `current`: 이번 레벨에서 모은 점수, `required`: 다음 레벨까지 필요한 점수 폭, `percent`: `current ÷ required × 100` (내림)
+  - 최고 레벨(99)이면 `required: null`, `percent: 100`. 레벨이 점수보다 높으면(시드·관리자 데이터) `current` 는 0 입니다.
+
+**내 레벨 (`GET /api/members/me/level`)** — 헤더 간략 프로필이 화면을 옮길 때마다 부르므로 `member` 한 행만 읽습니다.
+
+```json
+{ "level": 48, "exp": { "activityPoint": 57000, "current": 600, "required": 2400, "percent": 25 } }
+```
+
+- 오류: 401 `UNAUTHORIZED` (토큰 없음·만료, 탈퇴한 회원)
 - 오류: `me/summary` — 401 `UNAUTHORIZED` (토큰 없음·만료, 탈퇴한 회원). `{memberId}` — 404 `MEMBER_NOT_FOUND` (없음, 탈퇴, `memberId` 가 1 이상의 정수가 아님), 401 (헤더가 있는데 토큰이 잘못됨).
 
 **목록 공통**

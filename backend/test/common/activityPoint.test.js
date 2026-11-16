@@ -4,6 +4,8 @@ const { describe, it, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
 const {
   DAILY_LIMITS,
+  MAX_LEVEL,
+  levelProgress,
   startOfKstDay,
   awardDailyLimitedPoints,
   revokeActivityPoints,
@@ -61,6 +63,24 @@ function createFakeConnection() {
 }
 
 const addMember = (state, id, activityPoint = 0, level = 1) => state.members.set(id, { id, activityPoint, level });
+
+describe('levelProgress', () => {
+  it('이번 레벨에서 모은 점수와 다음 레벨까지 필요한 점수 폭을 돌려준다', () => {
+    // Lv.1: 0 ~ 50점, Lv.2: 50 ~ 150점
+    assert.deepEqual(levelProgress(1, 0), { activityPoint: 0, current: 0, required: 50, percent: 0 });
+    assert.deepEqual(levelProgress(1, 30), { activityPoint: 30, current: 30, required: 50, percent: 60 });
+    assert.deepEqual(levelProgress(2, 50), { activityPoint: 50, current: 0, required: 100, percent: 0 });
+    assert.deepEqual(levelProgress(2, 149), { activityPoint: 149, current: 99, required: 100, percent: 99 });
+  });
+
+  it('레벨이 점수보다 높으면(시드·관리자 데이터) 0 에서 시작한다', () => {
+    assert.deepEqual(levelProgress(48, 0), { activityPoint: 0, current: 0, required: 2400, percent: 0 });
+  });
+
+  it('최고 레벨이면 required 는 null, percent 는 100', () => {
+    assert.deepEqual(levelProgress(MAX_LEVEL, 999999), { activityPoint: 999999, current: 0, required: null, percent: 100 });
+  });
+});
 
 describe('startOfKstDay', () => {
   it('한국 시간 자정(UTC 전날 15시)을 돌려준다', () => {

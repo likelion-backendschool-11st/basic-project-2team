@@ -45,6 +45,23 @@ function levelForPoints(points) {
 }
 
 /**
+ * 지금 레벨에서 다음 레벨까지의 경험치 진행도 (경험치 게이지용).
+ * current 는 이번 레벨에서 모은 점수, required 는 다음 레벨까지 필요한 점수 폭입니다. 최고 레벨이면 required 는 null, percent 는 100.
+ * 지급 때 레벨은 내려가지 않고(Math.max) 시드·관리자 데이터로 레벨이 점수보다 높을 수 있어, current 는 0~required 로 자릅니다.
+ * @param {number} level member.level
+ * @param {number} activityPoint member.activity_point
+ * @returns {{ activityPoint: number, current: number, required: number | null, percent: number }}
+ */
+function levelProgress(level, activityPoint) {
+  const points = Number(activityPoint) || 0;
+  if (level >= MAX_LEVEL) return { activityPoint: points, current: 0, required: null, percent: 100 };
+  const base = pointsForLevel(level);
+  const required = pointsForLevel(level + 1) - base;
+  const current = Math.min(required, Math.max(0, points - base));
+  return { activityPoint: points, current, required, percent: Math.floor((current / required) * 100) };
+}
+
+/**
  * 활동 점수를 지급합니다. 이력(activity_point_log)을 남기고 member.activity_point · level 을 갱신합니다.
  * 지급은 레벨을 내리지 않습니다 (점수 없이 레벨만 있는 기존 데이터 보호). 호출하는 쪽의 트랜잭션 안에서 실행해야 합니다.
  * @param {import('mysql2/promise').PoolConnection} connection
@@ -147,6 +164,7 @@ module.exports = {
   MIN_LEVEL,
   MAX_LEVEL,
   levelForPoints,
+  levelProgress,
   startOfKstDay,
   awardActivityPoints,
   awardDailyLimitedPoints,
