@@ -138,6 +138,7 @@ API의 `level`은 **서비스 활동 레벨**(`member.level`)입니다. 공고 �
 | category_code | VARCHAR(20) | N | FK → category | `game`에서 알 수 있지만, 목록 조회가 가장 잦아서 공고에 중복 저장 |
 | game_id | BIGINT UNSIGNED | N | FK → game | |
 | game_content_id | BIGINT UNSIGNED | Y | FK → game_content | API의 `detail` |
+| custom_detail | VARCHAR(50) | Y | | 상세 분류 직접 입력(API의 `customDetail`). `game_content_id`와 함께 쓰지 않으며, 마이그레이션은 `db/migrations/2026-11-16-post-custom-detail.sql` |
 | party_type | VARCHAR(20) | N | | API의 `type` (raid 등) |
 | title | VARCHAR(100) | N | | 2~100자 |
 | body | TEXT | N | | 마크다운 본문. TEXT 최대 64KB |

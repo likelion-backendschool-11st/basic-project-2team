@@ -40,7 +40,7 @@ function createBoardRepository(pool) {
     const [rows] = await pool.query(
       `SELECT p.id, p.category_code AS categoryCode, c.name AS categoryName,
               g.code AS gameCode, g.name AS gameName,
-              gc.code AS detailCode, gc.name AS detailName, gc.content_type AS detailType,
+              gc.code AS detailCode, gc.name AS detailName, gc.content_type AS detailType, p.custom_detail AS customDetail,
               p.party_type AS partyType, p.title, p.body, p.party_name AS partyName, p.play_style AS playStyle,
               p.required_spec AS requiredSpec, p.headcount, p.current_count AS currentCount,
               p.schedule_at AS scheduleAt, p.voice_required AS voiceRequired, p.status,

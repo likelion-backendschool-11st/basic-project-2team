@@ -1,5 +1,5 @@
 import React from 'react';
-import { HEADCOUNT_MIN, styleChoices, writeText, type SelectOption } from '../../data/writeData';
+import { CUSTOM_DETAIL, CUSTOM_DETAIL_MAX, HEADCOUNT_MIN, styleChoices, writeText, type SelectOption } from '../../data/writeData';
 import type { WriteDraft } from '../../hooks/useWriteForm';
 import { inputBaseClass } from '../signup/fieldStyles';
 
@@ -44,14 +44,26 @@ export const OptionPanel: React.FC<OptionPanelProps> = ({ draft, onChange, summa
         </div>
         {([['game', writeText.game, choices.game], ['type', writeText.type, choices.type], ['detail', writeText.detail, choices.detail]] as const)
           // 하위 항목(모집 유형·상세 분류)은 선택지가 하나뿐이면 자동 선택되므로 표시하지 않습니다.
-          .filter(([key, , options]) => key === 'game' || options.length > 1)
+          // (직접 입력을 고른 상태면 상세 분류 선택지가 적어도 드롭다운을 보여줘 다시 바꿀 수 있게 합니다.)
+          .filter(([key, , options]) => key === 'game' || options.length > 1 || (key === 'detail' && draft.detail === CUSTOM_DETAIL))
           .map(([key, label, options]) => (
             <div key={key}>
               <Label text={label} />
               <select className={field} value={draft[key]} onChange={(e) => onChange(key, e.target.value)}>
                 <option value="" disabled>{writeText.placeholders[key]}</option>
                 {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                {key === 'detail' && <option value={CUSTOM_DETAIL}>{writeText.customDetailOption}</option>}
               </select>
+              {key === 'detail' && draft.detail === CUSTOM_DETAIL && (
+                <input
+                  className={`${field} mt-2`}
+                  value={draft.customDetail}
+                  maxLength={CUSTOM_DETAIL_MAX}
+                  onChange={(e) => onChange('customDetail', e.target.value)}
+                  placeholder={writeText.customDetailPlaceholder}
+                  aria-label={writeText.customDetailOption}
+                />
+              )}
             </div>
           ))}
         {/* 게임 → 모집 유형 → 상세 분류가 모두 정해진(자동 선택 포함) 뒤에만 모집 인원을 보여줍니다. */}

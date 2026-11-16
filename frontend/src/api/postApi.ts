@@ -8,6 +8,8 @@ export interface CreatePostRequest {
   readonly game: string;
   readonly type: string;
   readonly detail: string;
+  /** 상세 분류를 직접 입력한 경우의 글자 (detail 과 함께 쓰지 않음) */
+  readonly customDetail?: string;
   readonly headcount: number;
   readonly style: string;
   readonly schedule?: string;

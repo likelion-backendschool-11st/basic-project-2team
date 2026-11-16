@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { HEADCOUNT_MAX, initialDraft, toolbarActions, typeLabels, writeText, type SelectOption, type ToolbarAction } from '../data/writeData';
+import { CUSTOM_DETAIL, HEADCOUNT_MAX, initialDraft, toolbarActions, typeLabels, writeText, type SelectOption, type ToolbarAction } from '../data/writeData';
 import { paths, ROUTES } from '../data/routes';
 import { getGames, type Game } from '../api/gameApi';
 import { createPost, getLatestDraft, saveDraft as saveDraftApi, updatePost } from '../api/postApi';
@@ -22,7 +22,8 @@ function normalizeDraft(draft: WriteDraft, games: readonly Game[]): WriteDraft {
   const game = games.find((g) => g.code === draft.game);
   const type = pick(draft.type, typesOf(game));
   const contents = (game?.contents ?? []).filter((c) => c.type === type);
-  const detail = pick(draft.detail, contents.map((c) => c.code));
+  // 「직접 입력」은 목록에 없는 값이라 그대로 유지합니다. 이때는 선택한 상세 분류가 없어 전체 상한을 씁니다.
+  const detail = draft.detail === CUSTOM_DETAIL ? CUSTOM_DETAIL : pick(draft.detail, contents.map((c) => c.code));
   // 선택한 상세 분류(모드)의 최대 인원을 넘지 않게 맞춥니다. 상세 분류를 고르기 전에는 전체 상한을 씁니다.
   const maxHeadcount = contents.find((c) => c.code === detail)?.maxHeadcount ?? HEADCOUNT_MAX;
   return { ...draft, game: game?.code ?? '', type, detail, headcount: Math.min(draft.headcount, maxHeadcount) };
@@ -72,7 +73,8 @@ export function useWriteForm(postId?: string) {
                 partyName: saved.partyName ?? '',
                 game: saved.game,
                 type: saved.type,
-                detail: saved.detail ?? '',
+                detail: saved.customDetail ? CUSTOM_DETAIL : (saved.detail ?? ''),
+                customDetail: saved.customDetail ?? '',
                 headcount: saved.headcount,
                 style: saved.style ?? initialDraft.style,
                 tbd: saved.scheduleTbd,
@@ -151,6 +153,8 @@ export function useWriteForm(postId?: string) {
     if (!draft.game) return setError(writeText.placeholders.game);
     if (!draft.type) return setError(writeText.placeholders.type);
     if (options.detail.length > 0 && !draft.detail) return setError(writeText.placeholders.detail);
+    const customDetail = draft.detail === CUSTOM_DETAIL ? draft.customDetail.trim() : '';
+    if (draft.detail === CUSTOM_DETAIL && !customDetail) return setError(writeText.customDetailRequired);
     setSubmitting(true);
     try {
       const body = {
@@ -159,7 +163,8 @@ export function useWriteForm(postId?: string) {
         partyName: draft.partyName,
         game: draft.game,
         type: draft.type,
-        detail: draft.detail,
+        detail: draft.detail === CUSTOM_DETAIL ? '' : draft.detail,
+        ...(customDetail ? { customDetail } : {}),
         headcount: draft.headcount,
         style: draft.style,
         scheduleTbd: draft.tbd,
@@ -178,7 +183,7 @@ export function useWriteForm(postId?: string) {
   };
 
   const summary = [
-    labelOf(options.detail, draft.detail).replace(/^어둠군단장 /, ''),
+    (draft.detail === CUSTOM_DETAIL ? draft.customDetail.trim() : labelOf(options.detail, draft.detail)).replace(/^어둠군단장 /, ''),
     `${draft.headcount}인 파티(${draft.headcount - 1}명 모집)`,
     draft.voice ? '마이크 필수' : '마이크 선택',
   ]

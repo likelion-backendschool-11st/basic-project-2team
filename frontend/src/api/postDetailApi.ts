@@ -11,6 +11,8 @@ export interface PostDetailResponse {
   readonly gameName: string;
   readonly detail: string | null;
   readonly detailName: string | null;
+  /** 상세 분류를 직접 입력한 공고의 글자 (목록에서 고른 공고는 null) */
+  readonly customDetail: string | null;
   readonly detailType: string | null;
   readonly type: string;
   readonly title: string;

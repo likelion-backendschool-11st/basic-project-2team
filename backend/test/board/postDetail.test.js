@@ -115,6 +115,7 @@ describe('GET /api/posts/:postId', () => {
       gameName: '로스트아크',
       detail: 'kamen',
       detailName: '카멘',
+      customDetail: null,
       detailType: 'RAID',
       type: 'raid',
       title: '[카멘 1-3관] 숙련 랏서폿 모십니다',
@@ -137,6 +138,12 @@ describe('GET /api/posts/:postId', () => {
       createdAt: '2026-11-12T11:30:00.000Z',
       updatedAt: '2026-11-12T11:30:00.000Z',
     });
+  });
+
+  it('직접 입력한 상세 분류는 detail 이 null 이고 detailName·customDetail 에 그 글자가 담긴다', async () => {
+    repo.state.posts.set(1, { ...baseRow(), detailCode: null, detailName: null, detailType: null, customDetail: '신규 레이드 하드' });
+    const { data } = await (await get(1)).json();
+    assert.deepEqual([data.detail, data.detailName, data.customDetail], [null, '신규 레이드 하드', '신규 레이드 하드']);
   });
 
   it('조회할 때마다 조회수가 1 씩 오른다', async () => {

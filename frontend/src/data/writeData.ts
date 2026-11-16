@@ -63,6 +63,9 @@ export const writeText = {
   game: '게임 선택',
   type: '모집 유형',
   detail: '상세 분류 (보스/던전명)',
+  customDetailOption: '직접 입력',
+  customDetailPlaceholder: '예) 신규 레이드 하드 (50자 이내)',
+  customDetailRequired: '직접 입력할 상세 분류를 입력해주세요.',
   headcount: '모집 인원',
   headcountNote: '작성자를 포함한 전체 파티 인원을 설정하세요',
   style: '선호 플레이 스타일',
@@ -103,6 +106,11 @@ export const toolbarActions: readonly ToolbarAction[] = [
   { id: 'link', icon: 'fa-link', label: '링크', before: '[링크 이름](', after: ')' },
 ];
 
+/** 상세 분류 드롭다운에서 「직접 입력」을 고른 상태를 나타내는 값 (서버로는 보내지 않고 customDetail 로 바꿔 보냅니다) */
+export const CUSTOM_DETAIL = '__custom__';
+/** 직접 입력 상세 분류 최대 글자 수 (서버 customDetail 과 같은 값) */
+export const CUSTOM_DETAIL_MAX = 50;
+
 export const initialDraft = {
   title: '',
   body: '',
@@ -111,6 +119,8 @@ export const initialDraft = {
   game: '',
   type: '',
   detail: '',
+  // 상세 분류를 「직접 입력」으로 고른 경우(detail === CUSTOM_DETAIL)의 입력값
+  customDetail: '',
   headcount: 8,
   style: 'hard',
   tbd: true,

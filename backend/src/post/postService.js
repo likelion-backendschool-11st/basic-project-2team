@@ -39,6 +39,7 @@ function createPostService({ postRepository, postEvents = NO_EVENTS, now = () =>
       categoryCode: game.categoryCode,
       gameId: game.id,
       gameContentId,
+      customDetail: input.customDetail,
       partyType: input.type,
       title: input.title,
       body: input.body,

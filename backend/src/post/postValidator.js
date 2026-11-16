@@ -13,6 +13,7 @@ const {
   PARTY_TYPES,
   PLAY_STYLES,
   DRAFT_STRING_FIELDS,
+  DETAIL_CUSTOM_MAX_LENGTH,
   DRAFT_BOOLEAN_FIELDS,
   postMessages: m,
 } = require('./postConstants');
@@ -65,6 +66,11 @@ function validateCreatePost(body, now, keepSchedule = null) {
   const detail = isBlankOrUndefined(source.detail) ? '' : asTrimmedString(source.detail);
   if (!isBlankOrUndefined(source.detail) && !detail) fail('detail', m.detailInvalid);
 
+  const customDetail = isBlankOrUndefined(source.customDetail) ? '' : asTrimmedString(source.customDetail);
+  if (!isBlankOrUndefined(source.customDetail) && typeof source.customDetail !== 'string') fail('customDetail', m.customDetailInvalid);
+  else if (charLength(customDetail) > DETAIL_CUSTOM_MAX_LENGTH) fail('customDetail', m.customDetailInvalid);
+  else if (customDetail && detail) fail('customDetail', m.detailAndCustom);
+
   const headcount = source.headcount;
   if (!Number.isInteger(headcount) || headcount < HEADCOUNT_MIN || headcount > HEADCOUNT_MAX) {
     fail('headcount', m.headcountInvalid);
@@ -104,6 +110,7 @@ function validateCreatePost(body, now, keepSchedule = null) {
     game,
     type,
     detail: detail || null,
+    customDetail: customDetail || null,
     headcount,
     style: style || null,
     scheduleAt,
