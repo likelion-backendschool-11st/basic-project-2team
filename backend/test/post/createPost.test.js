@@ -25,8 +25,8 @@ function createFakeRepository() {
       if (gameId !== 1) return null;
       return { kamen: { id: 10, type: 'raid', maxHeadcount: 8 }, ranked: { id: 11, type: 'rank', maxHeadcount: 5 } }[code] ?? null;
     },
-    async createPost({ post, tags, notice }) {
-      state.posts.push({ ...post, tags, notice });
+    async createPost({ post, tags, notice, interestNotice }) {
+      state.posts.push({ ...post, tags, notice, interestNotice });
       return state.posts.length;
     },
   };
@@ -93,6 +93,15 @@ describe('POST /api/posts', () => {
     assert.equal(notice.type, 'FAVORITE_AUTHOR_POST');
     const message = notice.message('길드장');
     assert.match(message, /^즐겨찾기한 '길드장'님이 새 공고를 올렸습니다: '\[카멘\] 가+…'$/);
+    assert.ok(message.length <= 200);
+  });
+
+  it('관심 게임 알림 유형과 문구(게임 이름은 repository 가 채움)를 넘긴다', async () => {
+    await post({ ...validBody(), title: `[카멘] ${'가'.repeat(60)}` });
+    const { interestNotice } = repo.state.posts[0];
+    assert.equal(interestNotice.type, 'INTEREST_POST');
+    const message = interestNotice.message('로스트아크');
+    assert.match(message, /^관심 게임 '로스트아크'에 새 공고가 올라왔습니다: '\[카멘\] 가+…'$/);
     assert.ok(message.length <= 200);
   });
 

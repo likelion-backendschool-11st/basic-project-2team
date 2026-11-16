@@ -1,8 +1,8 @@
 'use strict';
 
 const { ApiError } = require('../common/ApiError');
-const { notificationMessages: m } = require('./notificationConstants');
-const { parseId, parseListQuery } = require('./notificationValidator');
+const { MAX_SUBSCRIPTIONS, notificationMessages: m } = require('./notificationConstants');
+const { parseId, parseListQuery, parseSubscriptionBody, parseEnabledBody } = require('./notificationValidator');
 
 const toIso = (value) => (value ? new Date(value).toISOString() : null);
 
@@ -61,7 +61,56 @@ function createNotificationService({ notificationRepository }) {
     }
   }
 
-  return { list, unreadCount, markRead, markAllRead, remove };
+  const toSubscription = (row) => ({
+    id: row.id,
+    game: row.gameCode,
+    gameName: row.gameName,
+    detail: row.detailCode ?? null,
+    detailName: row.detailName ?? null,
+    enabled: Boolean(row.enabled),
+  });
+
+  const subscriptionNotFound = () => new ApiError(404, 'SUBSCRIPTION_NOT_FOUND', m.subscriptionNotFound);
+
+  /** GET /api/notifications/subscriptions */
+  async function listSubscriptions(memberId) {
+    return (await notificationRepository.findSubscriptions(memberId)).map(toSubscription);
+  }
+
+  /** POST /api/notifications/subscriptions — 게임(선택: 상세 분류) 하나를 관심 알림으로 등록 */
+  async function addSubscription(memberId, body) {
+    const { game, detail } = parseSubscriptionBody(body);
+    const gameRow = await notificationRepository.findGameByCode(game);
+    if (!gameRow) throw new ApiError(404, 'GAME_NOT_FOUND', m.gameNotFound);
+    let contentId = null;
+    if (detail !== null) {
+      const content = await notificationRepository.findGameContentByCode(gameRow.id, detail);
+      if (!content) throw new ApiError(404, 'GAME_CONTENT_NOT_FOUND', m.detailNotFound);
+      contentId = content.id;
+    }
+    if ((await notificationRepository.countSubscriptions(memberId)) >= MAX_SUBSCRIPTIONS) {
+      throw new ApiError(409, 'SUBSCRIPTION_LIMIT', m.subscriptionLimit);
+    }
+    if (await notificationRepository.subscriptionExists(memberId, gameRow.id, contentId)) {
+      throw new ApiError(409, 'SUBSCRIPTION_EXISTS', m.subscriptionExists);
+    }
+    return { id: await notificationRepository.addSubscription(memberId, gameRow.id, contentId) };
+  }
+
+  /** PATCH /api/notifications/subscriptions/:id { enabled } */
+  async function setSubscriptionEnabled(memberId, rawId, body) {
+    const id = parseId(rawId);
+    const enabled = parseEnabledBody(body);
+    if (id === null || !(await notificationRepository.setSubscriptionEnabled(memberId, id, enabled))) throw subscriptionNotFound();
+  }
+
+  /** DELETE /api/notifications/subscriptions/:id */
+  async function removeSubscription(memberId, rawId) {
+    const id = parseId(rawId);
+    if (id === null || !(await notificationRepository.removeSubscription(memberId, id))) throw subscriptionNotFound();
+  }
+
+  return { list, unreadCount, markRead, markAllRead, remove, listSubscriptions, addSubscription, setSubscriptionEnabled, removeSubscription };
 }
 
 module.exports = { createNotificationService };

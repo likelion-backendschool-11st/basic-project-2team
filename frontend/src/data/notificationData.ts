@@ -7,6 +7,7 @@ export type NotificationType =
   | 'POST_UPDATED'
   | 'POST_DELETED'
   | 'FAVORITE_AUTHOR_POST'
+  | 'INTEREST_POST'
   | 'SANCTION';
 
 export interface NotificationView {
@@ -24,6 +25,16 @@ export interface NotificationView {
 
 export const NOTIFICATION_PAGE_SIZE = 20;
 
+/** 관심 알림 설정 개수 상한 (서버 MAX_SUBSCRIPTIONS 와 같은 값) */
+export const MAX_SUBSCRIPTIONS = 20;
+
+export interface SubscriptionView {
+  readonly id: number;
+  /** 화면에 보일 이름: `로스트아크` 또는 `로스트아크 · 카멘` */
+  readonly name: string;
+  readonly enabled: boolean;
+}
+
 const toneBrand = 'bg-mercury/15 text-mercury-light';
 const toneOk = 'bg-emerald-500/15 text-emerald-300';
 const toneWarn = 'bg-amber-500/15 text-amber-300';
@@ -37,6 +48,7 @@ export const notificationTypes: Readonly<Record<NotificationType, { label: strin
   POST_UPDATED: { label: '공고 변경', icon: 'fa-solid fa-pen-to-square', tone: toneWarn },
   POST_DELETED: { label: '공고 삭제', icon: 'fa-solid fa-trash', tone: toneDanger },
   FAVORITE_AUTHOR_POST: { label: '즐겨찾기 새 공고', icon: 'fa-solid fa-star', tone: toneBrand },
+  INTEREST_POST: { label: '관심 게임 새 공고', icon: 'fa-solid fa-gamepad', tone: toneOk },
   SANCTION: { label: '제재 안내', icon: 'fa-solid fa-triangle-exclamation', tone: toneDanger },
 };
 
@@ -65,6 +77,23 @@ export const notificationText = {
   justNow: '방금 전',
   loginRequired: '로그인 후 알림을 확인할 수 있습니다.',
   goLogin: '로그인하러 가기',
+  settings: '알림 설정',
+  settingsTitle: '관심 게임 알림',
+  settingsDesc: '관심 있는 게임(또는 레이드 등 상세 분류)의 새 공고가 올라오면 알림을 받습니다. 항목별로 켜고 끌 수 있습니다.',
+  settingsPanelLabel: '알림 설정 패널',
+  settingsGame: '게임',
+  settingsDetail: '상세 분류',
+  settingsGamePlaceholder: '게임 선택',
+  settingsDetailAll: '전체 분류',
+  settingsAdd: '추가',
+  settingsAdding: '추가 중...',
+  settingsEmpty: '설정한 관심 게임이 없습니다. 게임을 골라 추가해보세요.',
+  settingsLoading: '불러오는 중입니다...',
+  settingsLoadFailed: '알림 설정을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.',
+  settingsSaveFailed: '알림 설정을 저장하지 못했습니다. 잠시 후 다시 시도해주세요.',
+  settingsRemove: '삭제',
+  settingsLimit: (max: number) => `최대 ${max}개까지 설정할 수 있습니다.`,
+  settingsSwitchLabel: (name: string) => `${name} 알림`,
   prevPage: '이전 페이지',
   nextPage: '다음 페이지',
 } as const;

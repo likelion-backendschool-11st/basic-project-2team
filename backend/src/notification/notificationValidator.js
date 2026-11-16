@@ -1,7 +1,7 @@
 'use strict';
 
 const { ApiError } = require('../common/ApiError');
-const { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, notificationMessages: m } = require('./notificationConstants');
+const { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, CODE_PATTERN, notificationMessages: m } = require('./notificationConstants');
 
 /** 양의 정수 문자열이면 숫자로, 아니면 null (값이 없으면 fallback) */
 function parseInteger(raw, fallback) {
@@ -27,4 +27,25 @@ function parseListQuery(query) {
   return { page, size, unreadOnly: unread === 'true' };
 }
 
-module.exports = { parseId, parseListQuery };
+const isObject = (body) => typeof body === 'object' && body !== null && !Array.isArray(body);
+
+/** POST /subscriptions 본문 { game, detail? } */
+function parseSubscriptionBody(body) {
+  const fields = [];
+  const source = isObject(body) ? body : {};
+  const game = source.game;
+  if (typeof game !== 'string' || !CODE_PATTERN.test(game)) fields.push({ field: 'game', message: m.gameInvalid });
+  const detail = source.detail ?? null;
+  if (detail !== null && (typeof detail !== 'string' || !CODE_PATTERN.test(detail))) fields.push({ field: 'detail', message: m.detailInvalid });
+  if (fields.length > 0) throw new ApiError(400, 'INVALID_INPUT', m.invalidInput, fields);
+  return { game, detail };
+}
+
+/** PATCH /subscriptions/:id 본문 { enabled } */
+function parseEnabledBody(body) {
+  const enabled = isObject(body) ? body.enabled : undefined;
+  if (typeof enabled !== 'boolean') throw new ApiError(400, 'INVALID_INPUT', m.invalidInput, [{ field: 'enabled', message: m.enabledInvalid }]);
+  return enabled;
+}
+
+module.exports = { parseId, parseListQuery, parseSubscriptionBody, parseEnabledBody };

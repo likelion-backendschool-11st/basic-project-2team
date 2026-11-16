@@ -11,7 +11,8 @@ const OTHER = 9;
 
 /** DB 대신 메모리에 저장하는 가짜 repository (실제 repository 와 같이 모든 조회에 member_id 조건을 겁니다) */
 function createFakeRepository() {
-  const state = { rows: [] };
+  const state = { rows: [], subs: [], nextSubId: 1 };
+  const games = { lostark: { id: 1, name: '로스트아크', contents: { kamen: { id: 10, name: '카멘' } } }, lol: { id: 2, name: '리그 오브 레전드', contents: {} } };
   const mine = (memberId) => state.rows.filter((r) => r.memberId === memberId);
   return {
     state,
@@ -31,6 +32,50 @@ function createFakeRepository() {
       const index = state.rows.findIndex((r) => r.id === id && r.memberId === memberId);
       if (index >= 0) state.rows.splice(index, 1);
       return index >= 0;
+    },
+    async findSubscriptions(memberId) {
+      return state.subs
+        .filter((s) => s.memberId === memberId)
+        .map((s) => {
+          const game = Object.values(games).find((g) => g.id === s.gameId);
+          const content = Object.entries(game.contents).find(([, c]) => c.id === s.contentId);
+          return {
+            id: s.id,
+            gameCode: Object.keys(games).find((k) => games[k] === game),
+            gameName: game.name,
+            detailCode: content?.[0] ?? null,
+            detailName: content?.[1].name ?? null,
+            enabled: s.enabled ? 1 : 0,
+          };
+        });
+    },
+    async findGameByCode(code) {
+      return games[code] ? { id: games[code].id } : null;
+    },
+    async findGameContentByCode(gameId, code) {
+      const game = Object.values(games).find((g) => g.id === gameId);
+      return game?.contents[code] ? { id: game.contents[code].id } : null;
+    },
+    async countSubscriptions(memberId) {
+      return state.subs.filter((s) => s.memberId === memberId).length;
+    },
+    async subscriptionExists(memberId, gameId, contentId) {
+      return state.subs.some((s) => s.memberId === memberId && s.gameId === gameId && s.contentId === contentId);
+    },
+    async addSubscription(memberId, gameId, contentId) {
+      const id = state.nextSubId++;
+      state.subs.push({ id, memberId, gameId, contentId, enabled: true });
+      return id;
+    },
+    async setSubscriptionEnabled(memberId, id, enabled) {
+      const s = state.subs.find((x) => x.id === id && x.memberId === memberId);
+      if (s) s.enabled = enabled;
+      return Boolean(s);
+    },
+    async removeSubscription(memberId, id) {
+      const i = state.subs.findIndex((x) => x.id === id && x.memberId === memberId);
+      if (i >= 0) state.subs.splice(i, 1);
+      return i >= 0;
     },
     async markAllRead(memberId) {
       mine(memberId).forEach((r) => {
@@ -64,13 +109,16 @@ describe('notification inbox API', () => {
       isRead,
       createdAt: new Date(`2026-11-13T0${id}:00:00Z`),
     });
+    repo.state.subs = [];
+    repo.state.nextSubId = 1;
     repo.state.rows = [row(1, ME, 1), row(2, ME, 0), row(3, ME, 0, null), row(4, OTHER, 0)];
   });
 
-  const call = (method, path, memberId = ME) =>
+  const call = (method, path, memberId = ME, body) =>
     fetch(`${baseUrl}/api/notifications${path}`, {
       method,
-      headers: memberId ? { Authorization: `Bearer ${tokens.createAccessToken(memberId)}` } : {},
+      headers: { ...(memberId ? { Authorization: `Bearer ${tokens.createAccessToken(memberId)}` } : {}), ...(body ? { 'content-type': 'application/json' } : {}) },
+      body: body ? JSON.stringify(body) : undefined,
     });
   const json = async (res) => res.json();
 
@@ -147,8 +195,57 @@ describe('notification inbox API', () => {
     assert.deepEqual((await json(await call('GET', '/unread-count', OTHER))).data, { count: 1 });
   });
 
+  describe('관심 알림 설정', () => {
+    it('게임·상세 분류를 등록하면 201, 목록에 이름과 함께 나온다 (내 설정만)', async () => {
+      assert.equal((await call('POST', '/subscriptions', ME, { game: 'lostark' })).status, 201);
+      const res = await call('POST', '/subscriptions', ME, { game: 'lostark', detail: 'kamen' });
+      assert.deepEqual((await json(res)).data, { id: 2 });
+      await call('POST', '/subscriptions', OTHER, { game: 'lol' });
+      const { data } = await json(await call('GET', '/subscriptions'));
+      assert.deepEqual(data, [
+        { id: 1, game: 'lostark', gameName: '로스트아크', detail: null, detailName: null, enabled: true },
+        { id: 2, game: 'lostark', gameName: '로스트아크', detail: 'kamen', detailName: '카멘', enabled: true },
+      ]);
+    });
+
+    it('없는 게임·상세 분류는 404, 같은 설정은 409 SUBSCRIPTION_EXISTS, 20개 넘으면 409 SUBSCRIPTION_LIMIT', async () => {
+      assert.equal((await json(await call('POST', '/subscriptions', ME, { game: 'nope' }))).error.code, 'GAME_NOT_FOUND');
+      assert.equal((await json(await call('POST', '/subscriptions', ME, { game: 'lostark', detail: 'nope' }))).error.code, 'GAME_CONTENT_NOT_FOUND');
+      await call('POST', '/subscriptions', ME, { game: 'lol' });
+      const dup = await call('POST', '/subscriptions', ME, { game: 'lol' });
+      assert.equal(dup.status, 409);
+      assert.equal((await json(dup)).error.code, 'SUBSCRIPTION_EXISTS');
+      repo.state.subs.push(...Array.from({ length: 19 }, (_, i) => ({ id: 100 + i, memberId: ME, gameId: 1, contentId: 1000 + i, enabled: true })));
+      const over = await call('POST', '/subscriptions', ME, { game: 'lostark' });
+      assert.equal(over.status, 409);
+      assert.equal((await json(over)).error.code, 'SUBSCRIPTION_LIMIT');
+    });
+
+    it('잘못된 본문은 필드별 400', async () => {
+      const res = await call('POST', '/subscriptions', ME, { game: 'A B', detail: 3 });
+      assert.equal(res.status, 400);
+      assert.deepEqual((await json(res)).error.fields.map((f) => f.field), ['game', 'detail']);
+      const bad = await call('PATCH', '/subscriptions/1', ME, { enabled: 'yes' });
+      assert.equal(bad.status, 400);
+    });
+
+    it('켜기·끄기와 삭제는 204, 남의 설정·없는 설정·형식이 틀린 id 는 404 SUBSCRIPTION_NOT_FOUND', async () => {
+      await call('POST', '/subscriptions', ME, { game: 'lol' });
+      assert.equal((await call('PATCH', '/subscriptions/1', ME, { enabled: false })).status, 204);
+      assert.equal((await json(await call('GET', '/subscriptions'))).data[0].enabled, false);
+      for (const [method, id, who] of [['PATCH', '1', OTHER], ['PATCH', '99', ME], ['DELETE', '1', OTHER], ['DELETE', 'abc', ME], ['DELETE', '0', ME]]) {
+        const res = await call(method, `/subscriptions/${id}`, who, method === 'PATCH' ? { enabled: true } : undefined);
+        assert.equal(res.status, 404, `${method} ${id}`);
+        assert.equal((await json(res)).error.code, 'SUBSCRIPTION_NOT_FOUND');
+      }
+      assert.equal(repo.state.subs.length, 1);
+      assert.equal((await call('DELETE', '/subscriptions/1')).status, 204);
+      assert.deepEqual((await json(await call('GET', '/subscriptions'))).data, []);
+    });
+  });
+
   it('로그인하지 않으면 모두 401', async () => {
-    for (const [method, path] of [['GET', ''], ['GET', '/unread-count'], ['PATCH', '/1/read'], ['PATCH', '/read-all'], ['DELETE', '/1']]) {
+    for (const [method, path] of [['GET', ''], ['GET', '/unread-count'], ['PATCH', '/1/read'], ['PATCH', '/read-all'], ['DELETE', '/1'], ['GET', '/subscriptions'], ['POST', '/subscriptions'], ['PATCH', '/subscriptions/1'], ['DELETE', '/subscriptions/1']]) {
       assert.equal((await call(method, path, null)).status, 401, `${method} ${path}`);
     }
   });
