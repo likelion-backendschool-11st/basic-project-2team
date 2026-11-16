@@ -25,6 +25,8 @@ export interface PostComment {
 }
 
 export const COMMENT_PAGE_SIZE = 4;
+/** 댓글 영역 id — 투표 위젯의 「댓글로 의견 남기기」가 이곳으로 스크롤합니다. */
+export const COMMENTS_ANCHOR_ID = 'post-comments';
 
 export const commentText = {
   title: '댓글',

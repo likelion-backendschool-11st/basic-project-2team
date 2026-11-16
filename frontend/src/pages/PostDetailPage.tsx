@@ -2,6 +2,10 @@ import React from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import CommentSection from '../components/comments/CommentSection';
 import ReportDialog from '../components/comments/ReportDialog';
+import PollCloseDialog from '../components/poll/PollCloseDialog';
+import PollFormDialog from '../components/poll/PollFormDialog';
+import PollParticipantsDialog from '../components/poll/PollParticipantsDialog';
+import PollWidget from '../components/poll/PollWidget';
 import ApplicantBanner from '../components/post/ApplicantBanner';
 import ApplicantsDialog from '../components/post/ApplicantsDialog';
 import HostCard from '../components/post/HostCard';
@@ -15,10 +19,11 @@ import RelatedPosts from '../components/post/RelatedPosts';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import Toast from '../components/ui/Toast';
 import LoggedInLayout from '../components/user/LoggedInLayout';
-import { commentText } from '../data/commentData';
+import { COMMENTS_ANCHOR_ID, commentText } from '../data/commentData';
 import { postDetailText, postText } from '../data/postData';
 import { paths, ROUTES } from '../data/routes';
 import { useComments } from '../hooks/useComments';
+import { usePoll } from '../hooks/usePoll';
 import { usePostDetail } from '../hooks/usePostDetail';
 import { usePostEvents } from '../hooks/usePostEvents';
 
@@ -40,16 +45,24 @@ const PostDetailView: React.FC<{ readonly postId: string }> = ({ postId }) => {
   const navigate = useNavigate();
   const post = usePostDetail(postId);
   const thread = useComments(postId, post.detail?.commentCount ?? 0);
-  // 다른 사람의 신청·승인·댓글 등을 새로고침 없이 반영합니다. 댓글 신호는 공고의 댓글 수도 바뀌므로 상세도 함께 불러옵니다.
+  const poll = usePoll(postId);
+  // 다른 사람의 신청·승인·댓글·투표 등을 새로고침 없이 반영합니다. 댓글 신호는 공고의 댓글 수도 바뀌므로 상세도 함께 불러옵니다.
+  // 파티원이 바뀌면(승인·탈퇴) 투표 자격도 바뀌고, 「댓글 작성자만」 투표는 댓글에 따라 자격이 바뀌므로 투표도 다시 불러옵니다.
   usePostEvents(postId, {
-    onPost: post.refresh,
+    onPost: () => {
+      post.refresh();
+      poll.refresh();
+    },
     onComments: () => {
       thread.refresh();
       post.refresh();
+      if (poll.poll?.commentersOnly) poll.refresh();
     },
+    onPoll: poll.refresh,
   });
   const { detail } = post;
   const leaveText = post.accepted ? postText.leave : postText.cancelApplication;
+  const scrollToComments = () => document.getElementById(COMMENTS_ANCHOR_ID)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
   if (!detail) {
     return (
@@ -68,6 +81,28 @@ const PostDetailView: React.FC<{ readonly postId: string }> = ({ postId }) => {
     );
   }
 
+  const current = poll.poll;
+  const pollWidget = current && (
+    <PollWidget
+      poll={current}
+      hostName={detail.host.name}
+      selected={poll.selected}
+      dirty={poll.dirty}
+      busy={poll.busy}
+      canEdit={poll.canEdit}
+      onToggle={poll.toggleOption}
+      onVote={poll.submitVote}
+      onTogglePin={poll.togglePin}
+      onEdit={poll.openEdit}
+      onConfirm={poll.closeDialog.open}
+      onParticipants={poll.participantsDialog.open}
+      onRefresh={poll.reloadWithToast}
+      onToComments={scrollToComments}
+    />
+  );
+  // 투표가 없거나 마지막 투표가 끝났을 때만 공대장에게 「투표하기」(새 투표) 버튼을 보여줍니다.
+  const canCreatePoll = detail.isOwner && !poll.loading && poll.canCreate;
+
   return (
     <LoggedInLayout>
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_380px] gap-6 items-start">
@@ -76,7 +111,14 @@ const PostDetailView: React.FC<{ readonly postId: string }> = ({ postId }) => {
           {detail.isOwner && <ApplicantBanner count={post.applicants.length} names={post.applicants.map((a) => a.name)} onManage={post.applicantsDialog.open} />}
           <PostTiles tiles={detail.tiles} />
           <PostDescription detail={detail} />
-          <CommentSection thread={thread} ownerView={detail.isOwner} title={detail.isOwner ? '댓글 및 공대 문의' : commentText.title} />
+          {current?.pinned && pollWidget}
+          <CommentSection
+            thread={thread}
+            ownerView={detail.isOwner}
+            title={detail.isOwner ? '댓글 및 공대 문의' : commentText.title}
+            onCreatePoll={canCreatePoll ? poll.openCreate : undefined}
+            poll={current && !current.pinned ? pollWidget : undefined}
+          />
         </div>
         <aside className="flex flex-col gap-5 xl:sticky xl:top-24">
           {detail.isOwner ? (
@@ -99,7 +141,12 @@ const PostDetailView: React.FC<{ readonly postId: string }> = ({ postId }) => {
       <ConfirmDialog isOpen={thread.deleteDialog.isOpen} title={commentText.deleteDialog.title} description={commentText.deleteDialog.description} confirmLabel={commentText.deleteDialog.confirm} cancelLabel={commentText.deleteDialog.cancel} icon="fa-trash-can" onConfirm={thread.confirmDelete} onCancel={thread.deleteDialog.close} />
       <ReportDialog isOpen={thread.reportDialog.isOpen} onConfirm={thread.confirmReport} onClose={thread.reportDialog.close} />
       <ApplicantsDialog isOpen={post.applicantsDialog.isOpen} applicants={post.applicants} onResolve={post.resolveApplicant} onClose={post.applicantsDialog.close} />
-      <Toast message={thread.toast.message ?? post.toast.message} />
+      {poll.formDialog.isOpen && (
+        <PollFormDialog editing={poll.formTarget} scheduleAt={detail.scheduleAt} busy={poll.busy} onSubmit={(input) => void poll.save(input)} onClose={poll.formDialog.close} />
+      )}
+      {poll.closeDialog.isOpen && current && <PollCloseDialog poll={current} busy={poll.busy} onSubmit={(input) => void poll.confirm(input)} onClose={poll.closeDialog.close} />}
+      {poll.participantsDialog.isOpen && current && <PollParticipantsDialog poll={current} busy={poll.busy} onRemind={() => void poll.remind()} onClose={poll.participantsDialog.close} />}
+      <Toast message={thread.toast.message ?? poll.toast.message ?? post.toast.message} />
     </LoggedInLayout>
   );
 };

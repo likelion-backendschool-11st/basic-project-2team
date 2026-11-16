@@ -133,6 +133,7 @@ export function toPostDetail(res: PostDetailResponse): PostDetail {
       { label: t.conditionVoice, value: res.voiceRequired ? t.voiceOn : t.voiceOff },
     ],
     status: res.status,
+    scheduleAt: res.schedule,
     commentCount: res.commentCount,
     scrapCount: res.scrapCount,
     scrapped: res.viewer?.scrapped ?? false,

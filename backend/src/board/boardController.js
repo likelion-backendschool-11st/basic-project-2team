@@ -27,7 +27,7 @@ function createBoardController(boardService, { postEvents, heartbeatMs = HEARTBE
 
   /**
    * GET /api/posts/:postId/events — 공고 변경 신호를 SSE 로 보냅니다(비로그인도 연결 가능).
-   * 신호(`event: post|comments`)에는 내용이 없고, 클라이언트가 받으면 일반 API 로 다시 조회합니다.
+   * 신호(`event: post|comments|poll`)에는 내용이 없고, 클라이언트가 받으면 일반 API 로 다시 조회합니다.
    */
   async function events(req, res) {
     const postId = parsePostId(req.params.postId);

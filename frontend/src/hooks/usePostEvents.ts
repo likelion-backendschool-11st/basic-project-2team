@@ -1,13 +1,15 @@
 import { useEffect, useRef } from 'react';
 import { apiUrl } from '../api/http';
 
-type Topic = 'post' | 'comments';
+type Topic = 'post' | 'comments' | 'poll';
 
 interface PostEventHandlers {
   /** 공고 본문 · 상태 · 인원 · 신청자 · 파티원이 바뀜 */
   readonly onPost: () => void;
   /** 댓글이 작성·수정·삭제·가림·복구됨 */
   readonly onComments: () => void;
+  /** 파티 의견 조율 투표가 생성·편집·투표·고정·확정됨 */
+  readonly onPoll?: () => void;
 }
 
 /** 짧은 시간에 여러 신호가 오면(예: 내 동작 + 서버 신호) 한 번만 다시 불러옵니다. */
@@ -32,11 +34,13 @@ export function usePostEvents(postId: string, handlers: PostEventHandlers) {
     const timers: Partial<Record<Topic, number>> = {};
     const fire = (topic: Topic) => {
       window.clearTimeout(timers[topic]);
-      timers[topic] = window.setTimeout(() => (topic === 'post' ? latest.current.onPost() : latest.current.onComments()), DEBOUNCE_MS);
+      const handler = { post: latest.current.onPost, comments: latest.current.onComments, poll: latest.current.onPoll }[topic];
+      timers[topic] = window.setTimeout(() => handler?.(), DEBOUNCE_MS);
     };
     const refreshAll = () => {
       fire('post');
       fire('comments');
+      fire('poll');
     };
 
     let connected = false;
@@ -52,6 +56,7 @@ export function usePostEvents(postId: string, handlers: PostEventHandlers) {
     };
     source.addEventListener('post', () => fire('post'));
     source.addEventListener('comments', () => fire('comments'));
+    source.addEventListener('poll', () => fire('poll'));
 
     const fallback = window.setInterval(() => {
       if (!connected && document.visibilityState === 'visible') refreshAll();

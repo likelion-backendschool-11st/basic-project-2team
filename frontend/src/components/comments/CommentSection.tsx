@@ -1,5 +1,6 @@
 import React from 'react';
-import { commentText, type CommentSort } from '../../data/commentData';
+import { COMMENTS_ANCHOR_ID, commentText, type CommentSort } from '../../data/commentData';
+import { pollText } from '../../data/pollData';
 import type { useComments } from '../../hooks/useComments';
 import Pagination from '../board/Pagination';
 import CommentComposer from './CommentComposer';
@@ -9,21 +10,33 @@ interface CommentSectionProps {
   readonly thread: ReturnType<typeof useComments>;
   readonly ownerView: boolean;
   readonly title?: string;
+  /** 공대장에게만: 「투표하기」 버튼 → 파티 의견 조율 투표 생성 */
+  readonly onCreatePoll?: () => void;
+  /** 상단에 고정하지 않은 투표 위젯 (작성창 위에 표시) */
+  readonly poll?: React.ReactNode;
 }
 
 const sorts: readonly CommentSort[] = ['oldest', 'newest'];
 
 /** Comment composer + sorted, paged thread with reply / edit / delete / report. */
-export const CommentSection: React.FC<CommentSectionProps> = ({ thread: t, ownerView, title = commentText.title }) => (
-  <section className="rounded-2xl border border-night-borderLight bg-night-surface p-6">
+export const CommentSection: React.FC<CommentSectionProps> = ({ thread: t, ownerView, title = commentText.title, onCreatePoll, poll }) => (
+  <section id={COMMENTS_ANCHOR_ID} className="scroll-mt-24 rounded-2xl border border-night-borderLight bg-night-surface p-6">
     <div className="flex items-center justify-between mb-4">
       <h2 className="text-sm font-bold text-white flex items-center gap-2"><i className="fa-regular fa-comment-dots text-mercury-light" />{title}<span className="text-[11px] px-1.5 rounded bg-mercury/20 text-indigo-200">{t.total}</span></h2>
-      <div className="flex gap-1 text-xs">
-        {sorts.map((s) => (
-          <button key={s} type="button" aria-pressed={t.sort === s} onClick={() => t.setSort(s)} className={`px-3 py-1.5 rounded-lg ${t.sort === s ? 'bg-mercury/25 text-white font-bold' : 'text-fog-muted hover:text-white'}`}>{commentText.sort[s]}</button>
-        ))}
+      <div className="flex items-center gap-2">
+        {onCreatePoll && (
+          <button type="button" onClick={onCreatePoll} className="inline-flex items-center gap-1.5 rounded-xl border border-mercury/40 bg-mercury/15 px-3 py-1.5 text-xs font-bold text-indigo-200 shadow-sm hover:border-mercury hover:bg-mercury/25 hover:text-white active:scale-95">
+            <i className="fa-solid fa-check-to-slot text-mercury-light" />{pollText.open}
+          </button>
+        )}
+        <div className="flex gap-1 text-xs">
+          {sorts.map((s) => (
+            <button key={s} type="button" aria-pressed={t.sort === s} onClick={() => t.setSort(s)} className={`px-3 py-1.5 rounded-lg ${t.sort === s ? 'bg-mercury/25 text-white font-bold' : 'text-fog-muted hover:text-white'}`}>{commentText.sort[s]}</button>
+          ))}
+        </div>
       </div>
     </div>
+    {poll && <div className="mb-4">{poll}</div>}
     <CommentComposer allowSecret={!ownerView} placeholder={ownerView ? '공대원들에게 안내할 공지사항이나 답변을 남겨보세요...' : commentText.placeholder} submitLabel={commentText.submit} onSubmit={(text, secret) => t.add(text, { secret })} />
     <div className="mt-5 flex flex-col gap-3">
       {t.error && <p className="py-8 text-center text-sm text-rose-300">{t.error}</p>}

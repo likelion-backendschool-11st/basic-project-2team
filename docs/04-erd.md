@@ -15,7 +15,7 @@
 | `PK` / `FK` / `UK` | 기본키 / 외래키 / UNIQUE |
 
 - `bigint`는 모두 `BIGINT UNSIGNED`, `int`·`smallint`·`tinyint`는 `UNSIGNED`입니다. 예외는 설명에 `signed`로 표시했습니다.
-- 모든 테이블에 있는 공통 컬럼 `created_at`, `updated_at`은 다이어그램에서 생략했습니다.
+- 모든 테이블에 있는 공통 컬럼 `created_at`, `updated_at`은 다이어그램에서 생략했습니다. 예외로 `poll_option`·`poll_vote`는 행을 고치지 않고 지우고 다시 넣어서 `updated_at`이 없고, `created_at`만 적었습니다.
 - 다른 절에서 자세히 그린 테이블은 `id`만 적고 "참고"로 표시했습니다.
 - 복합 UNIQUE, CHECK 제약은 Mermaid로 표현할 수 없어서 컬럼 설명에 적었습니다.
 
@@ -52,6 +52,13 @@ erDiagram
     post ||--o{ comment : ""
     member ||--o{ comment : "작성"
     comment |o--o{ comment : "대댓글"
+
+    post ||--o{ poll : ""
+    member ||--o{ poll : "작성"
+    poll ||--o{ poll_option : ""
+    poll ||--o{ poll_vote : ""
+    poll_option ||--o{ poll_vote : ""
+    member ||--o{ poll_vote : "투표"
 
     post ||--o{ review : ""
     member ||--o{ review : "평가자"
@@ -351,6 +358,58 @@ erDiagram
     }
 ```
 
+### 2.3.1 파티 의견 조율 투표
+
+```mermaid
+erDiagram
+    post ||--o{ poll : "공고별 투표 (진행 중은 1개)"
+    member ||--o{ poll : "작성 (공대장)"
+    poll ||--o{ poll_option : "항목 2~5개"
+    poll ||--o{ poll_vote : ""
+    poll_option ||--o{ poll_vote : ""
+    member ||--o{ poll_vote : "투표"
+
+    poll {
+        bigint id PK
+        bigint post_id FK
+        bigint author_id FK
+        varchar(40) title
+        varchar(100) description "NULL 가능, 공대장 안내 문구"
+        boolean is_multiple "복수 선택"
+        boolean commenters_only "댓글 작성자만 투표"
+        boolean is_pinned "상단 공지 고정, 기본 TRUE"
+        datetime closes_at "마감 시각"
+        bigint final_option_id "FK 없음, 확정 항목"
+        varchar(200) notice "결과 확정 공지"
+        datetime closed_at "NULL이면 미확정"
+        datetime reminded_at "마지막 미투표자 알림"
+    }
+
+    poll_option {
+        bigint id PK
+        bigint poll_id FK
+        varchar(30) label
+        tinyint sort_order "1~5"
+        datetime created_at "updated_at 없음 (지우고 다시 넣음)"
+    }
+
+    poll_vote {
+        bigint id PK
+        bigint poll_id FK "중복 저장, 회원별 조회용"
+        bigint option_id FK "UQ(option_id, member_id)"
+        bigint member_id FK
+        datetime created_at "투표 시각, updated_at 없음"
+    }
+
+    post {
+        bigint id PK "2.2 참고"
+    }
+
+    member {
+        bigint id PK "2.1 참고"
+    }
+```
+
 ### 2.4 알림
 
 ```mermaid
@@ -364,7 +423,7 @@ erDiagram
     notification {
         bigint id PK
         bigint member_id FK
-        varchar(30) type "APPLICATION_RECEIVED / APPLICATION_RESULT / APPLICATION_CANCELED / POST_UPDATED / INTEREST_POST / POST_DELETED / SANCTION"
+        varchar(30) type "APPLICATION_RECEIVED / APPLICATION_RESULT / APPLICATION_CANCELED / POST_UPDATED / INTEREST_POST / POST_DELETED / SANCTION / POLL_CONFIRMED / POLL_REMINDER"
         varchar(200) message
         bigint post_id FK "NULL 허용"
         boolean is_read
@@ -500,6 +559,12 @@ erDiagram
 | comment.post_id | post | 1:N | RESTRICT |
 | comment.author_id | member | 1:N | RESTRICT |
 | comment.parent_id | comment | 0..1:N | RESTRICT |
+| poll.post_id | post | 1:N | RESTRICT |
+| poll.author_id | member | 1:N | RESTRICT |
+| poll_option.poll_id | poll | 1:N | CASCADE |
+| poll_vote.poll_id | poll | 1:N | CASCADE |
+| poll_vote.option_id | poll_option | 1:N | CASCADE |
+| poll_vote.member_id | member | 1:N | CASCADE |
 | review.post_id | post | 1:N | RESTRICT |
 | review.reviewer_id | member | 1:N | RESTRICT |
 | review.target_id | member | 1:N | RESTRICT |
@@ -530,3 +595,4 @@ erDiagram
 | admin_action_log.target_id | 같은 이유. 이력은 대상이 지워져도 남아야 합니다. |
 | activity_point_log.ref_id | 근거가 공고·댓글·리뷰 중 하나라 하나의 FK로 걸 수 없습니다. 근거 글이 삭제돼도 점수 이력은 남아야 합니다. |
 | member_withdrawal.member_id | 보관용 사본이라 원본 회원 행과 독립적으로 파기 일정을 가져갑니다. |
+| poll.final_option_id | poll_option이 poll을 참조하므로 FK를 걸면 순환 참조가 됩니다. 확정할 때 같은 투표의 항목인지 애플리케이션에서 검사합니다. |

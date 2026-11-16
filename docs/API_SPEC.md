@@ -329,6 +329,7 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 - **실시간 신호** (`GET /api/posts/{postId}/events`): 공고 상세 화면이 열려 있는 동안 연결해 두는 **SSE** 입니다(비로그인도 연결 가능, 없거나 삭제된 공고는 404 `POST_NOT_FOUND`). 서버는 변경이 DB 에 반영된 **뒤에** 신호만 보내고 내용은 담지 않으며(`data: {}`), 화면은 신호를 받으면 인증된 일반 API(`GET /api/posts/{postId}` 등)로 다시 조회합니다. 그래서 권한 검사는 기존 API 가 그대로 합니다.
   - `event: post` — 공고 본문·상태(`OPEN`/`PAUSED`/`CLOSED`/`COMPLETED`/삭제)·인원·신청자·파티원이 바뀜: 참가 신청·취소, 승인/거절, 모집 상태 변경, 공고 수정·삭제(작성자·관리자)
   - `event: comments` — 댓글이 작성·수정·삭제·가림·복구됨
+  - `event: poll` — 파티 의견 조율 투표가 생성·편집·투표·고정·확정됨 (5절)
   - 연결이 끊기면 `retry: 3000`(3초)에 따라 브라우저가 다시 연결하고, 25초마다 `: ping` 주석 줄을 보내 프록시가 유휴 연결을 끊지 않게 합니다. 끊겨 있던 동안의 신호는 다시 보내지 않으므로 화면은 **재연결 직후 한 번 다시 조회**해야 합니다. 프록시 버퍼링을 끄도록 `X-Accel-Buffering: no` 를 보냅니다.
   - 구독 목록은 서버 프로세스 메모리에 있습니다(`common/postEvents.js`). 서버를 여러 대로 늘리면 Redis 같은 공유 채널이 필요합니다.
   - `GET /api/posts/{postId}?view=false` 로 조회하면 조회수를 올리지 않아, 신호를 받아 다시 조회할 때 쓸 수 있습니다.
@@ -572,6 +573,80 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 
 - 응답 `204`. 소프트 삭제(`status = DELETED`, `deleted_at`)이며, 루트 댓글이면 대댓글도 함께 삭제됩니다. 삭제된 수만큼 공고의 `commentCount` 가 줄어듭니다.
 - 오류: 401 `UNAUTHORIZED`, 403 `NOT_COMMENT_AUTHOR`, 404 `COMMENT_NOT_FOUND`(없음, 이미 삭제됨).
+
+### 파티 의견 조율 투표 (Poll)
+
+구현: `backend/src/poll/`. 공대장(공고 작성자)이 댓글 영역에서 만들고 공대원(파티장 + 수락된 파티원)이 투표합니다. 공고당 **진행 중인 투표는 하나**이며, 화면은 가장 최근 투표(진행 중이거나 끝난)를 보여줍니다. 변경되면 SSE `event: poll` 을 보냅니다.
+
+| Method | URI | 설명 | 인증 |
+| --- | --- | --- | --- |
+| GET | `/api/posts/{postId}/poll` | 공고의 가장 최근 투표. 없으면 `data: null` | |
+| POST | `/api/posts/{postId}/poll` | 투표 만들기 → `201` | 🔒 공고 작성자 |
+| PATCH | `/api/polls/{pollId}` | 투표 편집 (아무도 투표하지 않은 진행 중 투표만) | 🔒 공고 작성자 |
+| PUT | `/api/polls/{pollId}/votes` | 내 투표 바꾸기 `{ optionIds }` (빈 배열이면 취소) | 🔒 공대원 |
+| PATCH | `/api/polls/{pollId}/pin` | 상단 공지 고정 / 해제 `{ pinned }` | 🔒 공고 작성자 |
+| POST | `/api/polls/{pollId}/close` | 조기 마감 · 결과 확정 | 🔒 공고 작성자 |
+| POST | `/api/polls/{pollId}/reminders` | 미투표 공대원에게 알림 → `{ count }` | 🔒 공고 작성자 |
+
+**투표 만들기 · 편집 요청**
+
+```json
+{
+  "title": "오늘 레이드 출발 시간 언제가 좋으신가요?",
+  "description": "퇴근 일정 확인 후 투표 부탁드립니다.",
+  "multiple": false, "commentersOnly": false, "pinned": true,
+  "closesAt": "2026-11-16T13:00:00.000Z",
+  "options": ["오후 8:00 출발 (칼출)", "오후 9:00 출발 (여유출)"]
+}
+```
+
+- `title` 필수 1~40자, `description` 선택 100자 이하, `options` 2~5개(각 1~30자, 같은 이름 불가), `closesAt` 필수 — 지금 이후 30일 이내. `multiple`(복수 선택) · `commentersOnly`(이 공고에 댓글을 남긴 공대원만 투표, 파티장은 항상 가능) 기본 `false`, `pinned`(상단 공지 고정) 기본 `true`.
+- 「출발 30분 전 / 1시간 전 / 등록 후 2시간 / 직접 설정」 같은 마감 선택지는 프론트가 `closesAt` 으로 바꿔 보냅니다.
+- 편집은 항목을 새로 만들므로 항목 id 가 바뀝니다. 그사이 누가 투표했으면 409 `POLL_HAS_VOTES`.
+
+**투표 응답 (모든 API 공통)**
+
+```json
+{
+  "id": 3, "postId": 7, "title": "오늘 레이드 출발 시간 언제가 좋으신가요?", "description": null,
+  "multiple": false, "commentersOnly": false, "pinned": true,
+  "status": "OPEN", "closesAt": "2026-11-16T13:00:00.000Z", "createdAt": "2026-11-16T10:00:00.000Z",
+  "confirmedAt": null, "finalOptionId": null, "notice": null,
+  "options": [{ "id": 11, "label": "오후 8:00 출발 (칼출)", "voteCount": 4 }, { "id": 12, "label": "오후 9:00 출발 (여유출)", "voteCount": 3 }],
+  "totalVoters": 7, "eligibleCount": 7, "headcount": 8, "currentCount": 7,
+  "viewer": { "memberId": 9, "isHost": false, "isMember": true, "canVote": true, "votedOptionIds": [11] },
+  "participants": {
+    "voters": [{ "memberId": 9, "nickname": "홀리한빛", "mannerTemp": 36.5, "isHost": false, "optionIds": [11], "votedAt": "2026-11-16T10:12:00.000Z" }],
+    "nonVoters": [{ "memberId": 3, "nickname": "빛나는오더", "mannerTemp": 99.8, "isHost": true }]
+  }
+}
+```
+
+- `status`: `OPEN`(투표 중) · `ENDED`(마감 시각이 지났지만 공대장이 확정하지 않음) · `CONFIRMED`(확정됨). 투표는 `OPEN` 일 때만 됩니다.
+- `totalVoters` 는 투표한 사람 수(복수 선택이어도 1명), `eligibleCount` 는 투표할 수 있는 공대원 수입니다.
+- `viewer` 는 비로그인이면 `null`. `participants`(투표자 · 미투표자 명단)는 공대원(파티장 포함)에게만 내려주고 그 외에는 `null` 입니다. 탈퇴 회원 닉네임은 `"탈퇴한 회원"`.
+
+**투표하기 (`PUT /api/polls/{pollId}/votes`)** 🔒
+
+- 요청 `{ "optionIds": [11] }`. 보낸 항목으로 내 투표를 통째로 바꾸며, `[]` 이면 취소합니다. 단일 선택 투표에 2개 이상이면 400 `SINGLE_CHOICE_ONLY`.
+- 오류: 400 `INVALID_INPUT` · `POLL_OPTION_NOT_FOUND` · `SINGLE_CHOICE_ONLY`, 401, 403 `NOT_POLL_VOTER`(공대원 아님) · `POLL_COMMENT_REQUIRED`(댓글 작성자만 허용인데 댓글 없음), 404 `POLL_NOT_FOUND`, 409 `POLL_NOT_OPEN`.
+
+**결과 확정 (`POST /api/polls/{pollId}/close`)** 🔒 공고 작성자
+
+```json
+{ "finalOptionId": 11, "notice": "[공대장 공지] 오후 8시로 확정!", "pinned": true, "postComment": true, "notifyMembers": true }
+```
+
+- 마감 시각 전이면 조기 마감, 지났으면(`ENDED`) 확정만 합니다. `finalOptionId` 필수(득표와 상관없이 공대장이 고름), `notice` 선택 200자 이하, `pinned` 생략하면 고정 상태 유지.
+- `postComment: true` 면 공대장 이름으로 안내 댓글을 답니다(본문은 `notice`, 없으면 기본 문구). 공고의 `commentCount` 가 1 오르고 `event: comments` 도 보냅니다.
+- `notifyMembers: true` 면 파티장을 뺀 공대원에게 알림(`POLL_CONFIRMED`)을 보냅니다.
+- 오류: 400 `INVALID_INPUT` · `POLL_OPTION_NOT_FOUND`, 403 `NOT_POST_AUTHOR`, 404 `POLL_NOT_FOUND`, 409 `POLL_ALREADY_CONFIRMED`.
+
+**기타 오류**
+
+- 만들기: 403 `NOT_POST_AUTHOR`, 404 `POST_NOT_FOUND`, 409 `POLL_ALREADY_OPEN`(진행 중 투표 있음).
+- 편집: 403 `NOT_POST_AUTHOR`, 409 `POLL_NOT_OPEN` · `POLL_HAS_VOTES`.
+- 미투표자 알림: 파티장을 뺀 미투표 공대원에게 `POLL_REMINDER` 알림. 10분 안에 다시 보내면 429 `POLL_REMIND_TOO_SOON`, 보낼 사람이 없으면 `{ "count": 0 }`. 진행 중 투표가 아니면 409 `POLL_NOT_OPEN`.
 
 ## 6. 신고 (Report)
 

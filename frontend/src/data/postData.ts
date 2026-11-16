@@ -30,6 +30,8 @@ export interface PostDetail {
   readonly slots: readonly { readonly role: string; readonly filled: number; readonly total: number }[];
   readonly conditions: readonly { readonly label: string; readonly value: string }[];
   readonly status: PostStatus;
+  /** 출발 시각 ISO (일정 미정이면 null) — 투표 마감 시각 계산용 */
+  readonly scheduleAt: string | null;
   readonly commentCount: number;
   readonly scrapCount: number;
   /** 로그인한 사용자 기준 (비로그인이면 false / null) */
