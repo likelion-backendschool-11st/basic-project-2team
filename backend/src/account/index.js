@@ -6,8 +6,8 @@ const { createAccountController } = require('./accountController');
 const { createAccountRouter } = require('./accountRoutes');
 
 /** repository → service → controller → router 를 조립합니다. 테스트에서는 repository · avatarStorage 를 바꿔 끼웁니다. */
-function createAccountModule({ pool, accountRepository = createAccountRepository(pool), avatarStorage, requireAuth, bcryptRounds, now }) {
-  const accountService = createAccountService({ accountRepository, avatarStorage, bcryptRounds, now });
+function createAccountModule({ pool, accountRepository = createAccountRepository(pool), avatarStorage, avatarProcessor, requireAuth, bcryptRounds, now }) {
+  const accountService = createAccountService({ accountRepository, avatarStorage, avatarProcessor, bcryptRounds, now });
   const accountController = createAccountController(accountService);
   return { router: createAccountRouter(accountController, { requireAuth }) };
 }

@@ -68,6 +68,8 @@ describe('프로필 이미지 API (/api/members/me/avatar)', () => {
     const app = createApp({
       accountRepository: repo,
       avatarStorage: createAvatarStorage(dir),
+      // 이 파일의 테스트는 가짜 이미지 바이트를 쓰므로 변환은 건너뜁니다 (변환은 avatarImage.test.js 에서 검증).
+      avatarProcessor: async (buffer, extension) => ({ buffer, extension }),
       corsOrigins: [],
       bcryptRounds: 4,
       auth: AUTH,

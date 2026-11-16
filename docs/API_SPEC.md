@@ -279,7 +279,9 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 
 - 본문은 JSON 이 아니라 **이미지 파일 바이트 그대로** 보냅니다. `Content-Type` 은 `image/png` · `image/jpeg` · `image/gif` · `image/webp` 중 하나, 최대 2MB.
 - 형식은 파일 앞부분(시그니처)으로 판별하고 확장자도 그것으로 정합니다. SVG 등 다른 형식은 400 `INVALID_IMAGE`, 2MB 초과는 413 `PAYLOAD_TOO_LARGE`.
-- 파일은 서버 폴더(`UPLOAD_DIR`, 기본 `backend/uploads`)의 `avatars/` 에 저장하고, `avatarUrl` 은 API 서버 기준 경로(`/uploads/avatars/{파일}`)입니다. 화면에서는 API 서버 주소를 붙여 씁니다(프론트 `assetUrl`).
+- `R2_*` 환경 변수가 모두 있으면 파일을 Cloudflare R2 버킷(`R2_AVATAR_PREFIX` 폴더)에 올리고 `avatarUrl` 은 `R2_PUBLIC_BASE_URL` 기준 전체 주소입니다(이 경우 프론트 `assetUrl` 은 전체 주소를 그대로 씁니다). 이전에 로컬로 올린 `/uploads/avatars/…` 주소는 그대로 서빙·삭제합니다. 환경 변수가 없으면 아래처럼 로컬 저장입니다.
+- 올린 이미지는 서버가 가운데 기준 정사각형으로 잘라 **256×256 WEBP(품질 80)** 로 변환해 저장합니다(원본은 보관하지 않음). EXIF 회전을 적용하고 메타데이터는 버리며, 움직이는 GIF 는 첫 장만 씁니다. 읽을 수 없는 이미지는 400 `INVALID_IMAGE`. 그래서 `avatarUrl` 확장자는 항상 `.webp` 입니다.
+- (로컬) 파일은 서버 폴더(`UPLOAD_DIR`, 기본 `backend/uploads`)의 `avatars/` 에 저장하고, `avatarUrl` 은 API 서버 기준 경로(`/uploads/avatars/{파일}`)입니다. 화면에서는 API 서버 주소를 붙여 씁니다(프론트 `assetUrl`).
 - 새 이미지로 바꾸면 이전 파일을 지웁니다.
 
 **프로필 이미지 삭제 (`DELETE /api/members/me/avatar`)** → `204` — 기본 이미지(`avatarUrl: null`)로 되돌리고 파일을 지웁니다. 이미 기본이면 그대로 `204`.
