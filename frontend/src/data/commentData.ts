@@ -44,6 +44,9 @@ export const COMMENT_PAGE_SIZE = 4;
 /** 댓글 영역 id — 투표 위젯의 「댓글로 의견 남기기」가 이곳으로 스크롤합니다. */
 export const COMMENTS_ANCHOR_ID = 'post-comments';
 
+/** 욕설 필터에 걸렸을 때 뜨는 경고 모달 (공고·댓글 공통) */
+export const profanityDialog = { title: '부적절한 표현이 있어요', confirm: '확인했어요' } as const;
+
 export const commentText = {
   title: '댓글',
   placeholder: '파티 댓글을 남겨 보세요.',

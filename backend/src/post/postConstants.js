@@ -60,6 +60,7 @@ const postMessages = Object.freeze({
   titleInvalid: `제목은 ${TITLE_MIN_LENGTH}~${TITLE_MAX_LENGTH}자로 입력해주세요.`,
   bodyRequired: '본문을 입력해주세요.',
   bodyTooLong: `본문은 ${BODY_MAX_LENGTH}자 이하로 입력해주세요.`,
+  profanity: (label) => `${label}에 부적절한 표현이 포함되어 있습니다. 바른 표현으로 수정해주세요.`,
   partyNameInvalid: `파티명은 ${PARTY_NAME_MAX_LENGTH}자 이하로 입력해주세요.`,
   gameRequired: '게임을 선택해주세요.',
   typeInvalid: `모집 유형은 ${PARTY_TYPES.join(', ')} 중 하나여야 합니다.`,

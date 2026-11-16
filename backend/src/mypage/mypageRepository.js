@@ -128,6 +128,31 @@ function createMypageRepository(pool) {
     return { rows, totalCount: Number(totalCount) };
   }
 
+  /** 다른 회원이 볼 수 있는 작성 공고 한 페이지와 전체 건수 (삭제되지 않은 공고, 최신순) */
+  async function findMemberPostPage({ memberId, limit, offset }) {
+    const condition = `p.author_id = ? AND ${ALIVE_POST}`;
+    const [[{ totalCount }]] = await pool.query(`SELECT COUNT(*) AS totalCount FROM post p WHERE ${condition}`, [memberId]);
+    const [rows] = await pool.query(
+      `SELECT ${POST_COLUMNS}, p.view_count AS viewCount, p.comment_count AS commentCount, p.created_at AS createdAt
+         FROM post p
+         JOIN game g ON g.id = p.game_id
+        WHERE ${condition}
+        ORDER BY p.created_at DESC, p.id DESC
+        LIMIT ? OFFSET ?`,
+      [memberId, limit, offset],
+    );
+    return { rows, totalCount: Number(totalCount) };
+  }
+
+  /** 이 시각 이후에 회원이 받은 평가 (별점, 받은 시각), 반영 순서(review.id 순) */
+  async function findRatingsSince(memberId, since) {
+    const [rows] = await pool.query(
+      'SELECT rating, created_at AS createdAt FROM review WHERE target_id = ? AND created_at >= ? ORDER BY id',
+      [memberId, since],
+    );
+    return rows;
+  }
+
   /** 내가 신청한 공고 한 페이지와 전체 건수 (최근 신청순). status 가 있으면 그 상태만 */
   async function findMyApplicationPage({ memberId, status, limit, offset }) {
     const where = ['pa.applicant_id = ?', ALIVE_POST];
@@ -248,6 +273,8 @@ function createMypageRepository(pool) {
     findGameProfiles,
     findProfileStats,
     findTopReviewTags,
+    findMemberPostPage,
+    findRatingsSince,
     findMyPostPage,
     findMyApplicationPage,
     findMyCommentPage,

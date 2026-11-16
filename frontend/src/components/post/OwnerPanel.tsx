@@ -1,12 +1,13 @@
 import React from 'react';
 import type { Participant, PostDetail } from '../../data/postData';
-import ParticipantsCard from './ParticipantsCard';
+import ParticipantsCard, { type ParticipantNoShow } from './ParticipantsCard';
 import { postText } from '../../data/postData';
 import type { PartyState } from '../../hooks/usePostDetail';
 
 interface OwnerPanelProps {
   readonly detail: PostDetail;
   readonly participants: readonly Participant[];
+  readonly noShow?: ParticipantNoShow;
   readonly state: PartyState;
   readonly onClose: () => void;
   readonly onTogglePause: () => void;
@@ -14,9 +15,9 @@ interface OwnerPanelProps {
 }
 
 /** Owner view: participants roster + conditions + recruit controls. */
-export const OwnerPanel: React.FC<OwnerPanelProps> = ({ detail, participants, state, onClose, onTogglePause, onDisband }) => (
+export const OwnerPanel: React.FC<OwnerPanelProps> = ({ detail, participants, noShow, state, onClose, onTogglePause, onDisband }) => (
   <>
-    <ParticipantsCard participants={participants} max={detail.max} />
+    <ParticipantsCard participants={participants} max={detail.max} noShow={noShow} />
     <section className="rounded-2xl border border-night-borderLight bg-night-surface p-5">
       <h2 className="text-sm font-bold text-white mb-3">{postText.conditionsTitle}</h2>
       <dl className="divide-y divide-night-borderLight text-xs">

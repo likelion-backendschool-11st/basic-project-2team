@@ -82,6 +82,14 @@ function createFakeRepository() {
     async findTopReviewTags(memberId, limit) {
       return (state.tags.get(memberId) ?? []).slice(0, limit);
     },
+    async findMemberPostPage(filter) {
+      state.calls.push({ name: 'findMemberPostPage', ...filter });
+      return slice(state.posts, filter);
+    },
+    async findRatingsSince(memberId, since) {
+      state.calls.push({ name: 'findRatingsSince', memberId, since });
+      return state.ratings;
+    },
     async findMyPostPage(filter) {
       state.calls.push({ name: 'findMyPostPage', ...filter });
       return slice(state.posts, filter);
@@ -148,6 +156,7 @@ describe('마이페이지 API (/api/members)', () => {
     state.stats.clear();
     state.tags.clear();
     state.posts = [];
+    state.ratings = [];
     state.applications = [];
     state.comments = [];
     state.scraps = [];
@@ -595,6 +604,48 @@ describe('마이페이지 API (/api/members)', () => {
       assert.equal((await get('/me/favorites')).status, 401);
       assert.equal((await request('POST', `/me/favorites/${OTHER}`)).status, 401);
       assert.equal((await request('DELETE', `/me/favorites/${OTHER}`)).status, 401);
+    });
+  });
+  describe('GET /{memberId}/posts, /{memberId}/manner-history (로그인 없이)', () => {
+    it('다른 회원이 쓴 공고를 보여주고(내 전용 필드 제외) 탈퇴·없는 회원은 404', async () => {
+      repo.state.posts = [postColumns({ viewCount: 5, commentCount: 1, createdAt: new Date('2026-11-01T00:00:00Z') })];
+      const res = await get(`/${OTHER}/posts`);
+      assert.equal(res.status, 200);
+      const { data } = await res.json();
+      assert.equal(data.totalCount, 1);
+      assert.equal(data.items[0].title, '[카멘] 숙련 서폿 구해요');
+      assert.equal(data.items[0].views, 5);
+      assert.equal('review' in data.items[0], false);
+      assert.equal((await get(`/${WITHDRAWN}/posts`)).status, 404);
+      assert.equal((await get('/999/posts')).status, 404);
+    });
+
+    it('매너 온도 변화: 기간 시작 온도에서 평가를 날짜별로 반영해 현재 온도에 닿는다', async () => {
+      // 현재 36.5, 5점(+0.5) 2건 → 시작 35.5. 오늘(KST 11-16 09시) 기준 3일 구간 = 11-14 ~ 11-16
+      repo.state.ratings = [
+        { rating: 5, createdAt: new Date('2026-11-14T03:00:00Z') },
+        { rating: 5, createdAt: new Date('2026-11-15T20:00:00Z') }, // KST 11-16
+      ];
+      const { data } = await (await get(`/${OTHER}/manner-history?days=3`)).json();
+      assert.equal(data.current, 36.5);
+      assert.deepEqual(data.points, [
+        { date: '2026-11-14', temp: 36, reviewCount: 1 },
+        { date: '2026-11-15', temp: 36, reviewCount: 0 },
+        { date: '2026-11-16', temp: 36.5, reviewCount: 1 },
+      ]);
+    });
+
+    it('가입한 지 기간이 안 된 회원은 가입일부터 시작한다', async () => {
+      repo.state.members.set(OTHER, memberRow({ id: OTHER, mannerTemp: '36.5', createdAt: new Date('2026-11-14T10:00:00Z') }));
+      const { data } = await (await get(`/${OTHER}/manner-history?days=30`)).json();
+      assert.deepEqual(data.points.map((p) => p.date), ['2026-11-14', '2026-11-15', '2026-11-16']);
+    });
+
+    it('days 가 범위를 벗어나면 400, 기본은 30일', async () => {
+      assert.equal((await get(`/${OTHER}/manner-history?days=91`)).status, 400);
+      const { data } = await (await get(`/${OTHER}/manner-history`)).json();
+      assert.equal(data.points.length, 30);
+      assert.equal(data.points.every((p) => p.temp === 36.5), true);
     });
   });
 });

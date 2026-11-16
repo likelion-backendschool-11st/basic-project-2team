@@ -105,6 +105,7 @@ export const reportActionLabel: Record<ReportAction, string> = {
   SUSPEND: '이용 정지',
   BAN: '영구 정지',
   DELETE_CONTENT: '게시물 삭제',
+  CONFIRM_NO_SHOW: '노쇼 확정',
   DISMISS: '기각',
 };
 
@@ -116,15 +117,15 @@ export const suspendPeriods = [
 ] as const;
 export const DEFAULT_SUSPEND_DAYS = 7;
 
-export type DecisionId = 'dismiss' | 'warn' | 'suspend' | 'ban' | 'delete';
+export type DecisionId = 'dismiss' | 'warn' | 'suspend' | 'ban' | 'delete' | 'noShow';
 
-interface Decision {
+export interface Decision {
   readonly id: DecisionId;
   readonly title: string;
   readonly desc: string;
   readonly recommended?: boolean;
-  /** 공고·댓글 신고에만 고를 수 있음 */
-  readonly contentOnly?: boolean;
+  /** 이 유형의 신고에만 고를 수 있음 (없으면 모든 신고) */
+  readonly onlyFor?: readonly ReportType[];
   readonly request: ProcessReportRequest;
 }
 
@@ -134,7 +135,8 @@ export const decisions: readonly Decision[] = [
   { id: 'warn', title: '경고 조치', desc: '경미한 1차 단순 위반 및 주의 통지', request: { status: 'DONE', action: 'WARN' } },
   { id: 'suspend', title: '이용 정지', desc: '기간을 지정하여 파티 생성 및 참여 일시적 차단', recommended: true, request: { status: 'DONE', action: 'SUSPEND' } },
   { id: 'ban', title: '영구 정지', desc: '계정 영구 접속 박탈 (책임 관리자 전용)', request: { status: 'DONE', action: 'BAN' } },
-  { id: 'delete', title: '공고 또는 댓글 단건 삭제', desc: '해당 게시물을 비공개 처리 (공고·댓글 신고만)', contentOnly: true, request: { status: 'DONE', action: 'DELETE_CONTENT' } },
+  { id: 'delete', title: '공고 또는 댓글 단건 삭제', desc: '해당 게시물을 비공개 처리 (공고·댓글 신고만)', onlyFor: ['POST', 'COMMENT'], request: { status: 'DONE', action: 'DELETE_CONTENT' } },
+  { id: 'noShow', title: '노쇼 확정', desc: '신청을 노쇼로 바꾸고 매너 온도 −2.0℃, 본인에게 알림 (노쇼 신고만)', onlyFor: ['NO_SHOW'], request: { status: 'DONE', action: 'CONFIRM_NO_SHOW' } },
 ];
 
 export const reportDetailText = {

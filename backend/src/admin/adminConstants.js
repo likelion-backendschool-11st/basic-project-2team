@@ -54,6 +54,8 @@ const reportAction = Object.freeze({
   suspend: 'SUSPEND',
   ban: 'BAN',
   deleteContent: 'DELETE_CONTENT',
+  /** 노쇼 신고만: 신청을 NO_SHOW 로 바꾸고 매너 온도를 내립니다 */
+  confirmNoShow: 'CONFIRM_NO_SHOW',
   dismiss: 'DISMISS',
 });
 const reportDoneActions = Object.freeze([
@@ -61,6 +63,7 @@ const reportDoneActions = Object.freeze([
   reportAction.suspend,
   reportAction.ban,
   reportAction.deleteContent,
+  reportAction.confirmNoShow,
 ]);
 
 /** sanction.type */
@@ -97,6 +100,9 @@ const memberStatusSeverity = Object.freeze({
 /** post.status — 화면의 모집 중 · 마감 · 종료 · 삭제됨 */
 const postStatus = Object.freeze({ open: 'OPEN', paused: 'PAUSED', closed: 'CLOSED', completed: 'COMPLETED', deleted: 'DELETED' });
 const postStatuses = Object.freeze(Object.values(postStatus));
+
+/** post_application.status (노쇼 확정에 쓰는 값만) */
+const applicationStatus = Object.freeze({ accepted: 'ACCEPTED', noShow: 'NO_SHOW' });
 
 /** comment.status */
 const commentStatus = Object.freeze({ visible: 'VISIBLE', hidden: 'HIDDEN', deleted: 'DELETED' });
@@ -157,7 +163,7 @@ const logTargetType = Object.freeze({
 });
 
 /** notification.type */
-const notificationType = Object.freeze({ postDeleted: 'POST_DELETED', sanction: 'SANCTION', partyInvite: 'PARTY_INVITE' });
+const notificationType = Object.freeze({ postDeleted: 'POST_DELETED', sanction: 'SANCTION', noShow: 'NO_SHOW', partyInvite: 'PARTY_INVITE' });
 
 const adminMessages = Object.freeze({
   invalidInput: '입력값을 확인해주세요.',
@@ -183,6 +189,9 @@ const adminMessages = Object.freeze({
   reportNotFound: '존재하지 않는 신고입니다.',
   reportAlreadyHandled: '이미 처리가 끝난 신고입니다.',
   deleteContentNotAllowed: '공고 또는 댓글 신고에만 게시물 삭제 조치를 할 수 있습니다.',
+  confirmNoShowNotAllowed: '노쇼 신고에만 노쇼 확정 조치를 할 수 있습니다.',
+  applicationNotFound: '노쇼 신고 대상 신청이 존재하지 않습니다.',
+  noShowNotApplicable: '승인된 파티원이 아니어서 노쇼로 확정할 수 없습니다 (신청 취소 등).',
   postNotFound: '존재하지 않는 공고입니다.',
   postAlreadyDeleted: '이미 삭제된 공고입니다.',
   memberNotFound: '존재하지 않는 회원입니다.',
@@ -197,6 +206,7 @@ const adminMessages = Object.freeze({
   /** 회원 알림함 문구 (notification.message, VARCHAR(200)) */
   postDeletedNotice: (title, reason) => `관리자에 의해 공고 "${title}" 이(가) 삭제되었습니다. 사유: ${reason}`,
   sanctionNotice: (label, reason) => `${label} 조치를 받았습니다. 사유: ${reason}`,
+  noShowNotice: (title, mannerTemp) => `"${title}" 파티 노쇼가 확인되어 매너 온도가 ${mannerTemp}℃ 가 되었습니다.`,
   releaseNotice: (label, reason) => `${label} 조치가 해제되었습니다. 사유: ${reason}`,
   sanctionLabel: (type, days) =>
     ({ WARNING: '경고', SUSPEND: `이용 정지 (${days}일)`, BAN: '영구 정지' })[type],
@@ -235,6 +245,7 @@ module.exports = {
   memberStatusSeverity,
   postStatus,
   postStatuses,
+  applicationStatus,
   commentStatus,
   commentUpdateStatuses,
   COMMENT_REPORTED,

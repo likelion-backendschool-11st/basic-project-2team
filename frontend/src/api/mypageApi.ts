@@ -167,6 +167,22 @@ export type MemberProfileResponse = Omit<MySummaryResponse, 'ageRangePublic' | '
 
 export const getMemberProfile = (memberId: number) => request<MemberProfileResponse>('GET', `/api/members/${memberId}`);
 
+/** GET /api/members/{memberId}/posts 아이템 (로그인 없이 조회) */
+export type MemberPostItem = Omit<MyPostItem, 'canComplete' | 'review'>;
+
+/** GET /api/members/{memberId}/manner-history */
+export interface MannerHistoryResponse {
+  readonly days: number;
+  readonly current: number;
+  readonly points: readonly { readonly date: string; readonly temp: number; readonly reviewCount: number }[];
+}
+
+export const getMemberPosts = (memberId: number, page: number, size: number) =>
+  request<Page<MemberPostItem>>('GET', `/api/members/${memberId}/posts?${pageQuery(page, size)}`);
+
+export const getMannerHistory = (memberId: number, days: number) =>
+  request<MannerHistoryResponse>('GET', `/api/members/${memberId}/manner-history?days=${days}`);
+
 export const getMyPosts = (page: number, size: number) => request<Page<MyPostItem>>('GET', `/api/members/me/posts?${pageQuery(page, size)}`);
 
 export const getMyApplications = (status: ApplicationStatus | null, page: number, size: number) =>

@@ -11,6 +11,7 @@ import {
   type RootCommentResponse,
 } from '../api/commentApi';
 import { ApiRequestError } from '../api/http';
+import { useProfanityNotice } from './useProfanityNotice';
 import { getMemberProfile, type MemberProfileResponse } from '../api/mypageApi';
 import { inviteToParty } from '../api/postApi';
 import { COMMENT_PAGE_SIZE, commentText, type CommentChannel, type CommentSort, type PostComment } from '../data/commentData';
@@ -21,7 +22,7 @@ import { useToast } from './useToast';
 /** 프로필 팝오버에 보여줄 작성자 정보. 불러오는 중이면 'loading', 실패하면 'error' */
 export type CommentAuthorProfile = MemberProfileResponse | 'loading' | 'error';
 
-const errorMessage = (err: unknown, fallback: string) => (err instanceof ApiRequestError ? err.message : fallback);
+const errorMessage = (err: unknown, fallback: string) => (err instanceof ApiRequestError ? (err.fields[0]?.message ?? err.message) : fallback);
 
 /** API 댓글 → 화면용 PostComment. seq 는 서버가 정한 순서(목록 안의 위치)입니다. */
 function toPostComment(c: CommentResponse, seq: number, now: number): PostComment {
@@ -78,6 +79,7 @@ export function useComments(postId: string, initialTotal: number, { channel = 'p
   const deleteDialog = useModal(false);
   const reportDialog = useModal(false);
   const toast = useToast();
+  const profanity = useProfanityNotice();
 
   const paging = usePagination(rootTotal, COMMENT_PAGE_SIZE, `${postId}${sort}`);
   const page = paging.page;
@@ -148,7 +150,7 @@ export function useComments(postId: string, initialTotal: number, { channel = 'p
     try {
       await createComment(postId, { text: body, secret: opts.secret ?? false, channel, ...(opts.parentId ? { parentId: Number(opts.parentId) } : {}) });
     } catch (err) {
-      toast.show(errorMessage(err, commentText.loadFailed));
+      if (!profanity.catches(err)) toast.show(errorMessage(err, commentText.loadFailed));
       return false;
     }
     setReplyTo(null);
@@ -174,7 +176,7 @@ export function useComments(postId: string, initialTotal: number, { channel = 'p
       toast.show(commentText.updated);
       reload(); // 채택된 답글을 고치면 채택이 풀리므로 목록을 다시 불러옵니다.
     } catch (err) {
-      toast.show(errorMessage(err, commentText.loadFailed));
+      if (!profanity.catches(err)) toast.show(errorMessage(err, commentText.loadFailed));
     }
   };
 
@@ -249,6 +251,6 @@ export function useComments(postId: string, initialTotal: number, { channel = 'p
     channel, invite,
     comments, accept, cancelAccept, refresh: reload, total: channel === 'party' ? channelCount + totalDelta : Math.max(0, initialTotal + totalDelta), visible, repliesOf, sort, setSort, paging, loading, error,
     replyTo, setReplyTo, editing, setEditing, popoverFor, setPopoverFor, profileOf,
-    add, saveEdit, askDelete, confirmDelete, askReport, confirmReport, deleteDialog, reportDialog, toast,
+    add, saveEdit, askDelete, confirmDelete, askReport, confirmReport, deleteDialog, reportDialog, toast, profanity,
   };
 }

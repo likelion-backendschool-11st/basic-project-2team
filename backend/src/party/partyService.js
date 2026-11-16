@@ -8,6 +8,7 @@ const {
   POST_STATUS,
   MEMBER_STATUS,
   LATE_CANCEL_HOURS,
+  APPLICANT_TOP_TAG_LIMIT,
   NOTIFICATION_TYPE,
   NOTIFICATION_TITLE_MAX,
   partyMessages: m,
@@ -124,13 +125,16 @@ function createPartyService({ partyRepository, postEvents = NO_EVENTS, memberEve
     const status = parseListStatus(query);
     const post = await loadOwnedPost(rawPostId, memberId);
     const rows = await partyRepository.findApplications(post.id, status);
+    // 탈퇴한 신청자는 닉네임처럼 받은 태그도 보여 주지 않습니다.
+    const visibleIds = [...new Set(rows.filter((row) => row.memberStatus !== MEMBER_STATUS.withdrawn).map((row) => row.memberId))];
+    const topTags = await partyRepository.findTopTagsByMembers(visibleIds, APPLICANT_TOP_TAG_LIMIT);
     return rows.map((row) => ({
       id: row.id,
       status: row.status,
       role: row.role,
       message: row.message,
       appliedAt: toIso(row.appliedAt),
-      applicant: toMember(row),
+      applicant: { ...toMember(row), topTags: topTags.get(row.memberId) ?? [] },
     }));
   }
 

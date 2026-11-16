@@ -13,7 +13,7 @@ const APPLICANT_COLUMNS = `m.id AS memberId, m.nickname, m.avatar_url AS avatarU
        m.manner_temp AS mannerTemp, m.review_count AS reviewCount, m.status AS memberStatus`;
 
 /**
- * 참가 신청 · 승인/거절 · 파티원 조회용 테이블 접근: post_application · post · member
+ * 참가 신청 · 승인/거절 · 파티원 조회용 테이블 접근: post_application · post · member · review · review_tag_map · review_tag
  * @param {import('mysql2/promise').Pool} pool
  */
 function createPartyRepository(pool) {
@@ -154,6 +154,28 @@ function createPartyRepository(pool) {
       [postId, status ? [status] : [S.pending, S.accepted, S.rejected]],
     );
     return rows;
+  }
+
+  /** 회원별로 받은 평가에서 많이 선택된 태그 상위 limit 개: Map<memberId, [{ code, label, count }]> */
+  async function findTopTagsByMembers(memberIds, limit) {
+    const topTags = new Map();
+    if (memberIds.length === 0) return topTags;
+    const [rows] = await pool.query(
+      `SELECT r.target_id AS memberId, rt.code, rt.label, COUNT(*) AS count
+         FROM review r
+         JOIN review_tag_map rtm ON rtm.review_id = r.id
+         JOIN review_tag rt ON rt.id = rtm.review_tag_id
+        WHERE r.target_id IN (?)
+        GROUP BY r.target_id, rt.id, rt.code, rt.label, rt.sort_order
+        ORDER BY r.target_id, count DESC, rt.sort_order, rt.id`,
+      [memberIds],
+    );
+    for (const row of rows) {
+      const tags = topTags.get(row.memberId) ?? [];
+      if (tags.length < limit) tags.push({ code: row.code, label: row.label, count: Number(row.count) });
+      topTags.set(row.memberId, tags);
+    }
+    return topTags;
   }
 
   /**
@@ -329,6 +351,7 @@ function createPartyRepository(pool) {
     reapply,
     cancelApplication,
     findApplications,
+    findTopTagsByMembers,
     decideApplication,
     changePostStatus,
     findParticipants,

@@ -24,6 +24,8 @@ const ROLE_MAX_LENGTH = 30;
 const MESSAGE_MAX_LENGTH = 200;
 /** 수락된 신청을 출발 이 시간 이내(이미 지난 경우 포함)에 취소하면 late_cancel 로 기록 (REQ-APPLY-002) */
 const LATE_CANCEL_HOURS = 3;
+/** 신청자 목록에 보여 줄 대표 평가 태그 수 (받은 횟수 많은 순) */
+const APPLICANT_TOP_TAG_LIMIT = 3;
 
 /** notification.type (docs/03-db-design.md 2.12) */
 const NOTIFICATION_TYPE = Object.freeze({
@@ -94,5 +96,6 @@ module.exports = {
   ROLE_MAX_LENGTH,
   MESSAGE_MAX_LENGTH,
   LATE_CANCEL_HOURS,
+  APPLICANT_TOP_TAG_LIMIT,
   partyMessages,
 };

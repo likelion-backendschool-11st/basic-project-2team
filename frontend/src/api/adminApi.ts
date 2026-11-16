@@ -38,7 +38,7 @@ export const isAdminAuthError = (err: unknown) =>
 
 export type ReportStatus = 'PENDING' | 'IN_PROGRESS' | 'DONE' | 'REJECTED';
 export type ReportType = 'MEMBER' | 'NO_SHOW' | 'POST' | 'COMMENT';
-export type ReportAction = 'WARN' | 'SUSPEND' | 'BAN' | 'DELETE_CONTENT' | 'DISMISS';
+export type ReportAction = 'WARN' | 'SUSPEND' | 'BAN' | 'DELETE_CONTENT' | 'CONFIRM_NO_SHOW' | 'DISMISS';
 export type PostStatus = 'OPEN' | 'PAUSED' | 'CLOSED' | 'COMPLETED' | 'DELETED';
 export type MemberStatus = 'ACTIVE' | 'WARNED' | 'SUSPENDED' | 'BANNED' | 'WITHDRAWN';
 export type SanctionType = 'WARNING' | 'SUSPEND' | 'BAN';
@@ -100,9 +100,9 @@ export interface AdminProfile {
   readonly role: string;
 }
 
-/** POST /api/admin/auth/login — 성공하면 관리자 토큰을 저장합니다. */
+/** POST /api/admin/auth/login — 성공하면 관리자 토큰을 저장합니다. 회원 로그인 여부와 상관없이 관리자 요청으로 보냅니다. */
 export async function adminLogin(userId: string, password: string) {
-  const data = await request<{ readonly accessToken: string; readonly admin: AdminProfile }>('POST', '/api/admin/auth/login', { userId, password });
+  const data = await adminRequest<{ readonly accessToken: string; readonly admin: AdminProfile }>('POST', '/auth/login', { userId, password });
   saveAdminToken(data.accessToken);
   return data.admin;
 }

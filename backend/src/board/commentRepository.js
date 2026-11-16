@@ -280,6 +280,42 @@ function createCommentRepository(pool) {
     }
   }
 
+  /**
+   * 노쇼 신고 대상: 공고와 그 공고에서 memberId 의 신청 행. 공고가 없거나 삭제됐으면 null, 신청한 적이 없으면 application 이 null.
+   * @returns {Promise<{ postId: number, authorId: number, status: string, scheduleAt: Date | null, application: { id: number, status: string } | null } | null>}
+   */
+  async function findNoShowTarget(postId, memberId) {
+    const [rows] = await pool.query(
+      `SELECT p.id AS postId, p.author_id AS authorId, p.status, p.schedule_at AS scheduleAt,
+              a.id AS applicationId, a.status AS applicationStatus
+         FROM post p LEFT JOIN post_application a ON a.post_id = p.id AND a.applicant_id = ?
+        WHERE p.id = ? AND ${ALIVE_POST} LIMIT 1`,
+      [memberId, postId],
+    );
+    const row = rows[0];
+    if (!row) return null;
+    const { applicationId, applicationStatus, ...post } = row;
+    return { ...post, application: applicationId ? { id: applicationId, status: applicationStatus } : null };
+  }
+
+  /**
+   * 노쇼 신고를 저장합니다 (target_id 는 post_application id). 같은 사람이 이미 신고했으면(report UNIQUE) null.
+   * @returns {Promise<number | null>} 새 신고 id
+   */
+  async function createNoShowReport({ reporterId, applicationId, targetMemberId, postId, reasonCode, detail }) {
+    try {
+      const [result] = await pool.query(
+        `INSERT INTO report (reporter_id, target_type, target_id, target_member_id, post_id, reason_code, detail)
+         VALUES (?, 'NO_SHOW', ?, ?, ?, ?, ?)`,
+        [reporterId, applicationId, targetMemberId, postId, reasonCode, detail],
+      );
+      return result.insertId;
+    } catch (err) {
+      if (err && err.code === 'ER_DUP_ENTRY') return null;
+      throw err;
+    }
+  }
+
   /** 로그인한 사용자가 신고한 댓글 id 집합 (목록의 reported 표시용) */
   async function findReportedCommentIds(memberId, commentIds) {
     if (commentIds.length === 0) return new Set();
@@ -307,6 +343,8 @@ function createCommentRepository(pool) {
     createCommentReport,
     createMemberReport,
     createPostReport,
+    findNoShowTarget,
+    createNoShowReport,
     findReportedCommentIds,
   };
 }

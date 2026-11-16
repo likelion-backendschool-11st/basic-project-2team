@@ -15,7 +15,7 @@ const C = 4;
 
 /** DB 대신 메모리에 저장하는 가짜 repository. 승인·취소의 인원 계산은 실제 repository 와 같은 규칙입니다. */
 function createFakeRepository() {
-  const state = { posts: new Map(), members: new Map(), applications: [], notifications: [], nextId: 1 };
+  const state = { posts: new Map(), members: new Map(), applications: [], notifications: [], topTags: new Map(), nextId: 1 };
   const notify = (memberId, type, message) => state.notifications.push({ memberId, type, message });
   const dropInvites = (postId, memberId) => {
     state.notifications = state.notifications.filter((n) => !(n.memberId === memberId && n.type === 'PARTY_INVITE' && n.postId === postId));
@@ -67,6 +67,9 @@ function createFakeRepository() {
       return state.applications
         .filter((a) => a.postId === postId && ['PENDING', 'ACCEPTED', 'REJECTED'].includes(a.status) && (!status || a.status === status))
         .map((a) => ({ ...a, appliedAt: NOW, ...memberRow(a.applicantId) }));
+    },
+    async findTopTagsByMembers(memberIds, limit) {
+      return new Map(memberIds.filter((id) => state.topTags.has(id)).map((id) => [id, state.topTags.get(id).slice(0, limit)]));
     },
     async decideApplication({ postId, applicationId, status, notices }) {
       const post = state.posts.get(postId);
@@ -162,6 +165,7 @@ describe('party application API', () => {
     events.log.length = 0;
     memberEvents.log.length = 0;
     Object.assign(repo.state, { applications: [], notifications: [], nextId: 1 });
+    repo.state.topTags.clear();
     repo.state.members.clear();
     repo.state.posts.clear();
     repo.state.posts.set(1, { authorId: HOST, title: '카멘 하드 숙련팟', status: 'OPEN', headcount: 3, currentCount: 1, scheduleAt: new Date('2026-11-14T12:00:00Z') });
@@ -309,7 +313,7 @@ describe('party application API', () => {
 
       const { data } = await json(await call('GET', '/1/applications', undefined, HOST));
       assert.deepEqual(data.map((a) => [a.id, a.status]), [[1, 'ACCEPTED'], [2, 'PENDING']]);
-      assert.deepEqual(data[0].applicant, { id: A, nickname: '회원2', avatarUrl: null, level: 1, mannerTemp: 36.5, reviewCount: 0 });
+      assert.deepEqual(data[0].applicant, { id: A, nickname: '회원2', avatarUrl: null, level: 1, mannerTemp: 36.5, reviewCount: 0, topTags: [] });
       assert.equal(data[0].role, '서포터');
 
       const pending = await json(await call('GET', '/1/applications?status=PENDING', undefined, HOST));
@@ -324,6 +328,21 @@ describe('party application API', () => {
       // 탈퇴 회원은 신청 자체가 막히므로 신청 후 상태만 바꿔 확인
       const { data } = await json(await call('GET', '/1/applications', undefined, HOST));
       assert.equal(data[0].applicant.nickname, '탈퇴한 회원');
+    });
+
+    it('신청자마다 많이 받은 평가 태그를 최대 3개 돌려주고, 탈퇴한 신청자는 비운다', async () => {
+      const tag = (code, count) => ({ code, label: `#${code}`, count });
+      repo.state.topTags.set(A, [tag('kind', 5), tag('punctual', 3), tag('order', 2), tag('fun', 1)]);
+      repo.state.topTags.set(B, [tag('kind', 1)]);
+      await apply(A);
+      await apply(B);
+      let { data } = await json(await call('GET', '/1/applications', undefined, HOST));
+      assert.deepEqual(data[0].applicant.topTags.map((t) => t.code), ['kind', 'punctual', 'order']);
+      assert.deepEqual(data[1].applicant.topTags, [tag('kind', 1)]);
+
+      repo.state.members.set(B, { status: 'WITHDRAWN' });
+      ({ data } = await json(await call('GET', '/1/applications', undefined, HOST)));
+      assert.deepEqual(data[1].applicant.topTags, []);
     });
   });
 

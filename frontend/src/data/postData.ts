@@ -120,6 +120,12 @@ export const postText = {
   reported: '신고됨',
   reportTitle: '공고 신고',
   reportedToast: '신고가 접수되었습니다. 운영팀이 검토 후 조치합니다.',
+  noShow: {
+    report: '노쇼 신고',
+    reported: '신고됨',
+    title: (name: string) => `${name}님 노쇼 신고`,
+    description: '약속한 파티에 참여하지 않은 파티원을 신고합니다. 운영팀이 확인하면 해당 파티원의 매너 온도가 내려갑니다. 허위 신고는 제재될 수 있습니다.',
+  },
   recruiting: (c: number, m: number) => `모집중 ${c}/${m}`,
   almostFull: '마감 직전 (1자리 남음)',
   hostLabel: '방장',
@@ -149,6 +155,9 @@ export const postText = {
       ? '대기 중인 신청자가 없습니다.'
       : `${names.slice(0, 3).join(', ')}${names.length > 3 ? ` 외 ${names.length - 3}명` : ''}님이 승인 대기 중입니다.`,
   manageApplicants: '신청자 목록 관리 / 승인',
+  applicantMannerTemp: (temp: number) => `매너온도 ${temp.toFixed(1)}℃`,
+  applicantReviewCount: (n: number) => `평가 ${n}건`,
+  applicantNoTags: '아직 받은 평가 태그가 없어요',
   participantsTitle: '파티 참가자 명단',
   emptySlot: '모집 중',
   conditionsTitle: '파티 모집 상세 조건',
@@ -166,3 +175,6 @@ export const postText = {
   leave: { title: '파티에서 탈퇴할까요?', description: '탈퇴 후 재신청하려면 방장의 수락을 다시 받아야 하며, 잦은 탈퇴는 매너 점수에 반영될 수 있습니다.', confirm: '탈퇴', cancel: '아니오' },
   closeConfirm: { title: '모집을 마감할까요?', description: '마감하면 더 이상 신청을 받을 수 없고, 현재 참가자로 파티가 확정됩니다.', confirm: '마감', cancel: '취소' },
 };
+
+/** 노쇼 신고 사유 (backend/src/board/commentConstants.js NO_SHOW_REPORT_REASONS) */
+export const noShowReasons: readonly string[] = ['연락 없이 불참', '약속 시간 지각', '시작 후 무단 이탈', '기타'];

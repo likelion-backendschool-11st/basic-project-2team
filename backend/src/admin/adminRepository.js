@@ -1,7 +1,8 @@
 'use strict';
 
-const { reportStatus, postStatus, commentStatus, notificationType, COMMENT_REPORTED } = require('./adminConstants');
+const { reportStatus, postStatus, applicationStatus, commentStatus, notificationType, COMMENT_REPORTED } = require('./adminConstants');
 const { revokeActivityPoints } = require('../common/activityPoint');
+const { applyNoShows } = require('../review/mannerTemp');
 
 /** LIKE 검색어의 %, _ 를 글자 그대로 찾도록 이스케이프합니다. */
 const likePattern = (q) => `%${q.replace(/[\\%_]/g, '\\$&')}%`;
@@ -305,6 +306,28 @@ function createAdminRepository(pool) {
       await db.query('DELETE FROM notification WHERE post_id = ? AND type = ?', [id, notificationType.partyInvite]);
     }
 
+    /** 노쇼 신고 대상 신청 행 (report.target_id) */
+    async function lockApplication(id) {
+      return firstOf(
+        'SELECT id, post_id AS postId, applicant_id AS applicantId, status FROM post_application WHERE id = ? FOR UPDATE',
+        [id],
+      );
+    }
+
+    /** 신청을 NO_SHOW 로 바꾸고, 승인 인원에서 빠지므로 공고 현재 인원을 1 줄입니다 (파티장 1명 아래로는 내려가지 않음). */
+    async function markNoShow({ applicationId, postId }) {
+      await db.query(`UPDATE post_application SET status = '${applicationStatus.noShow}' WHERE id = ?`, [applicationId]);
+      await db.query('UPDATE post SET current_count = IF(current_count > 1, current_count - 1, 1) WHERE id = ?', [postId]);
+    }
+
+    /** 노쇼 1건만큼 매너 온도를 내리고 새 값을 돌려줍니다 (review/mannerTemp.js). */
+    async function applyNoShowPenalty(memberId) {
+      const row = await firstOf('SELECT manner_temp AS mannerTemp FROM member WHERE id = ? FOR UPDATE', [memberId]);
+      const mannerTemp = applyNoShows(row.mannerTemp, 1);
+      await db.query('UPDATE member SET manner_temp = ? WHERE id = ?', [mannerTemp, memberId]);
+      return mannerTemp;
+    }
+
     // ───────── 회원
 
     async function listMembers({ status, q, reported, offset, limit, ...range }) {
@@ -502,6 +525,9 @@ function createAdminRepository(pool) {
       listReportsByPost,
       lockPost,
       deletePost,
+      lockApplication,
+      markNoShow,
+      applyNoShowPenalty,
       listMembers,
       findMemberById,
       listGameProfiles,

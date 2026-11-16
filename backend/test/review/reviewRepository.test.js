@@ -26,6 +26,7 @@ function createFakePool() {
         [TARGET_B, { id: TARGET_B, mannerTemp: '0.5', reviewCount: 3, activityPoint: 0, level: 7 }],
       ]),
       reviews: [],
+      noShows: [],
       tagMaps: [],
       pointLogs: [],
       nextReviewId: 100,
@@ -99,6 +100,12 @@ function createFakePool() {
       if (text.startsWith('SELECT target_id AS targetId, rating FROM review')) {
         const ids = params[0];
         return [db.reviews.filter((r) => !ids || ids.includes(r.targetId)).map((r) => ({ targetId: r.targetId, rating: r.rating }))];
+      }
+      if (text.startsWith('SELECT applicant_id AS memberId, COUNT(*) AS noShowCount FROM post_application')) {
+        const ids = params[0];
+        const counts = new Map();
+        for (const memberId of db.noShows) if (!ids || ids.includes(memberId)) counts.set(memberId, (counts.get(memberId) ?? 0) + 1);
+        return [[...counts].map(([memberId, noShowCount]) => ({ memberId, noShowCount }))];
       }
       throw new Error(`예상하지 못한 SQL: ${text}`);
     },
@@ -194,6 +201,16 @@ describe('reviewRepository — 매너 온도 재계산', () => {
       ],
     );
     assert.equal(fake.calls.commit, 1);
+  });
+
+  it('확정된 노쇼는 별점을 반영한 뒤 1건당 −2.0℃ 로 반영하고, 0.0℃ 아래로 내려가지 않는다', async () => {
+    fake.db.reviews.push({ id: 1, targetId: TARGET_A, rating: 5 });
+    fake.db.noShows.push(TARGET_A, TARGET_A, TARGET_B);
+    await repo.recalculateMannerTemps();
+    assert.equal(fake.db.members.get(TARGET_A).mannerTemp, '33');
+    assert.equal(fake.db.members.get(TARGET_A).reviewCount, 1);
+    assert.equal(fake.db.members.get(TARGET_B).mannerTemp, '34.5');
+    assert.equal(fake.db.members.get(REVIEWER).mannerTemp, '36.5');
   });
 
   it('평가 저장으로 쌓인 값과 재계산 결과가 같다', async () => {

@@ -17,6 +17,8 @@ function createMypageRouter(mypageController, { requireAuth, optionalAuth }) {
   router.get('/me/favorites', requireAuth, mypageController.listFavorites);
   router.post('/me/favorites/:memberId', requireAuth, mypageController.addFavorite);
   router.delete('/me/favorites/:memberId', requireAuth, mypageController.removeFavorite);
+  router.get('/:memberId/posts', mypageController.listMemberPosts);
+  router.get('/:memberId/manner-history', mypageController.getMannerHistory);
   router.get('/:memberId', optionalAuth, mypageController.getMemberProfile);
   return router;
 }

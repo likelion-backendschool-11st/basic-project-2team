@@ -10,8 +10,9 @@ import PollWidget from '../components/poll/PollWidget';
 import ApplicantBanner from '../components/post/ApplicantBanner';
 import ApplicantsDialog from '../components/post/ApplicantsDialog';
 import HostCard from '../components/post/HostCard';
+import NoShowReportDialog from '../components/post/NoShowReportDialog';
 import OwnerPanel from '../components/post/OwnerPanel';
-import ParticipantsCard from '../components/post/ParticipantsCard';
+import ParticipantsCard, { type ParticipantNoShow } from '../components/post/ParticipantsCard';
 import PartyStatusCard from '../components/post/PartyStatusCard';
 import PostDescription from '../components/post/PostDescription';
 import PostHeader from '../components/post/PostHeader';
@@ -20,11 +21,13 @@ import RelatedPosts from '../components/post/RelatedPosts';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import Toast from '../components/ui/Toast';
 import LoggedInLayout from '../components/user/LoggedInLayout';
-import { COMMENTS_ANCHOR_ID, commentText, type CommentChannel } from '../data/commentData';
+import NoticeDialog from '../components/ui/NoticeDialog';
+import { COMMENTS_ANCHOR_ID, commentText, profanityDialog, type CommentChannel } from '../data/commentData';
 import { postDetailText, postText } from '../data/postData';
 import { paths, ROUTES } from '../data/routes';
 import { useAuth } from '../hooks/useAuth';
 import { useComments } from '../hooks/useComments';
+import { useNoShowReport } from '../hooks/useNoShowReport';
 import { usePoll } from '../hooks/usePoll';
 import { usePostDetail } from '../hooks/usePostDetail';
 import { usePostEvents } from '../hooks/usePostEvents';
@@ -54,6 +57,7 @@ const PostDetailView: React.FC<{ readonly postId: string }> = ({ postId }) => {
   const activeThread = channel === 'party' ? partyThread : thread;
   const { user } = useAuth();
   const poll = usePoll(postId);
+  const noShowReport = useNoShowReport(Number(postId), post.toast.show);
   // 다른 사람의 신청·승인·댓글·투표 등을 새로고침 없이 반영합니다. 댓글 신호는 공고의 댓글 수도 바뀌므로 상세도 함께 불러옵니다.
   // 파티원이 바뀌면(승인·탈퇴) 투표 자격도 바뀌고, 「댓글 작성자만」 투표는 댓글에 따라 자격이 바뀌므로 투표도 다시 불러옵니다.
   usePostEvents(postId, {
@@ -109,6 +113,10 @@ const PostDetailView: React.FC<{ readonly postId: string }> = ({ postId }) => {
       onToComments={scrollToComments}
     />
   );
+  // 노쇼 신고는 확정 인원이 출발 시간이 지났거나 활동 완료된 파티에서만 할 수 있습니다 (서버도 같은 조건으로 막습니다).
+  const started = detail.status === 'COMPLETED' || (detail.scheduleAt !== null && new Date(detail.scheduleAt).getTime() <= Date.now());
+  const noShow: ParticipantNoShow | undefined =
+    user && isPartyMember && started ? { myId: user.id, isReported: noShowReport.isReported, onReport: noShowReport.ask } : undefined;
   // 투표가 없거나 마지막 투표가 끝났을 때만 공대장에게 「투표하기」(새 투표) 버튼을 보여줍니다.
   const canCreatePoll = detail.isOwner && !poll.loading && poll.canCreate;
 
@@ -135,11 +143,11 @@ const PostDetailView: React.FC<{ readonly postId: string }> = ({ postId }) => {
         </div>
         <aside className="flex flex-col gap-5 xl:sticky xl:top-24">
           {detail.isOwner ? (
-            <OwnerPanel detail={detail} participants={post.participants} state={post.state} onClose={post.closeRecruit.open} onTogglePause={post.togglePause} onDisband={post.disband.open} />
+            <OwnerPanel detail={detail} participants={post.participants} noShow={noShow} state={post.state} onClose={post.closeRecruit.open} onTogglePause={post.togglePause} onDisband={post.disband.open} />
           ) : (
             <>
               <PartyStatusCard detail={detail} filled={post.filled} percent={post.percent} applied={post.applied} accepted={post.accepted} state={post.state} scrapped={post.scrapped} onApply={post.apply} onLeave={post.leave.open} onScrap={post.toggleScrap} onCopy={post.copyLink} />
-              <ParticipantsCard participants={post.participants} max={detail.max} />
+              <ParticipantsCard participants={post.participants} max={detail.max} noShow={noShow} />
               <HostCard host={detail.host} profile={post.hostProfile} following={post.following} onFollow={post.toggleFollow} />
             </>
           )}
@@ -154,6 +162,8 @@ const PostDetailView: React.FC<{ readonly postId: string }> = ({ postId }) => {
       <ConfirmDialog isOpen={activeThread.deleteDialog.isOpen} title={commentText.deleteDialog.title} description={commentText.deleteDialog.description} confirmLabel={commentText.deleteDialog.confirm} cancelLabel={commentText.deleteDialog.cancel} icon="fa-trash-can" onConfirm={activeThread.confirmDelete} onCancel={activeThread.deleteDialog.close} />
       <ReportDialog isOpen={activeThread.reportDialog.isOpen} onConfirm={activeThread.confirmReport} onClose={activeThread.reportDialog.close} />
       <ReportDialog isOpen={post.reportDialog.isOpen} title={postText.reportTitle} onConfirm={post.confirmReport} onClose={post.reportDialog.close} />
+      <NoticeDialog isOpen={activeThread.profanity.message !== null} title={profanityDialog.title} description={activeThread.profanity.message ?? ''} confirmLabel={profanityDialog.confirm} onClose={activeThread.profanity.close} />
+      <NoShowReportDialog report={noShowReport} />
       <ApplicantsDialog isOpen={post.applicantsDialog.isOpen} applicants={post.applicants} onResolve={post.resolveApplicant} onClose={post.applicantsDialog.close} />
       {poll.formDialog.isOpen && (
         <PollFormDialog editing={poll.formTarget} scheduleAt={detail.scheduleAt} busy={poll.busy} onSubmit={(input) => void poll.save(input)} onClose={poll.formDialog.close} />

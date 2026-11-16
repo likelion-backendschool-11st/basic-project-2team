@@ -12,7 +12,8 @@ export type NotificationType =
   | 'PARTY_INVITE'
   | 'INVITE_ACCEPTED'
   | 'POLL_CONFIRMED'
-  | 'POLL_REMINDER';
+  | 'POLL_REMINDER'
+  | 'NO_SHOW';
 
 export interface NotificationView {
   readonly id: string;
@@ -60,6 +61,7 @@ export const notificationTypes: Readonly<Record<NotificationType, { label: strin
   INVITE_ACCEPTED: { label: '초대 수락', icon: 'fa-solid fa-handshake', tone: toneOk },
   POLL_CONFIRMED: { label: '투표 결과', icon: 'fa-solid fa-flag-checkered', tone: toneOk },
   POLL_REMINDER: { label: '투표 독려', icon: 'fa-solid fa-check-to-slot', tone: toneWarn },
+  NO_SHOW: { label: '노쇼 확정', icon: 'fa-solid fa-user-slash', tone: toneDanger },
 };
 
 /** 알려지지 않은 유형(서버에 새 유형이 생겼을 때)의 기본 표시 */

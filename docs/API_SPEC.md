@@ -440,6 +440,10 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 
 - `current` / `max` 는 파티장 포함 현재 인원 / 정원입니다. 탈퇴한 작성자는 `author` 가 `"탈퇴한 회원"` 입니다. 일정 미정이면 `schedule: null`, `scheduleTbd: true` 입니다.
 
+**욕설 필터 오류 코드** — 욕설 때문에 거절하면 `INVALID_INPUT` 이 아니라 400 `PROFANITY_DETECTED` 를 돌려줍니다(`error.fields` 형식은 같음). 프론트는 이 코드를 보고 경고 모달을 띄웁니다.
+
+**욕설 필터** — 댓글 작성(`POST /api/posts/{postId}/comments`)·수정(`PATCH /api/comments/{commentId}`)도 `text` 에 같은 검사를 하며 400 `PROFANITY_DETECTED` 의 `error.fields` 에 "댓글에 부적절한 표현이 포함되어 있습니다." 를 담습니다. 공고 작성(`POST /api/posts`)·수정(`PUT /api/posts/{postId}`) 때 `title`·`body`·`partyName`·`customDetail` 에 욕설이 있으면 400 `PROFANITY_DETECTED` 와 함께 해당 필드의 `error.fields` 에 "○○에 부적절한 표현이 포함되어 있습니다." 를 담습니다 (임시저장은 검사하지 않음). 글자·숫자·공백만 남기고 비교하므로 `시.발` 같은 기호 우회도 막지만, 띄어쓰기 우회(`시 발`)는 `10시 발로란트` 같은 정상 글을 막지 않으려고 허용합니다. 단어 목록은 `backend/src/common/profanityFilter.js`.
+
 ## 4. 파티 참가 (Application)
 
 | Method | URI | 설명 | 인증 |
@@ -468,10 +472,12 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 
 ```json
 [{ "id": 3, "status": "PENDING", "role": "서포터", "message": "잘 부탁드려요", "appliedAt": "2026-11-12T00:00:00.000Z",
-   "applicant": { "id": 2, "nickname": "빛나는오더", "avatarUrl": null, "level": 52, "mannerTemp": 99.8, "reviewCount": 184 } }]
+   "applicant": { "id": 2, "nickname": "빛나는오더", "avatarUrl": null, "level": 52, "mannerTemp": 99.8, "reviewCount": 184,
+                  "topTags": [{ "code": "kind", "label": "#친절함", "count": 42 }] } }]
 ```
 
-- 탈퇴한 신청자의 `nickname` 은 `"탈퇴한 회원"` 입니다. 오류: 400 `INVALID_INPUT`, 403 `NOT_POST_AUTHOR`.
+- `applicant.topTags` 는 신청자가 받은 평가에서 많이 선택된 태그 최대 3개입니다(많은 순, 같으면 태그 정렬 순). 받은 태그가 없으면 `[]`.
+- 탈퇴한 신청자의 `nickname` 은 `"탈퇴한 회원"` 이고 `topTags` 는 `[]` 입니다. 오류: 400 `INVALID_INPUT`, 403 `NOT_POST_AUTHOR`.
 
 **승인/거절 (`PATCH /api/posts/{postId}/applications/{applicationId}`)** 🔒 작성자 — 본문 `{ "status": "ACCEPTED" | "REJECTED" }` → `200` `{ "id": 3, "status": "ACCEPTED", "current": 2, "max": 8, "postStatus": "OPEN" }`
 
@@ -527,7 +533,7 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 
 ### 알림함 (Notification)
 
-구현: `backend/src/notification/` (`/api/notifications` 에 마운트). 모두 🔒 이며 **내 알림만** 다룹니다(관리자가 보낸 `SANCTION` · `POST_DELETED` 포함). 헤더 배지는 10초 폴링에 더해, 실시간 신호를 보내는 알림(아래)은 바로 반영합니다.
+구현: `backend/src/notification/` (`/api/notifications` 에 마운트). 모두 🔒 이며 **내 알림만** 다룹니다(관리자가 보낸 `SANCTION` · `POST_DELETED` · `NO_SHOW` 포함). 헤더 배지는 10초 폴링에 더해, 실시간 신호를 보내는 알림(아래)은 바로 반영합니다.
 
 **실시간 알림 신호 (`GET /api/notifications/stream`)** — 로그인한 회원 전용 SSE 입니다. `Authorization` 헤더가 필요해 브라우저는 `EventSource` 대신 `fetch` 스트림으로 받습니다(토큰을 URL 에 넣지 않으려고).
 
@@ -742,10 +748,10 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 
 | Method | URI | 설명 | 인증 |
 | --- | --- | --- | --- |
-| POST | `/api/reports` | 신고 `{ targetType: "MEMBER"\|"NO_SHOW"\|"POST"\|"COMMENT", targetId, reason, detail? }` | 🔒 |
+| POST | `/api/reports` | 신고 `{ targetType: "MEMBER"\|"NO_SHOW"\|"POST"\|"COMMENT", targetId, reason, detail?, postId? }` | 🔒 |
 
 - `reason`: `욕설 및 비하 발언` · `스팸 / 도배` · `부적절한 광고` · `개인정보 노출` · `기타`
-- ⚠️ 현재 구현은 **`COMMENT`(댓글) · `MEMBER`(회원) · `POST`(공고) 신고만** 받습니다. 다른 `targetType` 은 400 `INVALID_INPUT` 입니다 (NO_SHOW 는 추후 구현). 회원 신고의 `targetType` 은 DB·관리자 화면과 같은 `MEMBER` 입니다 (표의 `USER` 와 같은 뜻).
+- `targetType` 은 `COMMENT`(댓글) · `MEMBER`(회원) · `POST`(공고) · `NO_SHOW`(노쇼) 이고, 다른 값은 400 `INVALID_INPUT` 입니다. 회원 신고의 `targetType` 은 DB·관리자 화면과 같은 `MEMBER` 입니다 (표의 `USER` 와 같은 뜻).
 
 **회원 신고 (`targetType: "MEMBER"`)** — `targetId` 는 신고할 회원 id, `reason`·`detail` 규칙은 댓글 신고와 같습니다. 응답 `201 { id }`. 본인은 신고할 수 없고(400 `CANNOT_REPORT_SELF`), 같은 회원을 두 번 신고할 수 없으며(409 `ALREADY_REPORTED`), 없거나 탈퇴한 회원은 404 `MEMBER_NOT_FOUND` 입니다. 관리자 신고 목록에는 유형 `MEMBER` 로 나옵니다.
 
@@ -770,6 +776,19 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 - 같은 사람이 같은 공고를 두 번 신고할 수 없고(409), 본인 공고는 신고할 수 없습니다(400). 댓글과 달리 자동 가림은 없고 관리자 신고 목록(`/api/admin/reports`)에서 처리합니다.
 - 공고 상세(`GET /api/posts/{postId}`)의 `viewer.reported` 로 내가 신고했는지 알 수 있습니다.
 - 오류: 400 `INVALID_INPUT` · `CANNOT_REPORT_SELF`, 401 `UNAUTHORIZED`, 404 `POST_NOT_FOUND`(없음·삭제됨), 409 `ALREADY_REPORTED`.
+
+**노쇼 신고** (REQ-REPORT-002)
+
+```json
+{ "targetType": "NO_SHOW", "postId": 3, "targetId": 9, "reason": "연락 없이 불참", "detail": "30분 기다렸는데 연락 없음" }
+```
+
+- `targetId` 는 신고할 파티원의 **회원 id**, `postId` 는 그 파티(공고) id 입니다(필수). 서버가 그 공고의 신청 행을 찾아 `report.target_id` 에 `post_application.id` 를 저장하므로, 같은 사람이라도 파티마다 따로 신고할 수 있습니다.
+- `reason`: `연락 없이 불참` · `약속 시간 지각` · `시작 후 무단 이탈` · `기타` (다른 신고와 사유 목록이 다릅니다). `detail` 규칙은 같습니다.
+- 신고자는 그 파티의 **확정 인원**(파티장 + 승인된 파티원)이어야 하고, 대상은 그 파티에서 **승인(`ACCEPTED`)된 파티원**이어야 합니다. 파티장은 신청 행이 없어 노쇼 신고 대상이 아니며, 회원 신고(`MEMBER`)로 접수합니다.
+- 출발 시간(`schedule_at`)이 지났거나 공고가 `COMPLETED` 일 때만 받습니다 (일정 미정 공고는 활동 완료 후에만).
+- 신고만으로는 아무것도 바뀌지 않고, 관리자가 신고 처리에서 `CONFIRM_NO_SHOW` 로 확정해야 신청이 `NO_SHOW` 가 되고 매너 온도가 내려갑니다 (관리자 API 참고).
+- 응답 `201 { id }`. 오류: 400 `INVALID_INPUT` · `CANNOT_REPORT_SELF`, 401 `UNAUTHORIZED`, 403 `NOT_PARTY_MEMBER`, 404 `POST_NOT_FOUND` · `NO_SHOW_TARGET_NOT_FOUND`(대상이 승인된 파티원이 아님), 409 `NO_SHOW_TOO_EARLY` · `ALREADY_REPORTED`.
 
 ## 7. 리뷰 · 매너 평가 (Review)
 
@@ -843,6 +862,8 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 | GET | `/api/members/me/favorites` | 즐겨찾는 유저 목록 | 🔒 |
 | POST / DELETE | `/api/members/me/favorites/{memberId}` | 즐겨찾기 추가 / 해제 → `204` | 🔒 |
 | GET | `/api/members/{memberId}` | 회원 프로필 (로그인하면 `viewer` 포함) | |
+| GET | `/api/members/{memberId}/posts?page=&size=` | 그 회원이 쓴 공고 (삭제되지 않은 공고, 최신순). 아이템은 `/me/posts` 에서 `canComplete`·`review` 를 뺀 형태 | |
+| GET | `/api/members/{memberId}/manner-history?days=` | 최근 N일(기본 30, 최대 90, 가입한 지 N일이 안 됐으면 가입일부터) 매너 온도 변화 → `{ days, current, points: [{ date, temp, reviewCount }] }` | |
 | GET | `/api/rankings/manner?limit=` | 매너 랭킹 (메인 명예의 전당) | |
 
 구현: `backend/src/mypage/` (`/api/members` 에 마운트), 랭킹은 `backend/src/ranking/`
@@ -1014,7 +1035,7 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 | --- | --- |
 | 신고 `status` | `PENDING`(접수) · `IN_PROGRESS`(처리 중) · `DONE`(완료) · `REJECTED`(기각) |
 | 신고 `type` | `MEMBER`(유저) · `NO_SHOW`(노쇼) · `POST`(공고) · `COMMENT`(댓글) |
-| 신고 `action` | `WARN`(경고) · `SUSPEND`(이용 정지) · `BAN`(영구 정지) · `DELETE_CONTENT`(공고·댓글 삭제) · `DISMISS`(기각 시 자동) |
+| 신고 `action` | `WARN`(경고) · `SUSPEND`(이용 정지) · `BAN`(영구 정지) · `DELETE_CONTENT`(공고·댓글 삭제) · `CONFIRM_NO_SHOW`(노쇼 확정) · `DISMISS`(기각 시 자동) |
 | 공고 `status` | `OPEN`(모집 중) · `PAUSED`(모집 일시 중단) · `CLOSED`(마감) · `COMPLETED`(종료) · `DELETED`(삭제됨) |
 | 회원 `status` | `ACTIVE`(정상) · `WARNED`(경고) · `SUSPENDED`(이용 정지) · `BANNED`(영구 정지) · `WITHDRAWN`(탈퇴) |
 | 제재 `type` | `WARNING`(경고) · `SUSPEND`(기간 정지) · `BAN`(영구 정지) |
@@ -1083,6 +1104,7 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 | `IN_PROGRESS` | 지정 불가 | 담당 관리자·메모만 기록 |
 | `DONE` | 필수: `WARN` · `SUSPEND`(+`days` 1~365) · `BAN` | 피신고 회원에게 제재 추가 (`sanction.report_id` = 이 신고) + 회원 상태 변경 + 알림 |
 | `DONE` | `DELETE_CONTENT` | 공고 신고면 공고 삭제(작성자 알림), 댓글 신고면 댓글 삭제. 이미 삭제된 대상은 삭제를 건너뜀. 회원·노쇼 신고에는 불가 |
+| `DONE` | `CONFIRM_NO_SHOW` | 노쇼 신고만. 신청을 `NO_SHOW` 로 바꾸고 공고 `current` −1, 매너 온도 −2.0℃(0.0℃ 아래로는 안 내려감), 본인에게 `NO_SHOW` 알림. 같은 노쇼의 다른 신고는 이미 `NO_SHOW` 면 상태만 처리(감점·알림 중복 없음). 그 사이 신청이 취소 등으로 `ACCEPTED` 가 아니면 409 `NO_SHOW_NOT_APPLICABLE` |
 | `REJECTED` | 지정 불가 (`DISMISS` 로 저장) | 제재 없이 종료 |
 
 - `memo` (500자 이하)는 `admin_memo` 에 저장하고, 제재·삭제 사유로도 씁니다. 비우면 신고 사유(`reason_code`)를 씁니다.
@@ -1112,12 +1134,13 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 | 상태 | code | 상황 |
 | --- | --- | --- |
 | 400 | `INVALID_INPUT` | 쿼리·본문·경로 id 형식 오류. `error.fields` 에 필드별 오류 |
-| 400 | `INVALID_REPORT_ACTION` | 회원·노쇼 신고에 `DELETE_CONTENT` |
+| 400 | `INVALID_REPORT_ACTION` | 회원·노쇼 신고에 `DELETE_CONTENT`, 노쇼가 아닌 신고에 `CONFIRM_NO_SHOW` |
 | 401 | `UNAUTHORIZED` · `TOKEN_EXPIRED` | 관리자 토큰 없음·위조·회원 토큰 / 만료 |
 | 401 | `INVALID_CREDENTIALS` | 관리자 아이디 또는 비밀번호 불일치 |
 | 403 | `ADMIN_INACTIVE` | `admin_account.status` 가 `ACTIVE` 가 아님 (로그인·토큰 사용 모두) |
 | 404 | `REPORT_NOT_FOUND` · `POST_NOT_FOUND` · `MEMBER_NOT_FOUND` · `COMMENT_NOT_FOUND` · `SANCTION_NOT_FOUND` | 대상 없음 (`SANCTION_NOT_FOUND` 는 다른 회원의 제재 id 일 때도) |
 | 409 | `REPORT_ALREADY_HANDLED` | 이미 완료·기각된 신고 |
+| 409 | `NO_SHOW_NOT_APPLICABLE` | 노쇼 확정 대상 신청이 승인 상태가 아님 (취소 등) |
 | 409 | `POST_ALREADY_DELETED` | 이미 삭제된 공고 |
 | 409 | `MEMBER_WITHDRAWN` · `MEMBER_ALREADY_BANNED` | 탈퇴 회원 제재·제재 해제 / 이미 영구 정지된 회원 제재 |
 | 409 | `SANCTION_ALREADY_RELEASED` | 이미 해제된 제재 |
@@ -1133,3 +1156,5 @@ node -e "console.log(require('bcryptjs').hashSync('비밀번호', 10))"
 ```sql
 INSERT INTO admin_account (login_id, password_hash, name) VALUES ('master', '$2b$10$...', '관리자 마스터');
 ```
+
+**매너 온도 변화 (`/manner-history`)** — 온도 이력 테이블이 없어서 서버가 계산합니다. 현재 온도에서 기간 안에 받은 평가(`review`)를 거꾸로 빼 기간 시작 온도를 구하고, 그 평가를 시간순으로 다시 반영해 한국 시간(KST) 날짜별 하루 끝 온도를 만듭니다. `points` 는 기간의 모든 날짜를 오래된 순으로 담고(평가가 없던 날은 앞날 온도 그대로), `reviewCount` 는 그날 받은 평가 수입니다. 0.0·99.9℃ 상·하한에 닿은 구간은 거꾸로 빼기가 정확하지 않을 수 있습니다. 탈퇴·없는 회원은 404, `days` 범위 오류는 400.

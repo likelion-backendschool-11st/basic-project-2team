@@ -1,7 +1,7 @@
 'use strict';
 
 const { POST_STATUS_DELETED, APPLICATION_STATUS_ACCEPTED, MEMBER_STATUS_WITHDRAWN } = require('./reviewConstants');
-const { INITIAL_MANNER_TEMP, applyRatings } = require('./mannerTemp');
+const { INITIAL_MANNER_TEMP, applyRatings, applyNoShows } = require('./mannerTemp');
 const { awardActivityPoints } = require('../common/activityPoint');
 
 /**
@@ -135,7 +135,8 @@ function createReviewRepository(pool) {
   }
 
   /**
-   * 데이터 보정용: 리뷰 행만으로 매너 온도 · 받은 평가 수를 처음부터 다시 계산합니다 (review.id 순으로 반영).
+   * 데이터 보정용: 리뷰 행과 확정된 노쇼(post_application.status = NO_SHOW)로 매너 온도 · 받은 평가 수를 처음부터 다시 계산합니다
+   * (별점을 review.id 순으로 반영한 뒤 노쇼를 반영).
    * @param {number[] | null} [memberIds] 생략하면 전체 회원
    * @returns {Promise<number>} 값이 바뀐 회원 수
    */
@@ -162,11 +163,17 @@ function createReviewRepository(pool) {
         if (!ratingsByMember.has(row.targetId)) ratingsByMember.set(row.targetId, []);
         ratingsByMember.get(row.targetId).push(row.rating);
       }
+      const [noShowRows] = await connection.query(
+        `SELECT applicant_id AS memberId, COUNT(*) AS noShowCount FROM post_application
+          WHERE status = 'NO_SHOW' ${memberIds === null ? '' : 'AND applicant_id IN (?)'} GROUP BY applicant_id`,
+        memberIds === null ? [] : [memberIds],
+      );
+      const noShowsByMember = new Map(noShowRows.map((row) => [row.memberId, Number(row.noShowCount)]));
 
       let changed = 0;
       for (const member of members) {
         const ratings = ratingsByMember.get(member.id) ?? [];
-        const mannerTemp = applyRatings(INITIAL_MANNER_TEMP, ratings);
+        const mannerTemp = applyNoShows(applyRatings(INITIAL_MANNER_TEMP, ratings), noShowsByMember.get(member.id) ?? 0);
         if (Number(member.mannerTemp) === mannerTemp && member.reviewCount === ratings.length) continue;
         await connection.query('UPDATE member SET manner_temp = ?, review_count = ? WHERE id = ?', [
           mannerTemp,

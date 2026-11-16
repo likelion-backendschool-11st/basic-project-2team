@@ -1,5 +1,7 @@
 import React from 'react';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
+import NoticeDialog from '../components/ui/NoticeDialog';
+import { profanityDialog } from '../data/commentData';
 import Toast from '../components/ui/Toast';
 import MarkdownEditor from '../components/write/MarkdownEditor';
 import OptionPanel from '../components/write/OptionPanel';
@@ -49,6 +51,7 @@ export const PostWritePage: React.FC<PostWritePageProps> = () => {
         onConfirm={f.confirmLeave}
         onCancel={f.leave.close}
       />
+      <NoticeDialog isOpen={f.profanity.message !== null} title={profanityDialog.title} description={f.profanity.message ?? ''} confirmLabel={profanityDialog.confirm} onClose={f.profanity.close} />
       <Toast message={f.toast.message} />
     </div>
   );

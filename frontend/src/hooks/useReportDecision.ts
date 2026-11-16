@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { processReport, type AdminReportDetail } from '../api/adminApi';
-import { DEFAULT_SUSPEND_DAYS, decisions, reportDetailText as t, type DecisionId } from '../data/adminData';
+import { DEFAULT_SUSPEND_DAYS, decisions, reportDetailText as t, type Decision, type DecisionId } from '../data/adminData';
 import { useAdminErrorMessage } from './useAdminSession';
 import { useModal } from './useModal';
 import { useToast } from './useToast';
 
-/** 회원·노쇼 신고에는 원문이 없어 게시물 삭제를 고를 수 없습니다. */
-export const canDeleteContent = (report: Pick<AdminReportDetail, 'type'>) => report.type === 'POST' || report.type === 'COMMENT';
+/** 이 신고에 고를 수 있는 결정인지 (공고·댓글 삭제는 공고·댓글 신고만, 노쇼 확정은 노쇼 신고만) */
+export const isDecisionAllowed = (decision: Decision, report: Pick<AdminReportDetail, 'type'>) =>
+  !decision.onlyFor || decision.onlyFor.includes(report.type);
 
 /** 신고 상세의 처리 결정 폼: 결정 선택 → 사유 입력 → 확인 → PATCH, 끝나면 onDone 으로 다시 불러옵니다. */
 export function useReportDecision(reportId: number | null, onDone: () => void) {

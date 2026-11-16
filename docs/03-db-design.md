@@ -258,7 +258,7 @@ API의 `level`은 **서비스 활동 레벨**(`member.level`)입니다. 공고 �
 
 | 테이블 | 컬럼 | 비고 |
 | --- | --- | --- |
-| `notification` | id, member_id FK, type VARCHAR(30), message VARCHAR(200), post_id FK NULL, is_read BOOLEAN, created_at | type 예: APPLICATION_RECEIVED, APPLICATION_RESULT, APPLICATION_CANCELED, POST_UPDATED, INTEREST_POST, POST_DELETED, SANCTION, POLL_CONFIRMED, POLL_REMINDER, PARTY_INVITE(파티 초대 — 이 행이 초대장 역할, 지우면 초대도 사라지고 수락하거나 공고가 삭제·완료되면 삭제됨), INVITE_ACCEPTED |
+| `notification` | id, member_id FK, type VARCHAR(30), message VARCHAR(200), post_id FK NULL, is_read BOOLEAN, created_at | type 예: APPLICATION_RECEIVED, APPLICATION_RESULT, APPLICATION_CANCELED, POST_UPDATED, INTEREST_POST, POST_DELETED, SANCTION, NO_SHOW, POLL_CONFIRMED, POLL_REMINDER, PARTY_INVITE(파티 초대 — 이 행이 초대장 역할, 지우면 초대도 사라지고 수락하거나 공고가 삭제·완료되면 삭제됨), INVITE_ACCEPTED |
 | `notification_subscription` | id, member_id FK, game_id FK, game_content_id FK NULL, enabled BOOLEAN | NOTI-001 관심 게임·레이드 |
 
 ### 2.13 신고 · 관리
@@ -352,7 +352,7 @@ PK와 UNIQUE는 그 자체가 인덱스라서, 중복되는 인덱스는 따로 
 | # | 항목 | 결정 | 이유 |
 | --- | --- | --- | --- |
 | 1 | 필드 길이 | login_id 영문 소문자·숫자 4~20자, title 2~100자, party_name 30자, 공고당 태그 최대 5개 | 일반적인 커뮤니티 기준. 목록 카드에서 제목·태그가 넘치지 않는 길이 |
-| 2 | 매너 온도 | 초기값 36.5, 범위 0.0~99.9. 리뷰 1건마다 별점별로 더함: 5점 +0.5 / 4점 +0.2 / 3점 0 / 2점 −0.5 / 1점 −1.0. 범위 보정은 리뷰 한 건을 더할 때마다 하며, 재계산은 review.id 순으로 같은 방식으로 반영 | 평균 방식과 달리 리뷰가 쌓일수록 신뢰가 반영됩니다. 나쁜 평가를 더 크게 반영해 비매너를 억제합니다. 리뷰 행만으로 언제든 다시 계산할 수 있습니다. |
+| 2 | 매너 온도 | 초기값 36.5, 범위 0.0~99.9. 리뷰 1건마다 별점별로 더함: 5점 +0.5 / 4점 +0.2 / 3점 0 / 2점 −0.5 / 1점 −1.0. 범위 보정은 리뷰 한 건을 더할 때마다 하며, 재계산은 review.id 순으로 같은 방식으로 반영. 관리자가 노쇼를 확정하면 1건당 −2.0℃ (재계산은 별점을 모두 반영한 뒤 `post_application.status = NO_SHOW` 건수만큼 반영) | 평균 방식과 달리 리뷰가 쌓일수록 신뢰가 반영됩니다. 나쁜 평가를 더 크게 반영해 비매너를 억제합니다. 리뷰 행만으로 언제든 다시 계산할 수 있습니다. |
 | 3 | 파티 인원 | headcount·current_count 모두 **파티장 포함**. current_count 기본값 1 | 게임의 "8인 파티"처럼 전체 인원으로 말하는 것이 자연스럽습니다. ⚠️ 프론트 작성 화면 문구("작성자를 제외한 필요한 파티원 수")와 `1명` 선택지를 이 기준에 맞춰 고쳐야 합니다. |
 | 4 | 용어 | 공고는 "스크랩"(`post_scrap`), 사용자는 "즐겨찾기"(`favorite_member`) | 프론트 공고 상세가 이미 "스크랩"을 쓰고 있어 화면과 맞습니다. |
 | 5 | 중복 신고 | 같은 신고자가 같은 대상을 신고하는 것은 영구 1회. 노쇼는 신청 행(`post_application`) 단위라 파티마다 신고 가능 | UNIQUE 하나로 DB에서 보장됩니다. 허위 신고 반복자의 신고 기능 제한은 운영하면서 필요해지면 추가합니다. |

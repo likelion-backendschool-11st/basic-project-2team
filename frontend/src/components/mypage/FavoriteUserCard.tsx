@@ -1,6 +1,8 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import type { FavoriteUser } from '../../data/myPageData';
 import { favoritesText } from '../../data/myPageData';
+import { paths } from '../../data/routes';
 
 interface FavoriteUserCardProps {
   readonly user: FavoriteUser;
@@ -9,7 +11,7 @@ interface FavoriteUserCardProps {
 
 export const FavoriteUserCard: React.FC<FavoriteUserCardProps> = ({ user, onRemove }) => (
   <div className="bg-night-card border border-night-borderLight rounded-xl p-3.5 flex flex-col justify-between hover:border-mercury/50 transition-all group">
-    <div className="flex items-center space-x-3">
+    <Link to={paths.memberProfile(user.id)} className="flex items-center space-x-3" aria-label={`${user.name} ${favoritesText.viewProfile}`}>
       {user.avatarUrl ? (
         <img
           alt={`${user.name}${favoritesText.avatarAltSuffix}`}
@@ -34,7 +36,7 @@ export const FavoriteUserCard: React.FC<FavoriteUserCardProps> = ({ user, onRemo
         </div>
         <div className="text-[11px] truncate mt-0.5 text-slate-400">{user.detail}</div>
       </div>
-    </div>
+    </Link>
     <div className="mt-3 pt-2.5 border-t border-night-borderLight/60 flex items-center justify-between">
       <span className="text-[11px] font-medium text-emerald-400">{user.manner}</span>
       <button

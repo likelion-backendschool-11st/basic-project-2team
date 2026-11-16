@@ -6,6 +6,7 @@ import { getGames, type Game } from '../api/gameApi';
 import { createPost, getLatestDraft, saveDraft as saveDraftApi, updatePost } from '../api/postApi';
 import { getPostDetail } from '../api/postDetailApi';
 import { ApiRequestError } from '../api/http';
+import { useProfanityNotice } from './useProfanityNotice';
 import { useModal } from './useModal';
 import { useToast } from './useToast';
 
@@ -49,6 +50,7 @@ export function useWriteForm(postId?: string) {
   const bodyRef = useRef<HTMLTextAreaElement>(null);
   const leave = useModal(false);
   const toast = useToast();
+  const profanity = useProfanityNotice();
 
   /**
    * 게임 목록(GET /api/games)과 내 임시저장(GET /api/posts/drafts/latest)을 한 번 불러옵니다.
@@ -175,6 +177,7 @@ export function useWriteForm(postId?: string) {
       const { id } = editing ? await updatePost(postId, { ...body, tags: original.current.tags }) : await createPost(body);
       navigate(paths.postDetail(String(id)));
     } catch (err) {
+      if (profanity.catches(err)) return;
       // 필드별 오류가 있으면 첫 번째 메시지를, 없으면 서버 메시지를 보여줍니다.
       setError(err instanceof ApiRequestError ? (err.fields[0]?.message ?? err.message) : editing ? writeText.updateFailed : writeText.submitFailed);
     } finally {
@@ -202,6 +205,6 @@ export function useWriteForm(postId?: string) {
   return {
     draft, set, options, savedAt, previewing, submitting, togglePreview: () => setPreviewing((v) => !v), error, bodyRef,
     toolbarActions, maxHeadcount, applyToolbar, saveDraft, submit, summary, chars, gameLabel, typeLabel,
-    editing, leave, confirmLeave: () => navigate(editing ? paths.postDetail(postId) : ROUTES.board), toast,
+    editing, leave, confirmLeave: () => navigate(editing ? paths.postDetail(postId) : ROUTES.board), toast, profanity,
   };
 }
