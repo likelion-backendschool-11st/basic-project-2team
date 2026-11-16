@@ -10,12 +10,6 @@ export interface AccountNavItem {
   readonly danger?: boolean;
 }
 
-export const accountProfile = {
-  initial: '빛',
-  nickname: '빛나는힐러',
-  handle: 'user_party_9824',
-} as const;
-
 export const accountNav: readonly AccountNavItem[] = [
   { id: 'profile', label: '프로필 수정', icon: 'fa-user-pen', to: ROUTES.profileEdit },
   { id: 'password', label: '비밀번호 변경', icon: 'fa-key', to: ROUTES.passwordChange },
@@ -52,42 +46,50 @@ export interface PlayStyleOption {
 
 export const profileText = {
   nicknameLabel: '닉네임',
-  nicknameHint: '2~10자의 한글, 영문, 숫자만 사용 가능해요',
+  /** 백엔드 memberValidator.fieldRules.nickname 과 같은 규칙 (공백 없이 2~10자) */
+  nicknameHint: '공백 없이 2~10자로 입력해 주세요',
   nicknameOk: '사용 가능한 닉네임입니다.',
-  nicknameInvalid: '2~10자의 한글, 영문, 숫자만 사용할 수 있어요.',
+  nicknameInvalid: '닉네임은 공백 없이 2~10자로 입력해주세요.',
   nicknameTaken: '이미 사용 중인 닉네임입니다.',
+  nicknameUnchecked: '닉네임을 바꿨다면 [중복 확인]을 눌러주세요.',
   checkButton: '중복 확인',
+  checking: '확인 중...',
+  checkFailed: '닉네임을 확인하지 못했습니다. 잠시 후 다시 시도해주세요.',
   gamesLabel: '선호하는 게임',
   gamesSub: '(복수 선택 가능)',
   gamesSelected: (n: number) => `${n}개 선택됨`,
+  gamesEmpty: '선택할 수 있는 게임을 불러오지 못했습니다.',
   styleLabel: '플레이 스타일',
   save: '저장하기',
-  saved: '프로필이 저장되었습니다.',
+  saving: '저장 중...',
+  loading: '프로필을 불러오는 중입니다...',
+  loadFailed: '프로필을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.',
+  saveFailed: '프로필을 저장하지 못했습니다. 잠시 후 다시 시도해주세요.',
   maxNickname: 10,
   minNickname: 2,
-  takenNicknames: ['관리자', '운영자', 'admin'] as readonly string[],
+  bioLabel: '자기소개',
+  bioPlaceholder: '파티원들에게 나를 소개해 주세요 (예: 주말 저녁 위주로 플레이해요!)',
+  /** 백엔드 BIO_MAX_LENGTH */
+  maxBio: 200,
+  ageRangeLabel: '나이대',
+  ageRangeNone: '선택 안 함',
+  ageRangePublic: '다른 회원에게 나이대 공개',
+  ageRangePublicHint: '공개하지 않으면 내 프로필에서만 보여요.',
 };
 
-export const gameOptions: readonly GameOption[] = [
-  { id: 'lostark', name: '로스트아크', genre: 'MMORPG' },
-  { id: 'valorant', name: '발로란트', genre: 'FPS' },
-  { id: 'lol', name: '리그오브레전드', genre: 'MOBA' },
-  { id: 'overwatch', name: '오버워치 2', genre: 'FPS' },
-  { id: 'maple', name: '메이플스토리', genre: 'MMORPG' },
-  { id: 'helldivers', name: '헬다이버즈 2', genre: 'CO-OP' },
-];
+/** 나이대 선택지 (member.age_range VARCHAR(10) — 서버는 10자 이하 문자열이면 받습니다) */
+export const ageRanges: readonly string[] = ['10대', '20대', '30대', '40대', '50대 이상'];
 
+/** 플레이 스타일 — 백엔드 PROFILE_PLAY_STYLES(공고와 같은 값: hard · casual · newbie · any) */
 export const playStyles: readonly PlayStyleOption[] = [
   { id: 'casual', label: '즐겜 유저예요', description: '친목과 재미를 최우선으로 생각하며 파티원들과 소통을 즐기는 스타일입니다.' },
-  { id: 'hardcore', label: '빡겜 지향이에요', description: '공략과 효율을 중시하며 클리어와 랭크 상승을 목표로 하는 스타일입니다.' },
-  { id: 'voice', label: '보이스 필수예요', description: '디스코드 등 음성 소통을 기본으로 팀플레이를 하는 스타일입니다.' },
+  { id: 'hard', label: '빡겜 지향이에요', description: '공략과 효율을 중시하며 클리어와 랭크 상승을 목표로 하는 스타일입니다.' },
+  { id: 'newbie', label: '초보/트라이 배려해요', description: '처음 해보는 콘텐츠도 천천히 함께 배우며 즐기는 스타일입니다.' },
+  { id: 'any', label: '상관 없어요', description: '어떤 분위기의 파티든 상황에 맞춰 함께하는 스타일입니다.' },
 ];
 
-export const initialProfile = {
-  nickname: '빛나는힐러',
-  games: ['lostark', 'valorant', 'lol'] as readonly string[],
-  styleId: 'casual',
-};
+/** 플레이 스타일이 저장되지 않은 회원의 기본 선택 */
+export const DEFAULT_PLAY_STYLE = 'any';
 
 /* ───────── password change ───────── */
 
@@ -101,26 +103,25 @@ export interface PasswordFieldConfig {
 
 export const passwordFields: readonly PasswordFieldConfig[] = [
   { id: 'current', label: '현재 비밀번호', side: '본인 확인 필수', placeholder: '현재 사용 중인 비밀번호 입력', autoComplete: 'current-password' },
-  { id: 'next', label: '새 비밀번호', side: '영문, 숫자, 특수문자 조합', placeholder: '영문, 숫자, 특수문자 조합 8~16자', autoComplete: 'new-password' },
+  { id: 'next', label: '새 비밀번호', side: '영문, 숫자, 특수문자 조합', placeholder: '영문, 숫자, 특수문자(!, @, #) 조합 8~12자', autoComplete: 'new-password' },
   { id: 'confirm', label: '새 비밀번호 확인', side: '비밀번호 재확인', placeholder: '새 비밀번호를 다시 입력해 주세요', autoComplete: 'new-password' },
 ];
 
 export const passwordText = {
-  verifyButton: '확인',
-  verifyHint: '현재 비밀번호 입력 후 [확인]을 눌러주세요',
-  verifyOk: '현재 비밀번호가 확인되었습니다.',
-  verifyFail: '현재 비밀번호가 일치하지 않습니다.',
-  /** Mock account password, only to demonstrate the verify step. */
-  mockCurrent: 'party1234!',
+  /** 현재 비밀번호는 따로 확인하는 API 가 없어 [비밀번호 변경] 요청에서 함께 확인합니다. */
+  currentHint: '현재 비밀번호는 [비밀번호 변경]을 누르면 함께 확인합니다.',
+  failed: '비밀번호를 변경하지 못했습니다. 잠시 후 다시 시도해주세요.',
+  submitting: '변경 중...',
   requirementsTitle: '보안 요구 조건 실시간 충족 상태',
-  requirementPattern: '8~16자 / 영문+숫자+특수문자 필수',
+  requirementPattern: '8~12자 / 영문+숫자+특수문자(!, @, #) 필수',
   requirementMatch: '비밀번호 일치 확인',
   strengthLabel: '보안도:',
   strength: ['미입력', '취약', '보통', '안전'] as readonly string[],
   forgot: '현재 비밀번호를 잊으셨나요?',
   forgotNote: '로그아웃 후 비밀번호 찾기에서 재설정 가능',
   submit: '비밀번호 변경',
-  done: '비밀번호가 변경되었습니다.',
+  done: '비밀번호가 변경되었습니다. 보안을 위해 새 비밀번호로 다시 로그인해 주세요.',
+  goLogin: '다시 로그인하기',
   showLabel: '비밀번호 보기',
   hideLabel: '비밀번호 숨기기',
 };
@@ -132,7 +133,14 @@ export const withdrawText = {
   description: '탈퇴하시면 현재까지 쌓아온 소중한 기록과 활동 데이터가 모두 파기되며, OurParty 서비스 재이용이 일정 기간 제한됩니다.',
   infoTitle: '탈퇴 시 즉시 삭제되는 정보',
   submit: '회원 탈퇴',
+  submitting: '처리 중...',
   keep: '다시 생각해볼게요',
+  passwordLabel: '비밀번호 확인',
+  passwordPlaceholder: '본인 확인을 위해 현재 비밀번호를 입력해 주세요',
+  reasonLabel: '탈퇴 사유 (선택)',
+  reasonPlaceholder: '서비스 개선에 참고할게요 (200자 이하)',
+  reasonMax: 200,
+  failed: '회원 탈퇴를 처리하지 못했습니다. 잠시 후 다시 시도해주세요.',
 };
 
 export const withdrawRows = [

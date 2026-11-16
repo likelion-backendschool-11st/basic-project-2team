@@ -3,16 +3,17 @@ import AccountShell from '../components/account/AccountShell';
 import FormActions from '../components/account/FormActions';
 import GameCheckCard from '../components/account/GameCheckCard';
 import FieldStatusMessage, { type FieldStatusTone } from '../components/signup/FieldStatusMessage';
-import { inputBaseClass, labelClass } from '../components/signup/fieldStyles';
-import { accountPanelText, gameOptions, playStyles, profileText } from '../data/accountData';
+import { checkboxClass, inputBaseClass, labelClass } from '../components/signup/fieldStyles';
+import { accountPanelText, playStyles, profileText } from '../data/accountData';
 import { useProfileForm, type NicknameStatus } from '../hooks/useProfileForm';
 
 interface ProfileEditPageProps {
   readonly className?: string;
 }
 
-const statusView: Readonly<Record<NicknameStatus, { tone: FieldStatusTone; message: string } | null>> = {
-  idle: null,
+const statusView: Readonly<Record<NicknameStatus, { tone: FieldStatusTone; message: string }>> = {
+  idle: { tone: 'hint', message: profileText.nicknameUnchecked },
+  checking: { tone: 'hint', message: profileText.checking },
   invalid: { tone: 'error', message: profileText.nicknameInvalid },
   taken: { tone: 'error', message: profileText.nicknameTaken },
   available: { tone: 'success', message: profileText.nicknameOk },
@@ -22,8 +23,23 @@ const statusView: Readonly<Record<NicknameStatus, { tone: FieldStatusTone; messa
 export const ProfileEditPage: React.FC<ProfileEditPageProps> = () => {
   const form = useProfileForm();
   const status = statusView[form.status];
+  const statusMessage = form.status === 'invalid' && form.statusMessage ? form.statusMessage : status.message;
   const style = playStyles.find((s) => s.id === form.styleId) ?? playStyles[0];
   const text = accountPanelText.profile;
+
+  if (form.loading || form.loadError) {
+    return (
+      <AccountShell active="profile" title={text.title} description={text.description}>
+        <div className="py-10 flex justify-center">
+          {form.loadError ? (
+            <FieldStatusMessage tone="error" message={form.loadError} />
+          ) : (
+            <p className="text-sm text-fog-muted">{profileText.loading}</p>
+          )}
+        </div>
+      </AccountShell>
+    );
+  }
 
   return (
     <AccountShell active="profile" title={text.title} description={text.description}>
@@ -39,13 +55,52 @@ export const ProfileEditPage: React.FC<ProfileEditPageProps> = () => {
                 {form.nickname.length}/{profileText.maxNickname}
               </span>
             </div>
-            <button type="button" onClick={form.checkNickname} className="h-12 px-6 rounded-full border border-night-borderLight text-sm font-semibold text-white hover:bg-white/5 flex items-center gap-2">
+            <button type="button" onClick={form.checkNickname} disabled={form.status === 'checking'} className="h-12 px-6 rounded-full border border-night-borderLight text-sm font-semibold text-white hover:bg-white/5 flex items-center gap-2">
               <i className="fa-regular fa-circle-check text-mercury-light" />
               {profileText.checkButton}
             </button>
           </div>
           <p className="text-xs text-fog-muted">💡 {profileText.nicknameHint}</p>
-          {status && <FieldStatusMessage tone={status.tone} message={status.message} />}
+          <FieldStatusMessage tone={status.tone} message={statusMessage} />
+        </section>
+
+        <section className="flex flex-col gap-2 pt-6 border-t border-night-borderLight">
+          <div className="flex items-center justify-between">
+            <label htmlFor="bio" className="text-sm font-bold text-white">
+              {profileText.bioLabel}
+            </label>
+            <span className="text-xs text-fog-muted">
+              {form.bio.length}/{profileText.maxBio}
+            </span>
+          </div>
+          <textarea
+            id="bio"
+            rows={3}
+            value={form.bio}
+            onChange={form.onBioChange}
+            maxLength={profileText.maxBio}
+            placeholder={profileText.bioPlaceholder}
+            className="w-full px-4 py-3 rounded-xl border border-night-borderLight bg-night-surface text-fog-headline placeholder:text-fog-muted text-sm leading-relaxed resize-none focus:outline-none focus:ring-0 focus:bg-night-card transition-all"
+          />
+        </section>
+
+        <section className="flex flex-col gap-3 pt-6 border-t border-night-borderLight">
+          <label htmlFor="age-range" className="text-sm font-bold text-white">
+            {profileText.ageRangeLabel}
+          </label>
+          <select id="age-range" value={form.ageRange} onChange={form.onAgeRangeChange} className={`${inputBaseClass} rounded-xl border border-night-borderLight`}>
+            <option value="">{profileText.ageRangeNone}</option>
+            {form.ageRangeOptions.map((a) => (
+              <option key={a} value={a}>
+                {a}
+              </option>
+            ))}
+          </select>
+          <label className="flex items-center gap-2.5 text-sm text-fog-sub cursor-pointer">
+            <input type="checkbox" className={checkboxClass} checked={form.ageRangePublic} onChange={form.onAgeRangePublicChange} />
+            {profileText.ageRangePublic}
+            <span className="text-xs text-fog-muted">{profileText.ageRangePublicHint}</span>
+          </label>
         </section>
 
         <section className="flex flex-col gap-3 pt-6 border-t border-night-borderLight">
@@ -57,10 +112,11 @@ export const ProfileEditPage: React.FC<ProfileEditPageProps> = () => {
             <span className="text-xs font-semibold text-mercury-light">{profileText.gamesSelected(form.games.length)}</span>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-            {gameOptions.map((g) => (
+            {form.gameOptions.map((g) => (
               <GameCheckCard key={g.id} game={g} checked={form.games.includes(g.id)} onToggle={form.toggleGame} />
             ))}
           </div>
+          {form.gameOptions.length === 0 && <p className="text-xs text-fog-muted">{profileText.gamesEmpty}</p>}
         </section>
 
         <section className="flex flex-col gap-3 pt-6 border-t border-night-borderLight">
@@ -80,7 +136,9 @@ export const ProfileEditPage: React.FC<ProfileEditPageProps> = () => {
           </p>
         </section>
 
-        <FormActions submitLabel={profileText.save} submitIcon="fa-floppy-disk" disabled={!form.canSave} />
+        {form.saveError && <FieldStatusMessage tone="error" message={form.saveError} />}
+
+        <FormActions submitLabel={form.saving ? profileText.saving : profileText.save} submitIcon="fa-floppy-disk" disabled={!form.canSave} />
       </form>
     </AccountShell>
   );

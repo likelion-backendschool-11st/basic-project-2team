@@ -2,7 +2,10 @@ import React from 'react';
 import AccountShell from '../components/account/AccountShell';
 import AgreementCheck from '../components/account/AgreementCheck';
 import FormActions from '../components/account/FormActions';
-import { accountPanelText, withdrawAgreements, withdrawRows, withdrawText } from '../data/accountData';
+import FieldStatusMessage from '../components/signup/FieldStatusMessage';
+import PasswordField from '../components/signup/PasswordField';
+import { inputBaseClass } from '../components/signup/fieldStyles';
+import { accountPanelText, passwordText, withdrawAgreements, withdrawRows, withdrawText } from '../data/accountData';
 import { useWithdrawForm } from '../hooks/useWithdrawForm';
 
 interface WithdrawPageProps {
@@ -45,18 +48,48 @@ export const WithdrawPage: React.FC<WithdrawPageProps> = () => {
         ))}
       </div>
 
-      <FormActions
-        submitLabel={withdrawText.submit}
-        submitIcon="fa-trash-can"
-        danger
-        disabled={!form.canWithdraw}
-        onSubmit={form.withdraw}
-        secondary={
-          <button type="button" onClick={form.keep} className="h-12 px-7 rounded-xl border border-night-borderLight text-sm font-semibold text-fog-sub hover:text-white hover:bg-white/5">
-            {withdrawText.keep}
-          </button>
-        }
-      />
+      <form onSubmit={form.onSubmit}>
+        <div className="mt-6 flex flex-col gap-5">
+          <div className="flex flex-col gap-2">
+            <span className="text-sm font-bold text-white">
+              {withdrawText.passwordLabel} <span className="text-rose-300">*</span>
+            </span>
+            <PasswordField
+              field={{ key: 'password', id: 'withdraw-password', label: '', type: 'password', placeholder: withdrawText.passwordPlaceholder, autoComplete: 'current-password' }}
+              value={form.password}
+              onChange={form.onPasswordChange}
+              showLabel={passwordText.showLabel}
+              hideLabel={passwordText.hideLabel}
+            />
+          </div>
+          <div className="flex flex-col gap-2">
+            <label htmlFor="withdraw-reason" className="text-sm font-bold text-white">
+              {withdrawText.reasonLabel}
+            </label>
+            <input
+              id="withdraw-reason"
+              className={inputBaseClass}
+              value={form.reason}
+              onChange={form.onReasonChange}
+              maxLength={withdrawText.reasonMax}
+              placeholder={withdrawText.reasonPlaceholder}
+            />
+          </div>
+          {form.error && <FieldStatusMessage tone="error" message={form.error} />}
+        </div>
+
+        <FormActions
+          submitLabel={form.submitting ? withdrawText.submitting : withdrawText.submit}
+          submitIcon="fa-trash-can"
+          danger
+          disabled={!form.canWithdraw}
+          secondary={
+            <button type="button" onClick={form.keep} className="h-12 px-7 rounded-xl border border-night-borderLight text-sm font-semibold text-fog-sub hover:text-white hover:bg-white/5">
+              {withdrawText.keep}
+            </button>
+          }
+        />
+      </form>
     </AccountShell>
   );
 };
