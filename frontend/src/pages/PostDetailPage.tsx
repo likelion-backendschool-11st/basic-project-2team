@@ -127,7 +127,7 @@ const PostDetailView: React.FC<{ readonly postId: string }> = ({ postId }) => {
             <>
               <PartyStatusCard detail={detail} filled={post.filled} percent={post.percent} applied={post.applied} accepted={post.accepted} state={post.state} scrapped={post.scrapped} onApply={post.apply} onLeave={post.leave.open} onScrap={post.toggleScrap} onCopy={post.copyLink} />
               <ParticipantsCard participants={post.participants} max={detail.max} />
-              <HostCard host={detail.host} following={post.following} onFollow={post.toggleFollow} />
+              <HostCard host={detail.host} profile={post.hostProfile} following={post.following} onFollow={post.toggleFollow} />
             </>
           )}
           <RelatedPosts posts={post.related} />

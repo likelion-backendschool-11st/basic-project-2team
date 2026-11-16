@@ -1,6 +1,7 @@
-import { postDetailText, type ApplicationStatus, type PostDetail, type PostStatus } from '../data/postData';
+import { postDetailText, type ApplicationStatus, type HostProfile, type PostDetail, type PostStatus } from '../data/postData';
 import { styleChoices, typeLabels } from '../data/writeData';
 import { request } from './http';
+import type { MemberProfileResponse } from './mypageApi';
 
 /** GET /api/posts/{postId} 응답 (docs/API_SPEC.md 3절 「공고 상세」) */
 export interface PostDetailResponse {
@@ -78,6 +79,18 @@ function departureNote(schedule: string | null, now = Date.now()) {
 const styleLabel = (style: string | null) =>
   styleChoices.find((s) => s.id === style)?.label ?? postDetailText.styleAny;
 
+/**
+ * 작성자 공개 프로필 → 공대장 프로필 카드용 값. 프로필을 설정하지 않았으면 기본 문구 없이 null 로 둡니다.
+ * 게임 줄은 대표 게임(없으면 첫 선호 게임) · 플레이 스타일 · 플레이 시간대 중 있는 것만 잇습니다.
+ */
+export function toHostProfile(res: MemberProfileResponse): HostProfile {
+  const game = res.games.find((g) => g.isMain) ?? res.games[0];
+  const style = game?.playStyle ? styleChoices.find((s) => s.id === game.playStyle)?.label : undefined;
+  const gameLine = game ? [game.name, style, game.playTimeSlot].filter(Boolean).join(' · ') : '';
+  const bio = res.bio?.trim() ?? '';
+  return { gameLine: gameLine || null, bio: bio || null };
+}
+
 /** 마크다운 본문을 빈 줄 기준 문단으로 나눕니다 (마크다운 렌더러 도입 전까지 원문 그대로 표시). */
 const toParagraphs = (body: string) =>
   body
@@ -107,6 +120,7 @@ export function toPostDetail(res: PostDetailResponse): PostDetail {
       level: res.host.level,
       record: t.hostRecord(res.host.reviewCount),
       manner,
+      mannerTemp: res.host.mannerTemp,
     },
     views: res.views,
     postedAgo: timeAgo(res.createdAt),
