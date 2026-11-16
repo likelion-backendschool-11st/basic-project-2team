@@ -55,7 +55,7 @@ export interface ApplicationResponse {
   readonly role: string | null;
   readonly message: string | null;
   readonly appliedAt: string;
-  readonly applicant: { readonly id: number; readonly nickname: string; readonly level: number; readonly mannerTemp: number; readonly reviewCount: number };
+  readonly applicant: { readonly id: number; readonly nickname: string; readonly avatarUrl: string | null; readonly level: number; readonly mannerTemp: number; readonly reviewCount: number };
 }
 export const getPendingApplications = (postId: string) => request<readonly ApplicationResponse[]>('GET', postUrl(postId, '/applications?status=PENDING'));
 export const decideApplication = (postId: string, applicationId: number, status: 'ACCEPTED' | 'REJECTED') =>
@@ -73,6 +73,7 @@ export interface RelatedPostResponse {
 export interface ParticipantResponse {
   readonly id: number;
   readonly nickname: string;
+  readonly avatarUrl: string | null;
   readonly role: string | null;
   readonly isHost: boolean;
 }

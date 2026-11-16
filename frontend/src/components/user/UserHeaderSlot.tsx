@@ -4,6 +4,7 @@ import type { LoginUser } from '../../api/authApi';
 import { formatTemperature } from '../../api/mypageApi';
 import { userMenuText } from '../../data/userData';
 import { useUserMenu } from '../../hooks/useUserMenu';
+import { Avatar } from '../ui/Avatar';
 
 interface UserHeaderSlotProps {
   readonly user: LoginUser;
@@ -19,9 +20,7 @@ export const UserHeaderSlot: React.FC<UserHeaderSlotProps> = ({ user }) => {
         className="flex items-center gap-2.5 bg-night-surface border border-night-borderLight hover:border-mercury/50 rounded-full py-1 pl-1 pr-3.5 transition-all group"
       >
         <div className="relative">
-          <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-mercury to-indigo-400 flex items-center justify-center font-bold text-white text-xs shadow-md shadow-mercury/30">
-            {user.nickname.charAt(0)}
-          </div>
+          <Avatar url={user.avatarUrl} name={user.nickname} className="w-8 h-8 rounded-full bg-gradient-to-tr from-mercury to-indigo-400 flex items-center justify-center font-bold text-white text-xs shadow-md shadow-mercury/30" />
           {user.online && (
             <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emeraldAccent border-2 border-night-surface" />
           )}

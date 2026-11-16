@@ -1,6 +1,7 @@
 export interface ReviewMember {
   readonly id: string;
   readonly name: string;
+  readonly avatarUrl?: string | null;
   readonly level: number;
   readonly game: string;
   readonly className: string;

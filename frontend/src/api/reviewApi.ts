@@ -40,6 +40,7 @@ export const toReviewTag = (tag: ReviewTagResponse): ReviewTag => ({ id: tag.cod
 export const toReviewMember = (target: ReviewTargetResponse): ReviewMember => ({
   id: String(target.id),
   name: target.nickname,
+  avatarUrl: target.avatarUrl,
   level: target.level,
   game: target.game,
   className: target.characterName ?? '',

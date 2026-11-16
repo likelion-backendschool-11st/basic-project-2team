@@ -26,6 +26,7 @@ export const toMannerLeaders = (items: readonly MannerRankingItem[]): readonly M
       id: String(item.id),
       rank: item.rank as MannerLeader['rank'],
       initial: item.nickname.slice(0, 1),
+      avatarUrl: item.avatarUrl,
       name: item.nickname,
       game: item.mainGame?.name ?? homeText.leaderNoGame,
       accent: rankAccents[item.rank - 1] ?? 'mercury',

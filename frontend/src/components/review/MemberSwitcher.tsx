@@ -1,5 +1,6 @@
 import React from 'react';
 import type { ReviewMember } from '../../data/reviewData';
+import { Avatar } from '../ui/Avatar';
 import { reviewText } from '../../data/reviewData';
 
 interface MemberSwitcherProps {
@@ -21,9 +22,7 @@ export const MemberSwitcher: React.FC<MemberSwitcherProps> = ({ member, index, t
     </button>
     <div className="flex items-center gap-3 text-center">
       <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-mercury to-indigo-500 p-0.5 flex items-center justify-center shadow-md">
-        <div className="w-full h-full bg-night-base rounded-full flex items-center justify-center text-sm font-bold text-indigo-300">
-          {member.name}
-        </div>
+        <Avatar url={member.avatarUrl} name={member.name} className="w-full h-full bg-night-base rounded-full flex items-center justify-center text-sm font-bold text-indigo-300" />
       </div>
       <div className="text-left">
         <div className="flex items-center gap-1.5">

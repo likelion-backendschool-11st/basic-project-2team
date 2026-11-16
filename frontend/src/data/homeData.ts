@@ -37,6 +37,7 @@ export interface MannerLeader {
   readonly id: string;
   readonly rank: 1 | 2 | 3;
   readonly initial: string;
+  readonly avatarUrl?: string | null;
   readonly name: string;
   readonly game: string;
   readonly accent: Accent;

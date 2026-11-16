@@ -103,6 +103,7 @@ export function toPostDetail(res: PostDetailResponse): PostDetail {
     host: {
       id: res.host.id,
       name: res.host.nickname,
+      avatarUrl: res.host.avatarUrl,
       level: res.host.level,
       record: t.hostRecord(res.host.reviewCount),
       manner,

@@ -28,6 +28,7 @@ function toPostComment(c: CommentResponse, seq: number, now: number): PostCommen
     parentId: c.parentId === null ? undefined : String(c.parentId),
     author: c.author.nickname,
     initial: Array.from(c.author.nickname)[0] ?? '?',
+    avatarUrl: c.author.avatarUrl,
     badge: c.isPostAuthor ? 'author' : c.mine ? 'mine' : undefined,
     mine: c.mine,
     locked: c.text === null,
