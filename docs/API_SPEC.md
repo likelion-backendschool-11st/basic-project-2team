@@ -482,6 +482,7 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 | 작성자가 마감(`CLOSED`)·완료(`COMPLETED`) 처리 (재개는 알리지 않음) | 대기 중·수락된 신청자 | `POST_UPDATED` |
 | 작성자가 공고 수정(`PUT`)에서 **일정 · 게임 · 상세 분류를 바꿈** (제목·본문·태그만 고치면 알리지 않음) | 대기 중·수락된 신청자 | `POST_UPDATED` |
 | 작성자가 공고 삭제(`DELETE`) | 대기 중·수락된 신청자 | `POST_DELETED` (공고가 사라지므로 `postId` 는 `null`) |
+| 즐겨찾기한 작성자가 새 공고 등록(`POST /api/posts`) (수정·임시저장은 알리지 않음) | 그 작성자를 즐겨찾기한 회원(탈퇴 회원 제외) | `FAVORITE_AUTHOR_POST` (`postId` 는 새 공고) — `backend/src/post` 의 `postMessages.notice.favoriteAuthorPosted` |
 
 ### 알림함 (Notification)
 
