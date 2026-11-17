@@ -17,6 +17,9 @@ const C = 4;
 function createFakeRepository() {
   const state = { posts: new Map(), members: new Map(), applications: [], notifications: [], topTags: new Map(), nextId: 1 };
   const notify = (memberId, type, message) => state.notifications.push({ memberId, type, message });
+  const dropInvites = (postId, memberId) => {
+    state.notifications = state.notifications.filter((n) => !(n.memberId === memberId && n.type === 'PARTY_INVITE' && n.postId === postId));
+  };
   const find = (postId, memberId) => state.applications.find((a) => a.postId === postId && a.applicantId === memberId);
   const memberRow = (id) => ({ memberId: id, nickname: `회원${id}`, avatarUrl: null, level: 1, mannerTemp: '36.5', reviewCount: 0, memberStatus: state.members.get(id)?.status ?? 'ACTIVE' });
   return {
@@ -57,6 +60,7 @@ function createFakeRepository() {
         a.lateCancel = a.lateCancel || lateCancel;
       }
       a.status = 'CANCELED';
+      dropInvites(postId, applicantId);
       return true;
     },
     async findApplications(postId, status) {
@@ -101,6 +105,35 @@ function createFakeRepository() {
       }
       return out();
     },
+    async hasInvitation(postId, memberId) {
+      return state.notifications.some((n) => n.memberId === memberId && n.type === 'PARTY_INVITE' && n.postId === postId);
+    },
+    async createInvitation({ postId, memberId, message }) {
+      dropInvites(postId, memberId);
+      state.notifications.push({ memberId, type: 'PARTY_INVITE', message, postId });
+    },
+    async acceptInvitation({ postId, memberId, notices }) {
+      const post = state.posts.get(postId);
+      const out = (result) => ({ result, current: post.currentCount, max: post.headcount, postStatus: post.status });
+      const a = find(postId, memberId);
+      const removeInvitation = () => dropInvites(postId, memberId);
+      if (a?.status === 'ACCEPTED') {
+        removeInvitation();
+        return out('ALREADY_MEMBER');
+      }
+      if (!['OPEN', 'PAUSED'].includes(post.status)) return out('POST_CLOSED');
+      if (post.currentCount >= post.headcount) return out('FULL');
+      if (a) a.status = 'ACCEPTED';
+      else state.applications.push({ id: state.nextId++, postId, applicantId: memberId, role: null, message: null, status: 'ACCEPTED', lateCancel: false });
+      post.currentCount += 1;
+      removeInvitation();
+      notify(post.authorId, 'INVITE_ACCEPTED', notices.accepted);
+      if (post.currentCount >= post.headcount) {
+        post.status = 'CLOSED';
+        state.applications.filter((x) => x.postId === postId && x.status === 'PENDING').forEach((x) => notify(x.applicantId, 'POST_UPDATED', notices.closed));
+      }
+      return out('OK');
+    },
     async findParticipants(postId) {
       const post = state.posts.get(postId);
       const accepted = state.applications.filter((a) => a.postId === postId && a.status === 'ACCEPTED');
@@ -117,10 +150,11 @@ describe('party application API', () => {
   let baseUrl;
   const repo = createFakeRepository();
   const events = createRecordingEvents();
+  const memberEvents = createRecordingEvents();
   const tokens = createTokenProvider(AUTH);
 
   before(async () => {
-    const app = createApp({ partyRepository: repo, postEvents: events, corsOrigins: [], bcryptRounds: 4, auth: AUTH, now: () => NOW });
+    const app = createApp({ partyRepository: repo, postEvents: events, memberEvents, corsOrigins: [], bcryptRounds: 4, auth: AUTH, now: () => NOW });
     await new Promise((resolve) => {
       server = app.listen(0, resolve);
     });
@@ -129,6 +163,7 @@ describe('party application API', () => {
   after(() => server.close());
   beforeEach(() => {
     events.log.length = 0;
+    memberEvents.log.length = 0;
     Object.assign(repo.state, { applications: [], notifications: [], nextId: 1 });
     repo.state.topTags.clear();
     repo.state.members.clear();
@@ -542,6 +577,115 @@ describe('party application API', () => {
       repo.state.posts.get(1).title = '가'.repeat(60);
       await apply(A);
       assert.equal(repo.state.notifications[0].message, `회원2님이 '${'가'.repeat(40)}…' 공고에 참가를 신청했습니다.`);
+    });
+  });
+
+  describe('파티 초대 (POST /:postId/invitations · /invitations/accept)', () => {
+    const invite = (memberId, by = HOST) => call('POST', '/1/invitations', { memberId }, by);
+    const accept = (memberId) => call('POST', '/1/invitations/accept', undefined, memberId);
+    const invites = () => repo.state.notifications.filter((n) => n.type === 'PARTY_INVITE');
+
+    it('공대장이 초대하면 201 이고 초대받은 회원에게 PARTY_INVITE 알림과 실시간 신호가 간다', async () => {
+      const res = await invite(A);
+      assert.deepEqual(memberEvents.log, [[A, 'notifications']]);
+      assert.equal(res.status, 201);
+      assert.deepEqual((await json(res)).data, { postId: 1, memberId: A });
+      assert.deepEqual(invites(), [{ memberId: A, type: 'PARTY_INVITE', message: "회원1님이 '카멘 하드 숙련팟' 파티에 초대했습니다.", postId: 1 }]);
+    });
+
+    it('공대장이 아니면 403, 본인 초대는 403, memberId 가 잘못되면 400, 로그인 안 하면 401', async () => {
+      assert.equal((await json(await invite(B, A))).error.code, 'NOT_POST_AUTHOR');
+      assert.equal((await json(await invite(HOST))).error.code, 'CANNOT_INVITE_SELF');
+      assert.equal((await call('POST', '/1/invitations', { memberId: '2' }, HOST)).status, 400);
+      assert.equal((await call('POST', '/1/invitations', { memberId: A })).status, 401);
+      assert.equal(invites().length, 0);
+    });
+
+    it('이미 파티원·이미 초대함·정지/탈퇴 회원·마감·정원 참은 거절한다', async () => {
+      await invite(A);
+      assert.equal((await json(await invite(A))).error.code, 'ALREADY_INVITED');
+      await accept(A);
+      repo.state.notifications.length = 0;
+      assert.equal((await json(await invite(A))).error.code, 'ALREADY_MEMBER');
+      repo.state.members.set(B, { status: 'BANNED' });
+      assert.equal((await json(await invite(B))).error.code, 'INVITEE_UNAVAILABLE');
+      repo.state.members.set(B, { status: 'WITHDRAWN' });
+      assert.equal((await invite(B)).status, 404);
+      repo.state.posts.get(1).status = 'CLOSED';
+      assert.equal((await json(await invite(C))).error.code, 'POST_CLOSED');
+      repo.state.posts.get(1).status = 'OPEN';
+      repo.state.posts.get(1).currentCount = 3;
+      assert.equal((await json(await invite(C))).error.code, 'PARTY_FULL');
+    });
+
+    it('초대를 수락하면 바로 ACCEPTED 파티원이 되고 인원이 늘며 공대장에게 알리고 초대 알림은 지운다', async () => {
+      await invite(A);
+      const res = await accept(A);
+      assert.equal(res.status, 200);
+      assert.deepEqual((await json(res)).data, { postId: 1, status: 'ACCEPTED', current: 2, max: 3, postStatus: 'OPEN', alreadyMember: false });
+      assert.equal(repo.state.applications.find((a) => a.applicantId === A).status, 'ACCEPTED');
+      assert.deepEqual(repo.state.notifications.at(-1), { memberId: HOST, type: 'INVITE_ACCEPTED', message: "회원2님이 '카멘 하드 숙련팟' 파티 초대를 수락해 파티원이 되었습니다." });
+      assert.ok(events.log.length > 0);
+      assert.equal(invites().length, 0);
+      // 공대장(초대 수락 알림)과 수락한 회원(초대 알림 삭제)의 배지를 바로 갱신한다
+      assert.deepEqual(memberEvents.log.slice(-2), [[HOST, 'notifications'], [A, 'notifications']]);
+    });
+
+    it('수락한 초대는 지워져 다시 누르면 404, 대기 중에 승인돼 이미 파티원이면 200 (alreadyMember: true) 이고 알림만 지운다', async () => {
+      await invite(A);
+      await accept(A);
+      assert.equal((await json(await accept(A))).error.code, 'INVITATION_NOT_FOUND');
+      await apply(B);
+      await invite(B);
+      await decide(repo.state.applications.find((a) => a.applicantId === B).id, 'ACCEPTED');
+      const again = (await json(await accept(B))).data;
+      assert.deepEqual([again.alreadyMember, again.current], [true, 3]);
+      assert.equal(invites().length, 0);
+    });
+
+    it('초대로 들어왔다가 파티를 나간 회원은 다시 초대·수락할 수 있다', async () => {
+      await invite(A);
+      await accept(A);
+      assert.equal((await call('DELETE', '/1/applications/me', undefined, A)).status, 204);
+      assert.equal((await invite(A)).status, 201);
+      assert.equal(invites().length, 1);
+      const again = (await json(await accept(A))).data;
+      assert.deepEqual([again.alreadyMember, again.current], [false, 2]);
+      assert.equal(repo.state.applications.length, 1);
+    });
+
+    it('파티를 나가면 남아 있던 초대는 지워지고, 옛 초대가 남아 있어도 나간 회원은 새로 초대된다', async () => {
+      await apply(A);
+      await invite(A);
+      await decide(repo.state.applications[0].id, 'ACCEPTED');
+      await call('DELETE', '/1/applications/me', undefined, A);
+      assert.equal(invites().length, 0);
+      assert.equal((await json(await accept(A))).error.code, 'INVITATION_NOT_FOUND');
+      repo.state.notifications.push({ memberId: A, type: 'PARTY_INVITE', message: '옛 초대', postId: 1 });
+      assert.equal((await invite(A)).status, 201);
+      assert.deepEqual(invites().map((n) => n.message), ["회원1님이 '카멘 하드 숙련팟' 파티에 초대했습니다."]);
+    });
+
+    it('대기·거절·취소 이력이 있어도 같은 행을 ACCEPTED 로 바꾼다', async () => {
+      await apply(A);
+      repo.state.applications[0].status = 'REJECTED';
+      await invite(A);
+      assert.equal((await accept(A)).status, 200);
+      assert.deepEqual([repo.state.applications.length, repo.state.applications[0].status], [1, 'ACCEPTED']);
+    });
+
+    it('초대가 없으면 404 INVITATION_NOT_FOUND, 정원이 차면 409 PARTY_FULL, 마지막 자리면 마감하고 대기자에게 알린다', async () => {
+      assert.equal((await json(await accept(A))).error.code, 'INVITATION_NOT_FOUND');
+      await apply(C);
+      await invite(A);
+      await invite(B);
+      await accept(A);
+      const last = (await json(await accept(B))).data;
+      assert.deepEqual([last.current, last.postStatus], [3, 'CLOSED']);
+      assert.ok(repo.state.notifications.some((n) => n.memberId === C && n.type === 'POST_UPDATED'));
+      repo.state.posts.get(1).status = 'PAUSED';
+      repo.state.notifications.push({ memberId: C, type: 'PARTY_INVITE', postId: 1 });
+      assert.equal((await json(await accept(C))).error.code, 'PARTY_FULL');
     });
   });
 

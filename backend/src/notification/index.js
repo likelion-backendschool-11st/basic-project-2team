@@ -6,8 +6,8 @@ const { createNotificationController } = require('./notificationController');
 const { createNotificationRouter } = require('./notificationRoutes');
 
 /** repository → service → controller → router 를 조립합니다. 테스트에서는 repository 를 바꿔 끼웁니다. */
-function createNotificationModule({ pool, notificationRepository = createNotificationRepository(pool), requireAuth }) {
-  const controller = createNotificationController(createNotificationService({ notificationRepository }));
+function createNotificationModule({ pool, notificationRepository = createNotificationRepository(pool), memberEvents, requireAuth, heartbeatMs }) {
+  const controller = createNotificationController(createNotificationService({ notificationRepository }), { memberEvents, heartbeatMs });
   return { router: createNotificationRouter(controller, { requireAuth }) };
 }
 

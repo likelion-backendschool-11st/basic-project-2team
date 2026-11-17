@@ -87,7 +87,15 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = () => {
               className={`bg-night-surface border border-night-border rounded-2xl overflow-hidden transition-opacity ${n.loading ? 'opacity-60' : ''}`}
             >
               {n.items.map((item) => (
-                <NotificationRow key={item.id} notification={item} onOpen={n.open} onMarkRead={n.markRead} onDelete={n.remove} />
+                <NotificationRow
+                  key={item.id}
+                  notification={item}
+                  onOpen={n.open}
+                  onMarkRead={n.markRead}
+                  onAcceptInvite={(target) => void n.acceptInvite(target)}
+                  accepting={n.accepting === item.id}
+                  onDelete={n.remove}
+                />
               ))}
             </ul>
             {n.pager.pages.length > 1 && (

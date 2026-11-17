@@ -16,6 +16,8 @@ export interface NotificationItem {
   readonly postId: number | null;
   readonly read: boolean;
   readonly createdAt: string;
+  /** PARTY_INVITE 만: 이미 수락했는지 (공고가 지워졌으면 null) */
+  readonly invite: { readonly joined: boolean } | null;
 }
 
 export interface NotificationPage {
@@ -94,5 +96,6 @@ export function toNotificationView(item: NotificationItem, now: Date = new Date(
     timeAgo: timeAgo(item.createdAt, now),
     read: item.read,
     postId: item.postId,
+    invite: item.invite ?? null,
   };
 }

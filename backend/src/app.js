@@ -6,6 +6,7 @@ const { env } = require('./config/env');
 const { notFoundHandler, errorHandler } = require('./common/errorHandler');
 const { createTokenProvider } = require('./common/tokenProvider');
 const { createPostEvents } = require('./common/postEvents');
+const { createMemberEvents } = require('./common/memberEvents');
 const { createRequireAuth, createOptionalAuth, createRequireAdmin } = require('./common/authMiddleware');
 const { createMemberModule } = require('./member');
 const { createPostModule } = require('./post');
@@ -42,6 +43,7 @@ const { createPollModule } = require('./poll');
  *   rankingRepository?: object,
  *   pollRepository?: object,
  *   postEvents?: ReturnType<typeof createPostEvents>,
+ *   memberEvents?: ReturnType<typeof createMemberEvents>,
  *   avatarProcessor?: typeof import('./account/avatarImage').processAvatar,
  *   avatarStorage?: ReturnType<typeof createConfiguredAvatarStorage>,
  *   corsOrigins: string[],
@@ -67,6 +69,7 @@ function createApp({
   rankingRepository,
   pollRepository,
   postEvents = createPostEvents(),
+  memberEvents = createMemberEvents(),
   avatarStorage = createConfiguredAvatarStorage(env),
   avatarProcessor,
   corsOrigins,
@@ -101,8 +104,8 @@ function createApp({
   const post = createPostModule({ pool, postRepository, postEvents, requireAuth, now });
   app.use('/api/posts', post.router);
   app.use('/api/games', createGameModule({ pool, gameRepository }).router);
-  app.use('/api/posts', createPartyModule({ pool, partyRepository, postEvents, requireAuth, now }).router);
-  app.use('/api/notifications', createNotificationModule({ pool, notificationRepository, requireAuth }).router);
+  app.use('/api/posts', createPartyModule({ pool, partyRepository, postEvents, memberEvents, requireAuth, now }).router);
+  app.use('/api/notifications', createNotificationModule({ pool, notificationRepository, memberEvents, requireAuth }).router);
   app.use('/api/categories', createCategoryModule({ pool, categoryRepository }).router);
 
   const review = createReviewModule({ pool, reviewRepository, requireAuth });

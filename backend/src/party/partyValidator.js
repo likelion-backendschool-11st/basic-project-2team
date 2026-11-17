@@ -60,4 +60,13 @@ function parseListStatus(query) {
   return status;
 }
 
-module.exports = { parseId, validateApply, validateDecision, validatePostStatus, parseListStatus };
+/** 파티 초대 본문 { memberId } — 초대할 회원 id (양의 정수) */
+function validateInvite(body) {
+  const memberId = body && typeof body === 'object' ? body.memberId : undefined;
+  if (!Number.isSafeInteger(memberId) || memberId < 1) {
+    throw new ApiError(400, 'INVALID_INPUT', m.invalidInput, [{ field: 'memberId', message: m.inviteeInvalid }]);
+  }
+  return { memberId };
+}
+
+module.exports = { parseId, validateApply, validateDecision, validatePostStatus, parseListStatus, validateInvite };

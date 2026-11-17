@@ -2,6 +2,7 @@
 
 const { ApiError } = require('../common/ApiError');
 const { POST_EVENT, NO_EVENTS } = require('../common/postEvents');
+const { MEMBER_EVENT } = require('../common/memberEvents');
 const {
   APPLICATION_STATUS: S,
   POST_STATUS,
@@ -12,7 +13,7 @@ const {
   NOTIFICATION_TITLE_MAX,
   partyMessages: m,
 } = require('./partyConstants');
-const { parseId, validateApply, validateDecision, validatePostStatus, parseListStatus } = require('./partyValidator');
+const { parseId, validateApply, validateDecision, validatePostStatus, parseListStatus, validateInvite } = require('./partyValidator');
 
 const toIso = (value) => (value ? new Date(value).toISOString() : null);
 const postNotFound = () => new ApiError(404, 'POST_NOT_FOUND', m.postNotFound);
@@ -47,8 +48,10 @@ function toMember(row) {
  * 참가 신청 · 취소 · 신청자 목록 · 승인/거절 · 파티원 조회 비즈니스 로직 (docs/API_SPEC.md 4절).
  * @param {{ partyRepository: ReturnType<typeof import('./partyRepository').createPartyRepository>, now?: () => Date }} deps
  */
-function createPartyService({ partyRepository, postEvents = NO_EVENTS, now = () => new Date() }) {
+function createPartyService({ partyRepository, postEvents = NO_EVENTS, memberEvents = NO_EVENTS, now = () => new Date() }) {
   const changed = (postId) => postEvents.publish(postId, POST_EVENT.post);
+  /** 알림을 받은(또는 알림이 지워진) 회원의 헤더 배지·알림 목록을 바로 갱신하게 합니다. */
+  const notified = (...memberIds) => memberIds.forEach((memberId) => memberEvents.publish(memberId, MEMBER_EVENT.notifications));
 
   async function loadPost(rawPostId) {
     const postId = parseId(rawPostId);
@@ -87,12 +90,14 @@ function createPartyService({ partyRepository, postEvents = NO_EVENTS, now = () 
       if (existing.status !== S.canceled) throw new ApiError(403, 'REAPPLY_NOT_ALLOWED', m.reapplyNotAllowed);
       if (!(await partyRepository.reapply({ id: existing.id, postId: post.id, notice, ...input }))) throw alreadyApplied();
       changed(post.id);
+      notified(post.authorId);
       return { id: existing.id, status: S.pending };
     }
 
     const id = await partyRepository.createApplication({ postId: post.id, applicantId: memberId, notice, ...input });
     if (id === null) throw alreadyApplied();
     changed(post.id);
+    notified(post.authorId);
     return { id, status: S.pending };
   }
 
@@ -112,6 +117,7 @@ function createPartyService({ partyRepository, postEvents = NO_EVENTS, now = () 
     const canceled = await partyRepository.cancelApplication({ postId: post.id, applicantId: memberId, canceledAt: current, lateCancel, notice });
     if (!canceled) throw applicationNotFound();
     changed(post.id);
+    notified(post.authorId, memberId);
   }
 
   /** GET /api/posts/:postId/applications?status= — 작성자만 */
@@ -196,7 +202,75 @@ function createPartyService({ partyRepository, postEvents = NO_EVENTS, now = () 
     return rows.map((row) => ({ ...toMember(row), role: row.role, isHost: Boolean(row.isHost) }));
   }
 
-  return { apply, cancelMine, listApplications, decide, changeStatus, listParticipants };
+  /** 초대·초대 수락을 받을 수 있는 공고인지: 모집 중·일시 중단이고 정원이 남아 있어야 합니다. */
+  function assertJoinable(post) {
+    if (post.status !== POST_STATUS.open && post.status !== POST_STATUS.paused) throw new ApiError(409, 'POST_CLOSED', m.postClosed);
+    if (post.currentCount >= post.headcount) throw new ApiError(409, 'PARTY_FULL', m.partyFull);
+  }
+
+  /** POST /api/posts/:postId/invitations { memberId } — 공대장만. 초대받은 회원의 알림함에 PARTY_INVITE 알림이 갑니다. */
+  async function invite(rawPostId, hostId, body) {
+    const { memberId } = validateInvite(body);
+    const post = await loadOwnedPost(rawPostId, hostId);
+    if (memberId === hostId) throw new ApiError(403, 'CANNOT_INVITE_SELF', m.cannotInviteSelf);
+    const invitee = await partyRepository.findMemberStatus(memberId);
+    if (!invitee || invitee.status === MEMBER_STATUS.withdrawn) throw new ApiError(404, 'MEMBER_NOT_FOUND', m.memberNotFound);
+    try {
+      assertCanApply(invitee, now());
+    } catch {
+      throw new ApiError(409, 'INVITEE_UNAVAILABLE', m.inviteeUnavailable);
+    }
+    assertJoinable(post);
+    const application = await partyRepository.findMyApplication(post.id, memberId);
+    if (application?.status === S.accepted) throw new ApiError(409, 'ALREADY_MEMBER', m.alreadyMember);
+    // 파티를 나간(CANCELED) 회원은 남아 있던 옛 초대가 있어도 새로 초대할 수 있습니다(옛 초대는 새 초대로 바뀜).
+    if (application?.status !== S.canceled && (await partyRepository.hasInvitation(post.id, memberId))) {
+      throw new ApiError(409, 'ALREADY_INVITED', m.alreadyInvited);
+    }
+
+    const host = await partyRepository.findMemberStatus(hostId);
+    await partyRepository.createInvitation({ postId: post.id, memberId, message: m.notice.invited(host?.nickname ?? m.withdrawnMember, clipTitle(post.title)) });
+    notified(memberId);
+    return { postId: post.id, memberId };
+  }
+
+  /**
+   * POST /api/posts/:postId/invitations/accept — 받은 초대를 수락해 바로 파티원이 됩니다(공대장 승인 없음).
+   * 수락하면 받은 초대 알림은 지워집니다. 초대가 남아 있는데 이미 파티원이면(대기 중에 승인된 경우) 알림만 지우고 200 (alreadyMember: true).
+   */
+  async function acceptInvitation(rawPostId, memberId) {
+    const me = await partyRepository.findMemberStatus(memberId);
+    assertCanApply(me, now());
+    const post = await loadPost(rawPostId);
+    if (post.authorId === memberId) throw new ApiError(403, 'CANNOT_APPLY_OWN_POST', m.cannotApplyOwnPost);
+    if (!(await partyRepository.hasInvitation(post.id, memberId))) throw new ApiError(404, 'INVITATION_NOT_FOUND', m.invitationNotFound);
+
+    const title = clipTitle(post.title);
+    const outcome = await partyRepository.acceptInvitation({
+      postId: post.id,
+      memberId,
+      decidedAt: now(),
+      notices: { accepted: m.notice.inviteAccepted(me.nickname, title), closed: m.notice.closed(title) },
+    });
+    const result = (alreadyMember) => ({ postId: post.id, status: S.accepted, current: outcome.current, max: outcome.max, postStatus: outcome.postStatus, alreadyMember });
+    switch (outcome.result) {
+      case 'OK':
+        changed(post.id);
+        notified(post.authorId, memberId);
+        return result(false);
+      case 'ALREADY_MEMBER':
+        notified(memberId);
+        return result(true);
+      case 'POST_CLOSED':
+        throw new ApiError(409, 'POST_CLOSED', m.postClosed);
+      case 'FULL':
+        throw new ApiError(409, 'PARTY_FULL', m.partyFull);
+      default:
+        throw postNotFound();
+    }
+  }
+
+  return { apply, cancelMine, listApplications, decide, changeStatus, listParticipants, invite, acceptInvitation };
 }
 
 module.exports = { createPartyService };

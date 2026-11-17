@@ -163,7 +163,7 @@ const logTargetType = Object.freeze({
 });
 
 /** notification.type */
-const notificationType = Object.freeze({ postDeleted: 'POST_DELETED', sanction: 'SANCTION', noShow: 'NO_SHOW' });
+const notificationType = Object.freeze({ postDeleted: 'POST_DELETED', sanction: 'SANCTION', noShow: 'NO_SHOW', partyInvite: 'PARTY_INVITE' });
 
 const adminMessages = Object.freeze({
   invalidInput: '입력값을 확인해주세요.',

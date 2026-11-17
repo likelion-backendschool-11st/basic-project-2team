@@ -134,9 +134,21 @@ describe('notification inbox API', () => {
       postId: null,
       read: false,
       createdAt: '2026-11-13T03:00:00.000Z',
+      invite: null,
     });
     assert.equal(data.items[2].read, true);
     assert.deepEqual([data.page, data.size, data.totalCount, data.totalPages, data.unreadCount], [1, 20, 3, 1, 2]);
+  });
+
+  it('파티 초대 알림에는 수락 여부(invite.joined)를 붙인다', async () => {
+    repo.state.rows.push(
+      { id: 5, memberId: ME, type: 'PARTY_INVITE', message: '초대 5', postId: 1, isRead: 0, createdAt: new Date('2026-11-13T05:00:00Z'), applicationStatus: null },
+      { id: 6, memberId: ME, type: 'PARTY_INVITE', message: '초대 6', postId: 2, isRead: 1, createdAt: new Date('2026-11-13T06:00:00Z'), applicationStatus: 'ACCEPTED' },
+      { id: 7, memberId: ME, type: 'PARTY_INVITE', message: '초대 7', postId: null, isRead: 0, createdAt: new Date('2026-11-13T07:00:00Z'), applicationStatus: null },
+    );
+    const { items } = (await json(await call('GET', ''))).data;
+    const byId = Object.fromEntries(items.map((n) => [n.id, n.invite]));
+    assert.deepEqual([byId[5], byId[6], byId[7], byId[2]], [{ joined: false }, { joined: true }, null, null]);
   });
 
   it('unread=true 는 안 읽은 알림만, page·size 로 나눠 준다', async () => {

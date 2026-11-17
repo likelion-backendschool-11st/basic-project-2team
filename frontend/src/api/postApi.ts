@@ -56,6 +56,21 @@ export const reportNoShow = (postId: number, memberId: number, reason: string, d
 export const applyToPost = (postId: string) => request<{ readonly id: number; readonly status: string }>('POST', postUrl(postId, '/applications'), {});
 export const cancelApplication = (postId: string) => request<void>('DELETE', postUrl(postId, '/applications/me'));
 
+/** 파티 초대 (docs/API_SPEC.md 4절). 공대장이 보내면 받은 회원의 알림함에 PARTY_INVITE 알림이 갑니다. */
+export const inviteToParty = (postId: string, memberId: number) =>
+  request<{ readonly postId: number; readonly memberId: number }>('POST', postUrl(postId, '/invitations'), { memberId });
+
+/** 받은 초대 수락 → 바로 파티원(ACCEPTED). 이미 파티원이어도 200 (alreadyMember: true) */
+export interface AcceptInvitationResponse {
+  readonly postId: number;
+  readonly status: 'ACCEPTED';
+  readonly current: number;
+  readonly max: number;
+  readonly postStatus: string;
+  readonly alreadyMember: boolean;
+}
+export const acceptPartyInvite = (postId: string) => request<AcceptInvitationResponse>('POST', postUrl(postId, '/invitations/accept'));
+
 /** GET /api/posts/{postId}/applications 아이템 */
 export interface ApplicationResponse {
   readonly id: number;

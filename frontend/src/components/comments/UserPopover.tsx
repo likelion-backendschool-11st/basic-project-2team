@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toProfileSummary } from '../../api/mypageApi';
 import { memberProfileText } from '../../data/myPageData';
@@ -10,13 +10,22 @@ import ProfileSummaryCard from '../mypage/ProfileSummaryCard';
 interface UserPopoverProps {
   /** GET /api/members/{memberId} 결과. 불러오는 중이면 'loading', 실패하면 'error' */
   readonly profile: CommentAuthorProfile;
-  readonly onAction: (message: string) => void;
+  /** 공대장이 남의 댓글을 볼 때만: 이 공고 파티로 초대. 없으면 초대 버튼을 숨깁니다. 성공하면 창을 닫습니다. */
+  readonly onInvite?: () => Promise<boolean>;
   readonly onClose: () => void;
 }
 
 /** 댓글 작성자 프로필 카드(작성자 줄 아래에 뜨는 창): 마이페이지 프로필 카드와 같은 구성 + 파티 초대하기 */
-export const UserPopover: React.FC<UserPopoverProps> = ({ profile, onAction, onClose }) => {
+export const UserPopover: React.FC<UserPopoverProps> = ({ profile, onInvite, onClose }) => {
   const t = commentText.popover;
+  const [inviting, setInviting] = useState(false);
+  const invite = async () => {
+    if (!onInvite || inviting) return;
+    setInviting(true);
+    const ok = await onInvite();
+    setInviting(false);
+    if (ok) onClose();
+  };
   const summary = useMemo(() => (typeof profile === 'object' ? toProfileSummary(profile) : null), [profile]);
   return (
     <div role="dialog" aria-label={t.title} className="absolute inset-x-0 top-full z-30 mt-2 rounded-xl border border-mercury/30 bg-night-card p-5 shadow-2xl">
@@ -40,15 +49,16 @@ export const UserPopover: React.FC<UserPopoverProps> = ({ profile, onAction, onC
             <i className="fa-regular fa-id-card" />{memberProfileText.viewProfile}
           </Link>
         )}
-        {/* 초대 API 가 아직 없어 안내 토스트만 띄웁니다. */}
-        <button
-          type="button"
-          disabled={!summary}
-          onClick={() => { onAction(t.invited); onClose(); }}
-          className="flex items-center gap-2 rounded-lg bg-mercury px-4 py-2 text-xs font-bold text-white hover:bg-mercury-light disabled:opacity-40 disabled:pointer-events-none"
-        >
-          <i className="fa-solid fa-user-plus" />{t.invite}
-        </button>
+        {onInvite && (
+          <button
+            type="button"
+            disabled={!summary || inviting}
+            onClick={() => void invite()}
+            className="flex items-center gap-2 rounded-lg bg-mercury px-4 py-2 text-xs font-bold text-white hover:bg-mercury-light disabled:opacity-40 disabled:pointer-events-none"
+          >
+            <i className="fa-solid fa-user-plus" />{inviting ? t.inviting : t.invite}
+          </button>
+        )}
       </div>
     </div>
   );
