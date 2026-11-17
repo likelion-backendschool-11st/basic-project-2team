@@ -170,6 +170,8 @@ function createCommentService({ commentRepository, postEvents = NO_EVENTS, now =
 
     const post = await commentRepository.findPost(postId);
     if (!post) throw postNotFound();
+    // 작성자에게 차단당한 회원에게는 공고 상세처럼 없는 공고로 보입니다.
+    if (await commentRepository.isBlockedBy(post.authorId, memberId)) throw postNotFound();
 
     assertCanWrite(await commentRepository.findMemberStatus(memberId), now());
 
