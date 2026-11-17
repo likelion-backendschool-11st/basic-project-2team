@@ -8,11 +8,13 @@ import { useModal } from './useModal';
 import { useMyActivity } from './useMyActivity';
 import { useMyProfile } from './useMyProfile';
 import { useNoShowReport } from './useNoShowReport';
+import { usePartyInvite } from './usePartyInvite';
 import { usePartyReview } from './usePartyReview';
+import { useRecentPlayers } from './useRecentPlayers';
 import { useToast } from './useToast';
 
 /**
- * 마이페이지 전체 상태: 프로필 요약 · 활동 목록 · 즐겨찾기 · 활동 완료 처리 · 별점 평가(노쇼 신고 포함) · 스크랩 해제.
+ * 마이페이지 전체 상태: 프로필 요약 · 활동 목록 · 즐겨찾기 · 최근 함께한 플레이어(파티 초대) · 활동 완료 처리 · 별점 평가(노쇼 신고 포함) · 스크랩 해제.
  * 활동 완료(PATCH /api/posts/{postId}/status COMPLETED)에 성공하면 바로 별점 평가 창을 엽니다.
  */
 export function useMyPage() {
@@ -21,6 +23,8 @@ export function useMyPage() {
   const activity = useMyActivity();
   const favorites = useFavoriteUsers(toast.show);
   const blocks = useBlockedUsers(toast.show);
+  const recentPlayers = useRecentPlayers();
+  const invite = usePartyInvite(toast.show);
   const refresh = () => {
     activity.reload();
     profile.reload();
@@ -89,6 +93,8 @@ export function useMyPage() {
     activity,
     favorites,
     blocks,
+    recentPlayers,
+    invite,
     review,
     noShowReport,
     onPostAction,

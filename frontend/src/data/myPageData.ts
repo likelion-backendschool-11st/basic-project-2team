@@ -112,6 +112,37 @@ export interface BlockedUser {
   readonly blockedDate: string;
 }
 
+/** 「최근 함께한 플레이어」 카드 (GET /api/members/me/recent-players) */
+export interface RecentPlayer {
+  readonly id: number;
+  readonly name: string;
+  readonly level: number;
+  readonly avatarUrl: string | null;
+  readonly manner: string;
+  /** 마지막으로 함께한 파티의 게임 이름과 배지 색 */
+  readonly game: string;
+  readonly accent: GameAccent;
+  /** 마지막으로 함께한 파티 제목 */
+  readonly lastParty: string;
+  /** 예: `11-15 · 3회 함께` */
+  readonly meta: string;
+}
+
+/** 파티 초대 모달의 초대 대상 (최근 함께한 플레이어) */
+export interface InviteTarget {
+  readonly id: number;
+  readonly name: string;
+}
+
+/** 파티 초대 모달의 「내 모집 중 공고」 한 줄 */
+export interface InvitablePost {
+  readonly id: number;
+  readonly title: string;
+  readonly game: string;
+  readonly accent: GameAccent;
+  readonly members: string;
+}
+
 export const accountMenu = {
   title: '계정 관리',
   ariaLabel: '사이드 메뉴',
@@ -187,6 +218,37 @@ export const memberProfileText = {
   report: '신고',
   reportTitle: '회원 신고',
   reported: '신고가 접수되었습니다. 운영팀이 검토 후 조치합니다.',
+};
+
+export const recentPlayersText = {
+  title: '최근 함께한 플레이어',
+  countSuffix: '명',
+  hint: '활동 완료한 파티를 함께한 플레이어를 최근 순으로 최대 10명까지 보여줍니다.',
+  levelPrefix: 'Lv.',
+  mannerPrefix: '매너 ',
+  playCount: (count: number) => `${count}회 함께`,
+  lastPartyPrefix: '최근 파티 · ',
+  viewProfile: '프로필 보기',
+  invite: '파티 초대',
+  empty: '아직 함께 활동을 완료한 플레이어가 없습니다.',
+  loading: '불러오는 중…',
+  loadFailed: '최근 함께한 플레이어를 불러오지 못했습니다.',
+};
+
+export const inviteText = {
+  title: (name: string) => `${name}님을 파티에 초대`,
+  description: '초대할 내 공고를 골라주세요. 상대가 알림에서 초대를 수락하면 승인 없이 바로 파티에 합류합니다.',
+  ariaLabel: '파티 초대',
+  loading: '내 공고를 불러오는 중…',
+  loadFailed: '내 공고를 불러오지 못했습니다.',
+  empty: '초대할 수 있는 모집 중 공고가 없습니다.',
+  write: '새 공고 작성하기',
+  invite: '초대',
+  inviting: '초대 중…',
+  invited: '초대 완료',
+  close: '닫기',
+  done: (name: string) => `${name}님에게 초대 알림을 보냈습니다.`,
+  failed: '초대에 실패했습니다.',
 };
 
 /** 게임 코드별 배지 색 (없는 게임은 blue) */

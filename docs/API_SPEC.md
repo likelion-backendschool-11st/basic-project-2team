@@ -862,6 +862,7 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 | GET | `/api/members/me/scraps?page=&size=` | 내가 스크랩한 공고 | 🔒 |
 | GET | `/api/members/me/favorites` | 즐겨찾는 유저 목록 | 🔒 |
 | POST / DELETE | `/api/members/me/favorites/{memberId}` | 즐겨찾기 추가 / 해제 → `204` | 🔒 |
+| GET | `/api/members/me/recent-players` | 최근 함께한 플레이어 (최대 10명) | 🔒 |
 | GET | `/api/members/me/blocks` | 내가 차단한 유저 목록 | 🔒 |
 | POST / DELETE | `/api/members/me/blocks/{memberId}` | 차단 / 차단 해제 → `204`. 차단당한 회원은 내 공고를 볼 수 없음 | 🔒 |
 | GET | `/api/members/{memberId}` | 회원 프로필 (로그인하면 `viewer` 포함) | |
@@ -985,6 +986,19 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
   "current": 3, "max": 8, "schedule": "2026-11-15T12:00:00.000Z", "scheduleTbd": false, "status": "OPEN",
   "host": "빛나는오더", "scrappedAt": "2026-11-14T00:00:00.000Z"
 }
+```
+
+**최근 함께한 플레이어 (`/me/recent-players`)**
+
+- 활동 완료(`COMPLETED`)한 공고에서 나와 함께한 구성원(파티장 + 승인된 신청자)을 배열로 돌려줍니다. 나, 탈퇴한 회원, 내가 차단한 회원, 노쇼 처리된 회원, 삭제된 공고는 빠집니다.
+- 회원마다 가장 최근에 함께한 파티(`lastParty`)와 함께 완료한 횟수(`playCount`)를 붙이고, `lastParty.playedAt` 최신순으로 최대 10명입니다. `playedAt` 은 출발 시간, 시간 미정 공고면 공고가 마지막으로 바뀐 시각(완료 처리 시각)입니다.
+- 마이페이지에서 「프로필 보기」(`/members/{id}`)와 「파티 초대」(모집 중인 내 공고를 골라 4절 `POST /api/posts/{postId}/invitations`, 상대는 알림함에서 `POST .../invitations/accept` 로 수락)에 씁니다.
+
+```json
+[
+  { "id": 2, "nickname": "철수", "avatarUrl": null, "level": 52, "mannerTemp": 36.5, "playCount": 3,
+    "lastParty": { "postId": 7, "title": "[카멘] 숙련 서폿 구해요", "game": "lostark", "gameName": "로스트아크", "playedAt": "2026-11-15T12:00:00.000Z" } }
+]
 ```
 
 **즐겨찾기 (`/me/favorites`)**

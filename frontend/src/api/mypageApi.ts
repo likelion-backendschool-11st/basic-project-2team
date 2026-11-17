@@ -1,6 +1,7 @@
 import {
   activityText,
   favoritesText,
+  recentPlayersText,
   type BlockedUser,
   gameAccents,
   profileText,
@@ -8,6 +9,8 @@ import {
   type ActivityComment,
   type ActivityPost,
   type FavoriteUser,
+  type InvitablePost,
+  type RecentPlayer,
   type ProfileSummary,
   type TopTag,
 } from '../data/myPageData';
@@ -145,6 +148,23 @@ export interface BlockItem {
   readonly blockedAt: string;
 }
 
+/** GET /api/members/me/recent-players 아이템 (최근 함께 완료한 파티순, 최대 10명) */
+export interface RecentPlayerItem {
+  readonly id: number;
+  readonly nickname: string;
+  readonly avatarUrl: string | null;
+  readonly level: number;
+  readonly mannerTemp: number;
+  readonly playCount: number;
+  readonly lastParty: {
+    readonly postId: number;
+    readonly title: string;
+    readonly game: string;
+    readonly gameName: string;
+    readonly playedAt: string | null;
+  };
+}
+
 /* ── 호출 ── */
 
 const pageQuery = (page: number, size: number) => `page=${page}&size=${size}`;
@@ -205,6 +225,8 @@ export const getMyScraps = (page: number, size: number) =>
   request<Page<MyScrapItem>>('GET', `/api/members/me/scraps?${pageQuery(page, size)}`);
 
 export const getMyFavorites =() => request<readonly FavoriteItem[]>('GET', '/api/members/me/favorites');
+
+export const getRecentPlayers = () => request<readonly RecentPlayerItem[]>('GET', '/api/members/me/recent-players');
 
 export const addFavorite = (memberId: number) => request<void>('POST', `/api/members/me/favorites/${memberId}`);
 
@@ -321,6 +343,31 @@ export function toActivityComment(item: MyCommentItem, no: number): ActivityComm
     to: paths.postDetail(String(item.postId)),
   };
 }
+
+export const toRecentPlayer = (item: RecentPlayerItem): RecentPlayer => ({
+  id: item.id,
+  name: item.nickname,
+  level: item.level,
+  avatarUrl: item.avatarUrl,
+  manner: `${recentPlayersText.mannerPrefix}${formatTemperature(item.mannerTemp)}`,
+  game: item.lastParty.gameName,
+  accent: accentOf(item.lastParty.game),
+  lastParty: item.lastParty.title,
+  meta: [item.lastParty.playedAt ? toShortDate(item.lastParty.playedAt) : null, recentPlayersText.playCount(item.playCount)]
+    .filter(Boolean)
+    .join(' · '),
+});
+
+/** 초대할 수 있는 내 공고: 모집 중(OPEN)·일시 중단(PAUSED)이고 자리가 남은 공고 (POST /api/posts/{postId}/invitations 와 같은 조건) */
+export const isInvitablePost = (item: MyPostItem) => (item.status === 'OPEN' || item.status === 'PAUSED') && item.current < item.max;
+
+export const toInvitablePost = (item: MyPostItem): InvitablePost => ({
+  id: item.id,
+  title: item.title,
+  game: item.gameName,
+  accent: accentOf(item.game),
+  members: `(${item.current}/${item.max})`,
+});
 
 export const toFavoriteUser = (item: FavoriteItem): FavoriteUser => ({
   id: item.id,

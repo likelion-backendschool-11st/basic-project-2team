@@ -3,7 +3,7 @@
 const { ApiError } = require('../common/ApiError');
 const { POST_EVENT, NO_EVENTS } = require('../common/postEvents');
 const { levelProgress } = require('../common/activityPoint');
-const { KST_OFFSET_HOURS, TOP_TAG_LIMIT, RECENT_RATING_LIMIT, mypageMessages } = require('./mypageConstants');
+const { KST_OFFSET_HOURS, TOP_TAG_LIMIT, RECENT_RATING_LIMIT, RECENT_PLAYER_LIMIT, mypageMessages } = require('./mypageConstants');
 const { RATING_DELTA_TENTHS, applyRatings } = require('../review/mannerTemp');
 const { parsePageQuery, parseApplicationQuery, parseHistoryQuery } = require('./mypageValidator');
 
@@ -107,6 +107,23 @@ const toBlock = (row) => ({
   avatarUrl: row.avatarUrl ?? null,
   level: row.level,
   blockedAt: toIso(row.blockedAt),
+});
+
+/** 최근 함께한 플레이어 행 → API 아이템. lastParty 는 가장 최근에 함께 완료한 파티 */
+const toRecentPlayer = (row) => ({
+  id: row.id,
+  nickname: row.nickname,
+  avatarUrl: row.avatarUrl ?? null,
+  level: row.level,
+  mannerTemp: Number(row.mannerTemp),
+  playCount: Number(row.playCount),
+  lastParty: {
+    postId: row.lastPostId,
+    title: row.lastPostTitle,
+    game: row.lastGameCode,
+    gameName: row.lastGameName,
+    playedAt: toIso(row.lastPlayedAt),
+  },
 });
 
 /** 받은 태그 [{ code, label, count }] → 순위와 비율(태그를 고른 평가 수 / 전체 평가 수) */
@@ -318,6 +335,12 @@ function createMypageService({ mypageRepository, postEvents = NO_EVENTS, now = (
     return rows.map(toFavorite);
   }
 
+  /** GET /api/members/me/recent-players — 완료한 파티를 함께한 회원 (최근순, 최대 RECENT_PLAYER_LIMIT 명) */
+  async function listRecentPlayers(memberId) {
+    const rows = await mypageRepository.findRecentPlayers(memberId, RECENT_PLAYER_LIMIT);
+    return rows.map(toRecentPlayer);
+  }
+
   /** POST /api/members/me/favorites/{memberId} — 이미 즐겨찾기한 유저여도 성공으로 처리합니다. */
   async function addFavorite(memberId, targetMemberId) {
     if (memberId === targetMemberId) {
@@ -370,6 +393,7 @@ function createMypageService({ mypageRepository, postEvents = NO_EVENTS, now = (
     listMyComments,
     listMyScraps,
     listFavorites,
+    listRecentPlayers,
     addFavorite,
     removeFavorite,
     listBlocks,

@@ -15,6 +15,7 @@ function createMypageRouter(mypageController, { requireAuth, optionalAuth }) {
   router.get('/me/comments', requireAuth, mypageController.listMyComments);
   router.get('/me/scraps', requireAuth, mypageController.listMyScraps);
   router.get('/me/favorites', requireAuth, mypageController.listFavorites);
+  router.get('/me/recent-players', requireAuth, mypageController.listRecentPlayers);
   router.post('/me/favorites/:memberId', requireAuth, mypageController.addFavorite);
   router.delete('/me/favorites/:memberId', requireAuth, mypageController.removeFavorite);
   router.get('/me/blocks', requireAuth, mypageController.listBlocks);
