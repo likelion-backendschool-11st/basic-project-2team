@@ -103,6 +103,15 @@ export interface FavoriteUser {
   readonly manner: string;
 }
 
+export interface BlockedUser {
+  readonly id: number;
+  readonly name: string;
+  readonly level: number;
+  readonly avatarUrl: string | null;
+  /** 차단한 날짜 `MM-DD` */
+  readonly blockedDate: string;
+}
+
 export const accountMenu = {
   title: '계정 관리',
   ariaLabel: '사이드 메뉴',
@@ -275,5 +284,19 @@ export const favoritesText = {
   removed: (name: string) => `${name}님을 즐겨찾기에서 해제했습니다.`,
   removeFailed: '즐겨찾기 해제에 실패했습니다.',
   empty: '아직 즐겨찾기한 유저가 없습니다.',
+  avatarAltSuffix: ' 아바타',
+};
+
+export const blocksText = {
+  title: '차단한 유저 목록',
+  countSuffix: '명',
+  levelPrefix: 'Lv.',
+  note: '차단한 유저는 내 공고를 볼 수 없습니다.',
+  blockedDatePrefix: '차단일 ',
+  viewProfile: '프로필 보기',
+  remove: '차단 해제',
+  removed: (name: string) => `${name}님의 차단을 해제했습니다.`,
+  removeFailed: '차단 해제에 실패했습니다.',
+  empty: '차단한 유저가 없습니다.',
   avatarAltSuffix: ' 아바타',
 };

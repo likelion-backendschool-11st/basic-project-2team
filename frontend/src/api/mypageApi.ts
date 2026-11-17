@@ -1,6 +1,7 @@
 import {
   activityText,
   favoritesText,
+  type BlockedUser,
   gameAccents,
   profileText,
   type ActivityAction,
@@ -135,6 +136,15 @@ export interface FavoriteItem {
   readonly favoritedAt: string;
 }
 
+/** GET /api/members/me/blocks 아이템 */
+export interface BlockItem {
+  readonly id: number;
+  readonly nickname: string;
+  readonly avatarUrl: string | null;
+  readonly level: number;
+  readonly blockedAt: string;
+}
+
 /* ── 호출 ── */
 
 const pageQuery = (page: number, size: number) => `page=${page}&size=${size}`;
@@ -204,6 +214,8 @@ export const removeFavorite = (memberId: number) => request<void>('DELETE', `/ap
 export const addBlock = (memberId: number) => request<void>('POST', `/api/members/me/blocks/${memberId}`);
 
 export const removeBlock = (memberId: number) => request<void>('DELETE', `/api/members/me/blocks/${memberId}`);
+
+export const getMyBlocks = () => request<readonly BlockItem[]>('GET', '/api/members/me/blocks');
 
 /* ── 화면용 변환 ── */
 
@@ -317,4 +329,12 @@ export const toFavoriteUser = (item: FavoriteItem): FavoriteUser => ({
   detail: item.mainGame ? [item.mainGame.name, styleLabel(item.playStyle)].filter(Boolean).join(' · ') : favoritesText.noMainGame,
   avatarUrl: assetUrl(item.avatarUrl),
   manner: `${favoritesText.mannerPrefix}${formatTemperature(item.mannerTemp)}`,
+});
+
+export const toBlockedUser = (item: BlockItem): BlockedUser => ({
+  id: item.id,
+  name: item.nickname,
+  level: item.level,
+  avatarUrl: assetUrl(item.avatarUrl),
+  blockedDate: toShortDate(item.blockedAt),
 });
