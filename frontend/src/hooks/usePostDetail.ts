@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { getStoredUserJson, type LoginUser } from '../api/authApi';
 import { ApiRequestError, errorMessageOf, hasAccessToken } from '../api/http';
 import { promptLogin } from '../api/loginPrompt';
 import { notifyNotificationsChanged } from '../api/notificationApi';
@@ -18,18 +19,24 @@ import {
   removeScrap,
   reportPost,
 } from '../api/postApi';
-import { getPostDetail, toHostProfile, toPostDetail } from '../api/postDetailApi';
+import { getPostDetail, toHostProfile, toPostDetail, type PostDetailResponse } from '../api/postDetailApi';
 import { postDetailText, postText, type ApplicationStatus, type HostProfile, type Participant, type PostDetail, type PostStatus, type RelatedPost } from '../data/postData';
 import { paths, ROUTES } from '../data/routes';
 import { useModal } from './useModal';
 import { useToast } from './useToast';
 
-/**
- * 이 탭에서 처음 여는 공고인지 확인하며 표시해 둡니다. 새로고침·개발 모드의 effect 중복 실행으로
- * 조회수가 여러 번 오르지 않게 합니다(탭을 닫으면 초기화).
- */
-function markViewed(postId: string) {
-  const key = `viewed:${postId}`;
+/** 조회 기록을 나누는 조회자: 로그인했으면 회원 id, 아니면 guest */
+function currentViewer() {
+  try {
+    const json = getStoredUserJson();
+    return json ? String((JSON.parse(json) as LoginUser).id) : 'guest';
+  } catch {
+    return 'guest';
+  }
+}
+
+/** 이 탭에서 처음 보는 조회 기록 키인지 확인하며 표시해 둡니다(sessionStorage, 탭을 닫으면 초기화). */
+function markViewed(key: string) {
   try {
     if (sessionStorage.getItem(key)) return false;
     sessionStorage.setItem(key, '1');
@@ -37,6 +44,24 @@ function markViewed(postId: string) {
     // 저장소를 못 쓰면 매번 셉니다.
   }
   return true;
+}
+
+/** 조회수를 올리는 중인 요청 (키: 조회 기록 키) */
+const countingRequests = new Map<string, Promise<PostDetailResponse>>();
+
+/**
+ * 공고 상세를 처음 열 때 불러옵니다. 이 탭에서 지금 조회자(회원별, 비로그인은 guest)가 처음 여는 공고일 때만 조회수를 올려
+ * 새로고침·다시 방문으로는 오르지 않게 하고, 같은 탭에서 계정을 바꿔 열면 그 계정의 조회로 셉니다.
+ * 개발 모드(StrictMode)에서 effect 가 두 번 실행돼도 조회수를 올리는 요청은 하나만 보내고, 두 실행 모두 그 응답(오른 뒤의 조회수)을 씁니다.
+ */
+function openPostDetail(postId: string) {
+  const key = `viewed:${currentViewer()}:${postId}`;
+  const pending = countingRequests.get(key);
+  if (pending) return pending;
+  if (!markViewed(key)) return getPostDetail(postId, false);
+  const request = getPostDetail(postId, true).finally(() => countingRequests.delete(key));
+  countingRequests.set(key, request);
+  return request;
 }
 
 export type PartyState = 'open' | 'paused' | 'closed';
@@ -90,8 +115,8 @@ export function usePostDetail(postId: string) {
 
   useEffect(() => {
     let cancelled = false;
-    // 처음 열 때만 조회수를 올리고, 이후 다시 불러오기(자동 갱신 · 버튼 동작 뒤)는 올리지 않습니다.
-    getPostDetail(postId, version === 0 && markViewed(postId))
+    // 처음 열 때만 조회수를 올리고(openPostDetail), 이후 다시 불러오기(자동 갱신 · 버튼 동작 뒤)는 올리지 않습니다.
+    (version === 0 ? openPostDetail(postId) : getPostDetail(postId, false))
       .then((res) => {
         if (cancelled) return;
         const next = toPostDetail(res);
