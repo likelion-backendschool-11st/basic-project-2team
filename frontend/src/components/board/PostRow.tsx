@@ -4,6 +4,7 @@ import type { BoardPost } from '../../data/boardData';
 import { paths } from '../../data/routes';
 import { gameToneStyles, membersToneStyles, postBadgeStyles } from './postStyles';
 import HighlightedText from './HighlightedText';
+import ProfileLink from '../ui/ProfileLink';
 
 interface PostRowProps {
   readonly post: BoardPost;
@@ -35,7 +36,9 @@ export const PostRow: React.FC<PostRowProps> = ({ post, no, highlight }) => (
       </div>
     </td>
     <td className={cell}>
-      <span className="font-medium text-xs text-fog-sub">{post.author}</span>
+      <ProfileLink memberId={post.authorId} className="font-medium text-xs text-fog-sub">
+        {post.author}
+      </ProfileLink>
     </td>
     <td className={`${cell} text-xs text-fog-muted font-mono`}>{post.date}</td>
     <td className={`${cell} text-xs font-mono text-fog-muted`}>{post.views}</td>

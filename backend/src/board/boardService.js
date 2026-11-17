@@ -61,6 +61,8 @@ function toPostListItem(row, tags) {
     current: row.currentCount,
     max: row.headcount,
     tags,
+    // 탈퇴한 작성자는 프로필이 없으므로 id 도 감춥니다.
+    authorId: row.authorStatus === 'WITHDRAWN' ? null : row.authorId,
     author: row.authorStatus === 'WITHDRAWN' ? boardMessages.withdrawnHost : row.authorNickname,
     schedule: toIso(row.scheduleAt),
     scheduleTbd: row.scheduleAt === null || row.scheduleAt === undefined,

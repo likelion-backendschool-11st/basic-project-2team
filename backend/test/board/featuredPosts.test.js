@@ -19,6 +19,7 @@ const row = (id, overrides = {}) => ({
   viewCount: 10,
   commentCount: 2,
   createdAt: new Date('2026-11-12T11:30:00Z'),
+  authorId: 7,
   authorNickname: '빛나는오더',
   authorStatus: 'ACTIVE',
   ...overrides,
@@ -81,6 +82,7 @@ describe('GET /api/posts/popular · urgent (메인)', () => {
         current: 7,
         max: 8,
         tags: ['숙련'],
+        authorId: 7,
         author: '빛나는오더',
         schedule: '2026-11-15T12:00:00.000Z',
         scheduleTbd: false,
@@ -91,6 +93,7 @@ describe('GET /api/posts/popular · urgent (메인)', () => {
         createdAt: '2026-11-12T11:30:00.000Z',
       });
       assert.equal(data[0].author, '탈퇴한 회원');
+      assert.equal(data[0].authorId, null);
       assert.equal(data[0].scheduleTbd, true);
 
       const { limit, category, now } = repo.state.lastFilter;

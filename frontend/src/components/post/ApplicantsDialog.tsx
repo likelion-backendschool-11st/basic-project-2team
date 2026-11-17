@@ -2,6 +2,7 @@ import React from 'react';
 import Modal from '../ui/Modal';
 import type { Applicant } from '../../hooks/usePostDetail';
 import { Avatar } from '../ui/Avatar';
+import ProfileLink from '../ui/ProfileLink';
 import { postText as t } from '../../data/postData';
 
 interface ApplicantsDialogProps {
@@ -17,10 +18,12 @@ const chip = 'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px
 const ApplicantItem: React.FC<{ readonly applicant: Applicant; readonly onResolve: ApplicantsDialogProps['onResolve'] }> = ({ applicant: a, onResolve }) => (
   <li className="flex items-start justify-between gap-3 rounded-xl bg-night-base/60 p-3">
     <div className="flex items-start gap-3 min-w-0">
-      <Avatar url={a.avatarUrl} name={a.name} className="w-10 h-10 shrink-0 rounded-full bg-night-card flex items-center justify-center text-sm font-bold text-white" />
+      <ProfileLink memberId={a.memberId} ariaLabel={`${a.name} ${t.viewProfile}`} className="shrink-0 rounded-full hover:ring-2 hover:ring-mercury/50">
+        <Avatar url={a.avatarUrl} name={a.name} className="w-10 h-10 rounded-full bg-night-card flex items-center justify-center text-sm font-bold text-white" />
+      </ProfileLink>
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-sm font-semibold text-white truncate">{a.name}</span>
+          <ProfileLink memberId={a.memberId} className="text-sm font-semibold text-white truncate">{a.name}</ProfileLink>
           <span className={`${chip} border border-emeraldAccent/30 bg-emeraldAccent/15 text-emerald-300`}>
             <i className="fa-solid fa-temperature-half text-[9px]" />
             {t.applicantMannerTemp(a.mannerTemp)}

@@ -46,6 +46,7 @@ export function toPopularPost(item: PostListItem, now = new Date()): PopularPost
     voice: item.voiceRequired
       ? { label: homeText.voiceRequired, icon: 'fa-brands fa-discord', highlight: true }
       : { label: homeText.voiceOptional, icon: 'fa-solid fa-microphone-slash', highlight: false },
+    authorId: item.authorId,
     author: item.author,
     members: `${item.current}/${item.max}`,
   };

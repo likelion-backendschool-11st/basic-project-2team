@@ -19,6 +19,7 @@ const row = (id) => ({
   viewCount: 1,
   commentCount: 0,
   createdAt: new Date('2026-11-12T11:30:00Z'),
+  authorId: 7,
   authorNickname: '빛나는오더',
   authorStatus: 'ACTIVE',
 });

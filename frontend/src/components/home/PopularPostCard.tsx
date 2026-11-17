@@ -2,6 +2,7 @@ import React from 'react';
 import type { PopularPost } from '../../data/homeData';
 import { homeText } from '../../data/homeData';
 import { tagStyles } from '../../data/accentStyles';
+import ProfileLink from '../ui/ProfileLink';
 
 interface PopularPostCardProps {
   readonly post: PopularPost;
@@ -34,7 +35,7 @@ export const PopularPostCard: React.FC<PopularPostCardProps> = ({ post, onSelect
         </span>
         <span className="text-fog-muted text-[11px]">
           {homeText.authorPrefix}
-          {post.author}
+          <ProfileLink memberId={post.authorId}>{post.author}</ProfileLink>
         </span>
       </div>
       <div className="flex items-center font-bold text-mercury-light">
