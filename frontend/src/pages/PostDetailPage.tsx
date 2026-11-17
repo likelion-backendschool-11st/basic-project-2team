@@ -28,6 +28,7 @@ import { paths, ROUTES } from '../data/routes';
 import { useAuth } from '../hooks/useAuth';
 import { useComments } from '../hooks/useComments';
 import { useNoShowReport } from '../hooks/useNoShowReport';
+import { useParticipantsWatch } from '../hooks/useParticipantsWatch';
 import { usePoll } from '../hooks/usePoll';
 import { usePostDetail } from '../hooks/usePostDetail';
 import { usePostEvents } from '../hooks/usePostEvents';
@@ -60,11 +61,12 @@ const PostDetailView: React.FC<{ readonly postId: string }> = ({ postId }) => {
   const noShowReport = useNoShowReport(Number(postId), post.toast.show);
   // 다른 사람의 신청·승인·댓글·투표 등을 새로고침 없이 반영합니다. 댓글 신호는 공고의 댓글 수도 바뀌므로 상세도 함께 불러옵니다.
   // 파티원이 바뀌면(승인·탈퇴) 투표 자격도 바뀌고, 「댓글 작성자만」 투표는 댓글에 따라 자격이 바뀌므로 투표도 다시 불러옵니다.
+  const refreshPost = () => {
+    post.refresh();
+    poll.refresh();
+  };
   usePostEvents(postId, {
-    onPost: () => {
-      post.refresh();
-      poll.refresh();
-    },
+    onPost: refreshPost,
     onComments: () => {
       thread.refresh();
       partyThread.refresh();
@@ -73,6 +75,8 @@ const PostDetailView: React.FC<{ readonly postId: string }> = ({ postId }) => {
     },
     onPoll: poll.refresh,
   });
+  // 실시간 신호가 닿지 않는 환경(서버리스 배포 등)에서도 공대장·파티원 화면의 참가자 명단이 초대 수락·탈퇴·추방을 따라가게 합니다.
+  useParticipantsWatch(postId, post.participants, { enabled: isPartyMember, onChange: refreshPost });
   const { detail } = post;
   const leaveText = post.accepted ? postText.leave : postText.cancelApplication;
   const scrollToComments = () => document.getElementById(COMMENTS_ANCHOR_ID)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
