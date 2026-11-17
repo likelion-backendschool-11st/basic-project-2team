@@ -1,15 +1,15 @@
 import { useState } from 'react';
 import { ApiRequestError, errorMessageOf } from '../api/http';
 import { getMyPosts, isInvitablePost, toInvitablePost } from '../api/mypageApi';
-import { invitePlayer } from '../api/postApi';
+import { inviteToParty } from '../api/postApi';
 import { inviteText, type InvitablePost, type InviteTarget } from '../data/myPageData';
 
 /** 초대할 공고를 고를 때 불러오는 내 공고 수 (API 최대 size) */
 const MY_POST_FETCH_SIZE = 50;
 
 /**
- * 「파티 초대」 모달 (마이페이지 최근 함께한 플레이어 · 공고 상세 댓글 작성자): 대상 플레이어를 정하면 모집 중인 내 공고를 불러오고,
- * 공고를 고르면 POST /api/posts/{postId}/invitations 로 초대합니다(상대는 알림함에서 참여·거절). 결과 안내는 notify 로 넘깁니다.
+ * 「파티 초대」 모달 (마이페이지 최근 함께한 플레이어): 대상 플레이어를 정하면 모집 중인 내 공고를 불러오고,
+ * 공고를 고르면 POST /api/posts/{postId}/invitations 로 초대합니다(상대는 알림함에서 수락하면 바로 파티원). 결과 안내는 notify 로 넘깁니다.
  */
 export function usePartyInvite(notify: (message: string) => void) {
   const [target, setTarget] = useState<InviteTarget | null>(null);
@@ -43,7 +43,7 @@ export function usePartyInvite(notify: (message: string) => void) {
     setSendingPostId(postId);
     const markInvited = () => setInvited((prev) => new Set(prev).add(`${target.id}:${postId}`));
     try {
-      await invitePlayer(postId, target.id);
+      await inviteToParty(String(postId), target.id);
       markInvited();
       notify(inviteText.done(target.name));
     } catch (err) {

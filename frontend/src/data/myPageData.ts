@@ -119,7 +119,7 @@ export interface RecentPlayer {
   readonly meta: string;
 }
 
-/** 파티 초대 모달의 초대 대상 (최근 함께한 플레이어 · 댓글 작성자) */
+/** 파티 초대 모달의 초대 대상 (최근 함께한 플레이어) */
 export interface InviteTarget {
   readonly id: number;
   readonly name: string;
@@ -193,6 +193,16 @@ export const memberProfileText = {
   favorited: '즐겨찾는 중',
   favoriteAdded: '즐겨찾는 유저에 추가했습니다.',
   favoriteRemoved: '즐겨찾기를 해제했습니다.',
+  block: '차단',
+  blocked: '차단 해제',
+  blockDialog: {
+    title: '이 회원을 차단할까요?',
+    description: '차단한 회원은 내 공고를 목록·검색·상세에서 볼 수 없습니다. 프로필에서 언제든 해제할 수 있어요.',
+    confirm: '차단',
+    cancel: '취소',
+  },
+  blockAdded: '차단했습니다. 이 회원은 이제 내 공고를 볼 수 없습니다.',
+  blockRemoved: '차단을 해제했습니다.',
   actionFailed: '요청을 처리하지 못했습니다.',
   notFound: '존재하지 않거나 탈퇴한 회원입니다.',
   viewProfile: '프로필 보기',
@@ -218,7 +228,7 @@ export const recentPlayersText = {
 
 export const inviteText = {
   title: (name: string) => `${name}님을 파티에 초대`,
-  description: '초대할 내 공고를 골라주세요. 상대가 알림에서 참여를 누르면 승인 없이 바로 파티에 합류합니다.',
+  description: '초대할 내 공고를 골라주세요. 상대가 알림에서 초대를 수락하면 승인 없이 바로 파티에 합류합니다.',
   ariaLabel: '파티 초대',
   loading: '내 공고를 불러오는 중…',
   loadFailed: '내 공고를 불러오지 못했습니다.',

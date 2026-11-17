@@ -88,7 +88,7 @@ export const commentText = {
   reportedToast: '신고가 접수되었습니다. 운영팀이 검토 후 조치합니다.',
   deleteDialog: { title: '댓글 삭제', description: '작성하신 댓글을 삭제하시겠습니까? 삭제된 댓글은 복구할 수 없으며, 답글이 있는 경우에도 작성자 정보와 내용이 영구 삭제 처리됩니다.', confirm: '삭제하기', cancel: '취소' },
   reportDialog: { title: '댓글 신고', description: '신고 사유를 선택해 주세요. 허위 신고는 제재될 수 있습니다.', detailLabel: '상세 내용 (선택)', detailPlaceholder: '신고 사유를 자세히 적어 주시면 검토에 도움이 됩니다.', detailMax: 500, confirm: '신고 접수하기', cancel: '취소' },
-  popover: { title: '유저 프로필 카드', badge: '상세 정보', loading: '프로필을 불러오는 중...', loadFailed: '프로필을 불러오지 못했습니다.', invite: '파티 초대하기' },
+  popover: { title: '유저 프로필 카드', badge: '상세 정보', loading: '프로필을 불러오는 중...', loadFailed: '프로필을 불러오지 못했습니다.', invite: '파티 초대하기', inviting: '초대 보내는 중...', invited: '파티 초대를 보냈습니다.', inviteFailed: '파티 초대를 보내지 못했습니다.' },
 };
 
 /** 참가자 전용 댓글 탭 — Stitch 「참가자 전용 댓글(공대원 시크릿 채널)」 */

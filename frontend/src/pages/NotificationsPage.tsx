@@ -92,9 +92,9 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = () => {
                   notification={item}
                   onOpen={n.open}
                   onMarkRead={n.markRead}
+                  onAcceptInvite={(target) => void n.acceptInvite(target)}
+                  accepting={n.accepting === item.id}
                   onDelete={n.remove}
-                  onRespond={n.respond}
-                  responding={n.respondingId === item.id}
                 />
               ))}
             </ul>

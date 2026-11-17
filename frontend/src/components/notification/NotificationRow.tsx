@@ -6,21 +6,21 @@ interface NotificationRowProps {
   /** 알림 본문을 누름: 읽음 처리 + 연결된 공고로 이동 */
   readonly onOpen: (notification: NotificationView) => void;
   readonly onMarkRead: (notification: NotificationView) => void;
+  /** 파티 초대 알림의 「파티 참여 수락」: 파티원이 된 뒤 공고로 이동 */
+  readonly onAcceptInvite: (notification: NotificationView) => void;
+  /** 이 알림의 수락 요청이 진행 중 */
+  readonly accepting: boolean;
   readonly onDelete: (notification: NotificationView) => void;
-  /** 파티 초대 알림의 참여·거절 */
-  readonly onRespond: (notification: NotificationView, status: 'ACCEPTED' | 'DECLINED') => void;
-  /** 이 알림의 초대 응답을 보내는 중 */
-  readonly responding: boolean;
 }
 
 const actionBtn =
   'px-2.5 py-1 rounded-md text-xs font-medium border border-night-border text-fog-sub hover:text-white hover:border-night-borderLight transition-colors';
 
 /**
- * 알림 한 줄: 유형 아이콘 · 메시지 · 시각 + 「읽음으로 표시」·「삭제」 버튼 (응답 전 파티 초대면 「참여」·「거절」).
+ * 알림 한 줄: 유형 아이콘 · 메시지 · 시각 + 「읽음으로 표시」·「삭제」 버튼.
  * 안 읽은 알림은 강조하고, 본문을 누르면 읽음 처리·공고 이동을 합니다(읽었고 연결 공고도 없으면 본문은 누를 수 없음).
  */
-export const NotificationRow: React.FC<NotificationRowProps> = ({ notification: n, onOpen, onMarkRead, onDelete, onRespond, responding }) => {
+export const NotificationRow: React.FC<NotificationRowProps> = ({ notification: n, onOpen, onMarkRead, onAcceptInvite, accepting, onDelete }) => {
   const actionable = !n.read || n.postId !== null;
   const body = (
     <>
@@ -43,7 +43,21 @@ export const NotificationRow: React.FC<NotificationRowProps> = ({ notification: 
       </div>
     </>
   );
-  const pendingInvite = n.invitation === 'PENDING' && n.postId !== null;
+  const invite = n.invite && (
+    <button
+      type="button"
+      onClick={() => onAcceptInvite(n)}
+      disabled={accepting}
+      className={
+        n.invite.joined
+          ? 'inline-flex items-center gap-1.5 rounded-lg border border-emeraldAccent/40 bg-emeraldAccent/10 px-3 py-1.5 text-xs font-semibold text-emerald-300 hover:bg-emeraldAccent/20'
+          : 'inline-flex items-center gap-1.5 rounded-lg bg-mercury px-3 py-1.5 text-xs font-bold text-white shadow-md hover:bg-mercury-light disabled:opacity-60 enabled:active:scale-95'
+      }
+    >
+      <i className={n.invite.joined ? 'fa-solid fa-door-open' : 'fa-solid fa-user-check'} aria-hidden="true" />
+      {n.invite.joined ? notificationText.inviteJoined : accepting ? notificationText.inviteAccepting : notificationText.inviteAccept}
+    </button>
+  );
   const bodyCls = 'flex-1 min-w-0 flex items-start gap-4 text-left';
 
   return (
@@ -56,29 +70,8 @@ export const NotificationRow: React.FC<NotificationRowProps> = ({ notification: 
         <div className={bodyCls}>{body}</div>
       )}
       <div className="shrink-0 flex flex-col sm:flex-row gap-1.5 self-center">
-        {pendingInvite && (
-          <>
-            <button
-              type="button"
-              disabled={responding}
-              onClick={() => onRespond(n, 'ACCEPTED')}
-              className="px-3 py-1 rounded-md text-xs font-bold bg-mercury text-white hover:bg-mercury-light disabled:opacity-60 transition-colors"
-            >
-              {responding ? notificationText.inviteResponding : notificationText.inviteAccept}
-            </button>
-            <button type="button" disabled={responding} onClick={() => onRespond(n, 'DECLINED')} className={`${actionBtn} hover:text-rose-300 disabled:opacity-60`}>
-              {notificationText.inviteDecline}
-            </button>
-          </>
-        )}
-        {(n.invitation === 'ACCEPTED' || n.invitation === 'DECLINED') && (
-          <span
-            className={`px-2.5 py-1 rounded-md text-xs font-semibold text-center ${n.invitation === 'ACCEPTED' ? 'bg-emerald-500/15 text-emerald-300' : 'bg-night-card text-fog-muted'}`}
-          >
-            {n.invitation === 'ACCEPTED' ? notificationText.inviteAccepted : notificationText.inviteDeclined}
-          </span>
-        )}
-        {!n.read && !pendingInvite && (
+        {invite}
+        {!n.read && !n.invite && (
           <button type="button" onClick={() => onMarkRead(n)} className={actionBtn}>
             {notificationText.markRead}
           </button>

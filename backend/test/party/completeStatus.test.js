@@ -36,6 +36,7 @@ function createFakePool({ status = 'OPEN', accepted = [MEMBER], scheduleAt = nul
       if (text.startsWith('UPDATE post SET status')) return [{ affectedRows: 1 }];
       if (text.startsWith('SELECT id FROM member WHERE id IN')) return [[]];
       if (text.startsWith('INSERT INTO notification')) return [{ affectedRows: 0 }];
+      if (text.startsWith('DELETE FROM notification WHERE post_id = ? AND type = ?')) return [{ affectedRows: 0 }];
       if (text.startsWith('INSERT INTO activity_point_log')) {
         if (failOnAward) throw new Error('boom');
         return [{}];
@@ -63,6 +64,8 @@ describe('partyRepository.changePostStatus — 활동 완료 트랜잭션', () =
     assert.deepEqual(fake.members.get(AUTHOR), { activityPoint: 50, level: 2 });
     assert.deepEqual(fake.members.get(MEMBER), { activityPoint: 20, level: 1 });
     assert.deepEqual([fake.log.commit, fake.log.rollback, fake.log.release], [1, 0, 1]);
+    // 끝난 파티로는 들어올 수 없으니 남은 파티 초대 알림을 지운다
+    assert.ok(fake.log.queries.some(([text, params]) => text.startsWith('DELETE FROM notification') && params[1] === 'PARTY_INVITE'));
   });
 
   it('승인된 파티원(탈퇴 제외)이 없으면 NO_MEMBERS 이고 아무것도 바꾸지 않는다', async () => {

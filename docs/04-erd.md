@@ -67,6 +67,8 @@ erDiagram
     review_tag ||--o{ review_tag_map : ""
     member ||--o{ favorite_member : "즐겨찾기함"
     member ||--o{ favorite_member : "즐겨찾기됨"
+    member ||--o{ member_block : "차단함"
+    member ||--o{ member_block : "차단됨"
 
     member ||--o{ notification : ""
     post |o--o{ notification : ""
@@ -203,8 +205,6 @@ erDiagram
     post ||--o{ post_scrap : "스크랩됨"
     post ||--o{ post_application : "신청 받음"
     member ||--o{ post_application : "신청"
-    post ||--o{ party_invitation : "초대"
-    member ||--o{ party_invitation : "초대함 / 초대받음"
 
     category {
         varchar(20) code PK "mmorpg, fps ..."
@@ -289,15 +289,6 @@ erDiagram
         datetime canceled_at
     }
 
-    party_invitation {
-        bigint id PK
-        bigint post_id FK "UQ(post_id, invitee_id)"
-        bigint inviter_id FK "초대한 파티장"
-        bigint invitee_id FK
-        varchar(20) status "PENDING / ACCEPTED / DECLINED"
-        datetime responded_at
-    }
-
     member {
         bigint id PK "2.1 참고"
     }
@@ -321,6 +312,8 @@ erDiagram
     review_tag ||--o{ review_tag_map : ""
     member ||--o{ favorite_member : "즐겨찾기함 (member_id)"
     member ||--o{ favorite_member : "즐겨찾기됨 (target_member_id)"
+    member ||--o{ member_block : "차단함 (member_id)"
+    member ||--o{ member_block : "차단됨 (target_member_id)"
 
     comment {
         bigint id PK
@@ -361,6 +354,12 @@ erDiagram
     favorite_member {
         bigint member_id PK, FK
         bigint target_member_id PK, FK "자기 자신 불가 (애플리케이션 검증)"
+    }
+
+    member_block {
+        bigint member_id PK, FK "차단한 회원"
+        bigint target_member_id PK, FK "차단당한 회원 (자기 자신 불가)"
+        datetime created_at
     }
 
     post {
@@ -437,7 +436,7 @@ erDiagram
     notification {
         bigint id PK
         bigint member_id FK
-        varchar(30) type "APPLICATION_RECEIVED / APPLICATION_RESULT / APPLICATION_CANCELED / POST_UPDATED / INTEREST_POST / POST_DELETED / SANCTION / POLL_CONFIRMED / POLL_REMINDER / PARTY_INVITE / INVITE_RESULT"
+        varchar(30) type "APPLICATION_RECEIVED / APPLICATION_RESULT / APPLICATION_CANCELED / POST_UPDATED / INTEREST_POST / POST_DELETED / SANCTION / NO_SHOW / POLL_CONFIRMED / POLL_REMINDER / PARTY_INVITE / INVITE_ACCEPTED"
         varchar(200) message
         bigint post_id FK "NULL 허용"
         boolean is_read
@@ -570,9 +569,6 @@ erDiagram
 | post_scrap.post_id | post | 1:N | CASCADE |
 | post_application.post_id | post | 1:N | RESTRICT |
 | post_application.applicant_id | member | 1:N | RESTRICT |
-| party_invitation.post_id | post | 1:N | RESTRICT |
-| party_invitation.inviter_id | member | 1:N | RESTRICT |
-| party_invitation.invitee_id | member | 1:N | RESTRICT |
 | comment.post_id | post | 1:N | RESTRICT |
 | comment.author_id | member | 1:N | RESTRICT |
 | comment.parent_id | comment | 0..1:N | RESTRICT |
@@ -590,6 +586,8 @@ erDiagram
 | review_tag_map.review_tag_id | review_tag | 1:N | RESTRICT |
 | favorite_member.member_id | member | 1:N | CASCADE |
 | favorite_member.target_member_id | member | 1:N | CASCADE |
+| member_block.member_id | member | 1:N | CASCADE |
+| member_block.target_member_id | member | 1:N | CASCADE |
 | notification.member_id | member | 1:N | CASCADE |
 | notification.post_id | post | 0..1:N | SET NULL |
 | notification_subscription.member_id | member | 1:N | CASCADE |

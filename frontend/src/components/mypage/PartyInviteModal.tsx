@@ -17,7 +17,7 @@ interface PartyInviteModalProps {
   readonly onClose: () => void;
 }
 
-/** 최근 함께한 플레이어 · 댓글 작성자를 모집 중인 내 공고에 초대하는 모달 */
+/** 최근 함께한 플레이어를 모집 중인 내 공고에 초대하는 모달 */
 export const PartyInviteModal: React.FC<PartyInviteModalProps> = ({ target, posts, loading, error, sendingPostId, isInvited, onInvite, onClose }) => {
   const t = inviteText;
   let body: React.ReactNode;

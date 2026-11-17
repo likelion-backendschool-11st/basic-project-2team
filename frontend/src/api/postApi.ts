@@ -54,12 +54,22 @@ export const reportNoShow = (postId: number, memberId: number, reason: string, d
 
 /** 참가 신청 · 취소 (docs/API_SPEC.md 4절). role · message 는 선택이라 원클릭 신청은 빈 본문으로 보냅니다. */
 export const applyToPost = (postId: string) => request<{ readonly id: number; readonly status: string }>('POST', postUrl(postId, '/applications'), {});
-/** POST /api/posts/{postId}/invitations — 작성자가 모집 중인 공고에 회원을 초대 (상대에게 알림) */
-export const invitePlayer = (postId: number, memberId: number) => request<void>('POST', postUrl(String(postId), '/invitations'), { memberId });
-/** PATCH /api/posts/{postId}/invitations/me — 받은 초대에 응답. 수락하면 바로 파티원이 됩니다. */
-export const respondInvitation = (postId: number, status: 'ACCEPTED' | 'DECLINED') =>
-  request<{ readonly postId: number; readonly status: string; readonly current: number; readonly max: number }>('PATCH', postUrl(String(postId), '/invitations/me'), { status });
 export const cancelApplication = (postId: string) => request<void>('DELETE', postUrl(postId, '/applications/me'));
+
+/** 파티 초대 (docs/API_SPEC.md 4절). 공대장이 보내면 받은 회원의 알림함에 PARTY_INVITE 알림이 갑니다. */
+export const inviteToParty = (postId: string, memberId: number) =>
+  request<{ readonly postId: number; readonly memberId: number }>('POST', postUrl(postId, '/invitations'), { memberId });
+
+/** 받은 초대 수락 → 바로 파티원(ACCEPTED). 이미 파티원이어도 200 (alreadyMember: true) */
+export interface AcceptInvitationResponse {
+  readonly postId: number;
+  readonly status: 'ACCEPTED';
+  readonly current: number;
+  readonly max: number;
+  readonly postStatus: string;
+  readonly alreadyMember: boolean;
+}
+export const acceptPartyInvite = (postId: string) => request<AcceptInvitationResponse>('POST', postUrl(postId, '/invitations/accept'));
 
 /** GET /api/posts/{postId}/applications 아이템 */
 export interface ApplicationResponse {

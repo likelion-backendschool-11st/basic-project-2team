@@ -31,6 +31,7 @@ const mypageMessages = Object.freeze({
   unauthorized: '로그인이 필요합니다.',
   memberNotFound: '존재하지 않는 회원입니다.',
   cannotFavoriteSelf: '자기 자신은 즐겨찾기할 수 없습니다.',
+  cannotBlockSelf: '자기 자신은 차단할 수 없습니다.',
   withdrawnMember: '탈퇴한 회원',
 });
 

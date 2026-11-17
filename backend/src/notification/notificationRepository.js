@@ -1,20 +1,20 @@
 'use strict';
 
 /**
- * 알림함 테이블 접근: notification · party_invitation(초대 상태만 읽음) (내 알림만 다룹니다. 모든 쿼리에 member_id 조건이 있습니다)
+ * 알림함 테이블 접근: notification (내 알림만 다룹니다. 모든 쿼리에 member_id 조건이 있습니다)
  * @param {import('mysql2/promise').Pool} pool
  */
 function createNotificationRepository(pool) {
   /** 내 알림 한 페이지(최신순)와 조건에 맞는 전체 건수 */
   async function findPage({ memberId, unreadOnly, limit, offset }) {
-    const where = `n.member_id = ?${unreadOnly ? ' AND n.is_read = FALSE' : ''}`;
-    const [[{ totalCount }]] = await pool.query(`SELECT COUNT(*) AS totalCount FROM notification n WHERE ${where}`, [memberId]);
-    // 파티 초대 알림(PARTY_INVITE)이면 그 초대의 지금 상태를 붙입니다 (알림함에서 수락·거절 버튼을 보여줄지).
+    const where = `member_id = ?${unreadOnly ? ' AND is_read = FALSE' : ''}`;
+    const [[{ totalCount }]] = await pool.query(`SELECT COUNT(*) AS totalCount FROM notification WHERE ${where}`, [memberId]);
+    // 파티 초대 알림에는 받은 사람의 그 공고 신청 상태를 붙입니다(ACCEPTED 면 이미 수락한 초대).
     const [rows] = await pool.query(
-      `SELECT n.id, n.type, n.message, n.post_id AS postId, n.is_read AS isRead, n.created_at AS createdAt, pi.status AS invitationStatus
+      `SELECT n.id, n.type, n.message, n.post_id AS postId, n.is_read AS isRead, n.created_at AS createdAt, pa.status AS applicationStatus
          FROM notification n
-         LEFT JOIN party_invitation pi ON n.type = 'PARTY_INVITE' AND pi.post_id = n.post_id AND pi.invitee_id = n.member_id
-        WHERE ${where} ORDER BY n.created_at DESC, n.id DESC LIMIT ? OFFSET ?`,
+         LEFT JOIN post_application pa ON n.type = 'PARTY_INVITE' AND pa.post_id = n.post_id AND pa.applicant_id = n.member_id
+        WHERE n.member_id = ?${unreadOnly ? ' AND n.is_read = FALSE' : ''} ORDER BY n.created_at DESC, n.id DESC LIMIT ? OFFSET ?`,
       [memberId, limit, offset],
     );
     return { rows, totalCount };

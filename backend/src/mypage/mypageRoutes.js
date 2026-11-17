@@ -18,7 +18,10 @@ function createMypageRouter(mypageController, { requireAuth, optionalAuth }) {
   router.get('/me/recent-players', requireAuth, mypageController.listRecentPlayers);
   router.post('/me/favorites/:memberId', requireAuth, mypageController.addFavorite);
   router.delete('/me/favorites/:memberId', requireAuth, mypageController.removeFavorite);
-  router.get('/:memberId/posts', mypageController.listMemberPosts);
+  router.get('/me/blocks', requireAuth, mypageController.listBlocks);
+  router.post('/me/blocks/:memberId', requireAuth, mypageController.addBlock);
+  router.delete('/me/blocks/:memberId', requireAuth, mypageController.removeBlock);
+  router.get('/:memberId/posts', optionalAuth, mypageController.listMemberPosts);
   router.get('/:memberId/manner-history', mypageController.getMannerHistory);
   router.get('/:memberId', optionalAuth, mypageController.getMemberProfile);
   return router;

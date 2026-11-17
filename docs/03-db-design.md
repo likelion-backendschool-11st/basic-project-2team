@@ -25,11 +25,12 @@ OurParty 서비스의 테이블 설계안입니다. [요구사항 명세](./02-r
 | 인증 | `password_reset_token`, `refresh_token` | 비밀번호 재설정, 토큰 |
 | 마스터 | `category`, `game`, `game_content`, `tag`, `review_tag` | 장르, 게임, 레이드·던전, 공고 태그, 평가 태그 |
 | 공고 | `post`, `post_tag`, `post_draft`, `post_scrap` | 공고, 공고-태그 연결, 임시저장, 공고 즐겨찾기(스크랩) |
-| 파티 | `post_application`, `party_invitation` | 신청·승인·취소. 승인된 신청이 곧 파티원입니다. 파티장이 보낸 초대와 응답 |
+| 파티 | `post_application` | 신청·승인·취소. 승인된 신청이 곧 파티원입니다. |
 | 댓글 | `comment` | 댓글과 대댓글(1단계) |
 | 투표 | `poll`, `poll_option`, `poll_vote` | 공대장이 댓글 영역에 올리는 파티 의견 조율 투표, 항목, 투표 기록 |
 | 평가 | `review`, `review_tag_map` | 별점, 한 줄 평, 태그 |
 | 즐겨찾기 | `favorite_member` | 사용자 즐겨찾기 |
+| 차단 | `member_block` | 사용자 차단. 차단당한 회원은 차단한 회원의 공고를 볼 수 없음 |
 | 알림 | `notification`, `notification_subscription` | 알림함, 관심 알림 설정 |
 | 신고·관리 | `report`, `sanction`, `admin_account`, `admin_action_log` | 신고, 제재, 관리자 계정, 처리·접근 이력 |
 
@@ -179,19 +180,6 @@ API의 `level`은 **서비스 활동 레벨**(`member.level`)입니다. 공고 �
 
 `CANCELED` 상태인 사람이 다시 신청하면 같은 행의 상태를 `PENDING`으로 되돌립니다. `REJECTED`·`NO_SHOW` 상태에서는 같은 공고에 다시 신청할 수 없습니다.
 
-### 2.9.1 `party_invitation` — 파티 초대
-
-| 컬럼 | 타입 | 제약 | 비고 |
-| --- | --- | --- | --- |
-| id | BIGINT UNSIGNED | PK | |
-| post_id | BIGINT UNSIGNED | FK → post, UNIQUE(post_id, invitee_id) | 공고·회원당 1행 |
-| inviter_id | BIGINT UNSIGNED | FK → member | 초대한 파티장(공고 작성자) |
-| invitee_id | BIGINT UNSIGNED | FK → member, INDEX(invitee_id, status) | 초대받은 회원 |
-| status | VARCHAR(20) | 기본 `PENDING` | PENDING / ACCEPTED / DECLINED |
-| responded_at | DATETIME | NULL 가능 | 수락·거절한 시각 |
-
-초대받은 회원은 알림함(`PARTY_INVITE` 알림)에서 수락·거절합니다. 수락하면 파티장 승인 없이 같은 트랜잭션에서 `post_application` 을 `ACCEPTED` 로 만들고(신청 기록이 없으면 새 행, `PENDING`·`CANCELED` 행이 있으면 그 행) 공고 인원을 늘립니다. 수락·거절로 끝난 초대는 다시 초대하면 같은 행을 `PENDING` 으로 되돌립니다.
-
 ### 2.10 `comment`
 
 | 컬럼 | 타입 | 제약 | 비고 |
@@ -264,6 +252,7 @@ API의 `level`은 **서비스 활동 레벨**(`member.level`)입니다. 공고 �
 | `review` | id, post_id FK, reviewer_id FK, target_id FK, rating TINYINT, comment VARCHAR(500), created_at | UNIQUE(post_id, reviewer_id, target_id). CHECK rating 1~5, CHECK reviewer ≠ target | MySQL은 8.0.16부터 CHECK 제약을 실제로 검사합니다 |
 | `review_tag_map` | review_id, review_tag_id | PK(review_id, review_tag_id) | |
 | `favorite_member` | member_id, target_member_id, created_at | PK(member_id, target_member_id) | FAV-002. 자기 자신 즐겨찾기 금지는 애플리케이션에서 검증 (MySQL은 CASCADE FK 컬럼에 CHECK를 걸 수 없음) |
+| `member_block` | member_id(차단한 회원), target_member_id(차단당한 회원), created_at | PK(member_id, target_member_id) | 차단당한 회원에게는 차단한 회원의 공고가 목록·검색·메인·관련 공고·프로필에서 빠지고 상세는 404. 새 공고 알림도 보내지 않음. 자기 자신 차단 금지는 애플리케이션에서 검증 |
 
 ### 2.12 알림
 
@@ -271,7 +260,7 @@ API의 `level`은 **서비스 활동 레벨**(`member.level`)입니다. 공고 �
 
 | 테이블 | 컬럼 | 비고 |
 | --- | --- | --- |
-| `notification` | id, member_id FK, type VARCHAR(30), message VARCHAR(200), post_id FK NULL, is_read BOOLEAN, created_at | type 예: APPLICATION_RECEIVED, APPLICATION_RESULT, APPLICATION_CANCELED, POST_UPDATED, INTEREST_POST, POST_DELETED, SANCTION, NO_SHOW, POLL_CONFIRMED, POLL_REMINDER, PARTY_INVITE, INVITE_RESULT |
+| `notification` | id, member_id FK, type VARCHAR(30), message VARCHAR(200), post_id FK NULL, is_read BOOLEAN, created_at | type 예: APPLICATION_RECEIVED, APPLICATION_RESULT, APPLICATION_CANCELED, POST_UPDATED, INTEREST_POST, POST_DELETED, SANCTION, NO_SHOW, POLL_CONFIRMED, POLL_REMINDER, PARTY_INVITE(파티 초대 — 이 행이 초대장 역할, 지우면 초대도 사라지고 수락하거나 공고가 삭제·완료되면 삭제됨), INVITE_ACCEPTED |
 | `notification_subscription` | id, member_id FK, game_id FK, game_content_id FK NULL, enabled BOOLEAN | NOTI-001 관심 게임·레이드 |
 
 ### 2.13 신고 · 관리
@@ -287,11 +276,11 @@ API의 `level`은 **서비스 활동 레벨**(`member.level`)입니다. 공고 �
 
 | 부모 | 자식 | 관계 | 부모 삭제 시 (FK 동작) | 이유 |
 | --- | --- | --- | --- | --- |
-| member | post, comment, post_application, party_invitation, review, report, sanction | 1:N | RESTRICT | 회원은 소프트 삭제라 실제 행이 지워지지 않습니다. 기록을 보존해야 합니다. |
+| member | post, comment, post_application, review, report, sanction | 1:N | RESTRICT | 회원은 소프트 삭제라 실제 행이 지워지지 않습니다. 기록을 보존해야 합니다. |
 | member | member_agreement, member_game_profile, post_draft, refresh_token, password_reset_token, notification, notification_subscription, activity_point_log | 1:N | CASCADE | 회원에게만 딸린 데이터 |
-| member | favorite_member, post_scrap | N:M | CASCADE | |
+| member | favorite_member, member_block, post_scrap | N:M | CASCADE | |
 | category, game, game_content, tag, review_tag | 이 마스터 테이블을 참조하는 모든 FK (game, game_content, post, member_game_profile, post_tag, review_tag_map, notification_subscription) | 1:N | RESTRICT | 마스터 데이터. 사용 중인 행은 지우지 않고 `is_active=false`로 숨김 |
-| post | post_application, party_invitation, comment, review, report, poll | 1:N | RESTRICT | 공고는 소프트 삭제라 함께 보존 |
+| post | post_application, comment, review, report, poll | 1:N | RESTRICT | 공고는 소프트 삭제라 함께 보존 |
 | post | post_tag, post_scrap | 1:N | CASCADE | |
 | post | notification | 1:N | SET NULL | 알림은 공고 링크가 없어도 문구만으로 의미가 있습니다. |
 | comment | comment (parent_id) | 1:N, 자기 참조 | RESTRICT | 소프트 삭제 시 "삭제된 댓글입니다"로 표시 |
@@ -333,6 +322,7 @@ PK와 UNIQUE는 그 자체가 인덱스라서, 중복되는 인덱스는 따로 
 | review | (target_id, created_at) | 매너 온도 재계산, 이달의 파티장 (MAIN-010) | 특정 회원이 기간 안에 받은 평가만 범위로 조회 |
 | review_tag_map | (review_tag_id) | 태그 통계 | |
 | favorite_member | (target_member_id) | 회원 탈퇴 시 정리, 즐겨찾기한 사람 수 | |
+| member_block | (target_member_id) | 회원 탈퇴 시 정리 | 공고 필터는 PK(member_id, target_member_id)로 찾습니다. |
 | notification | (member_id, is_read, created_at) | 안 읽은 알림 수, 알림 목록 | |
 | notification_subscription | UQ(member_id, game_id, game_content_id) / (game_id, game_content_id, enabled) | 중복 설정 방지 / 공고 등록 시 알림 받을 대상 조회 | game_content_id가 NULL이면 UNIQUE가 중복을 막지 못합니다. 애플리케이션에서도 검사해야 합니다. |
 | report | UQ(reporter_id, target_type, target_id) | 중복 신고 제한 (REPORT-005) | 같은 사람이 같은 대상을 신고하는 것은 영구히 한 번만 가능 |

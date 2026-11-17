@@ -2,8 +2,6 @@ import React from 'react';
 import { COMMENTS_ANCHOR_ID, commentText, partyCommentText, type CommentSort } from '../../data/commentData';
 import { pollText } from '../../data/pollData';
 import type { useComments } from '../../hooks/useComments';
-import { usePartyInvite } from '../../hooks/usePartyInvite';
-import PartyInviteModal from '../mypage/PartyInviteModal';
 import Pagination from '../board/Pagination';
 import CommentComposer from './CommentComposer';
 import CommentItem from './CommentItem';
@@ -35,8 +33,6 @@ const sorts: readonly CommentSort[] = ['oldest', 'newest'];
  */
 export const CommentSection: React.FC<CommentSectionProps> = ({ thread: t, ownerView, title = commentText.title, onCreatePoll, poll, tabs, notice, composerHeader, locked }) => {
   const party = t.channel === 'party';
-  // 댓글 작성자 프로필 카드의 「파티 초대하기」 → 마이페이지와 같은 초대 모달 (결과는 댓글 토스트로 안내)
-  const invite = usePartyInvite(t.toast.show);
   const empty = party ? partyCommentText.empty : commentText.empty;
   return (
     <section id={COMMENTS_ANCHOR_ID} className="scroll-mt-24 rounded-2xl border border-night-borderLight bg-night-surface p-6">
@@ -97,7 +93,8 @@ export const CommentSection: React.FC<CommentSectionProps> = ({ thread: t, owner
                   onAccept={() => t.accept(item.id)}
                   onCancelAccept={() => t.cancelAccept(item.id)}
                   onTogglePopover={() => t.setPopoverFor(t.popoverFor === item.id ? null : item.id)}
-                  onInviteAuthor={invite.open}
+                  // 공대장만 남을 초대할 수 있습니다 (탈퇴 등으로 작성자를 모르면 버튼 없음).
+                  onInvite={ownerView && !item.mine && item.authorId ? () => t.invite(item.authorId) : undefined}
                   renderReply={render}
                 />
               );
@@ -109,16 +106,6 @@ export const CommentSection: React.FC<CommentSectionProps> = ({ thread: t, owner
           </div>
         </>
       )}
-      <PartyInviteModal
-        target={invite.target}
-        posts={invite.posts}
-        loading={invite.loading}
-        error={invite.error}
-        sendingPostId={invite.sendingPostId}
-        isInvited={invite.isInvited}
-        onInvite={invite.invite}
-        onClose={invite.close}
-      />
     </section>
   );
 };

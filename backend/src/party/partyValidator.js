@@ -1,7 +1,7 @@
 'use strict';
 
 const { ApiError } = require('../common/ApiError');
-const { INVITATION_RESPONSES, DECISION_STATUSES, LIST_STATUSES, POST_STATUSES, ROLE_MAX_LENGTH, MESSAGE_MAX_LENGTH, partyMessages: m } = require('./partyConstants');
+const { DECISION_STATUSES, LIST_STATUSES, POST_STATUSES, ROLE_MAX_LENGTH, MESSAGE_MAX_LENGTH, partyMessages: m } = require('./partyConstants');
 
 const charLength = (value) => Array.from(value).length;
 const POSITIVE_INT = /^[1-9]\d*$/;
@@ -60,22 +60,13 @@ function parseListStatus(query) {
   return status;
 }
 
-/** 파티 초대 본문 { memberId } — 1 이상의 안전한 정수 */
+/** 파티 초대 본문 { memberId } — 초대할 회원 id (양의 정수) */
 function validateInvite(body) {
   const memberId = body && typeof body === 'object' ? body.memberId : undefined;
   if (!Number.isSafeInteger(memberId) || memberId < 1) {
-    throw new ApiError(400, 'INVALID_INPUT', m.invalidInput, [{ field: 'memberId', message: m.memberIdInvalid }]);
+    throw new ApiError(400, 'INVALID_INPUT', m.invalidInput, [{ field: 'memberId', message: m.inviteeInvalid }]);
   }
   return { memberId };
 }
 
-/** 초대 응답 본문 { status: ACCEPTED | DECLINED } */
-function validateInvitationResponse(body) {
-  const status = body && typeof body === 'object' ? body.status : undefined;
-  if (!INVITATION_RESPONSES.includes(status)) {
-    throw new ApiError(400, 'INVALID_INPUT', m.invalidInput, [{ field: 'status', message: m.invitationStatusInvalid }]);
-  }
-  return { status };
-}
-
-module.exports = { parseId, validateApply, validateDecision, validatePostStatus, parseListStatus, validateInvite, validateInvitationResponse };
+module.exports = { parseId, validateApply, validateDecision, validatePostStatus, parseListStatus, validateInvite };

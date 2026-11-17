@@ -10,6 +10,7 @@ const {
   POST_STATUS_CLOSED,
   POST_STATUS_COMPLETED,
   NOTICE_TARGET_STATUSES,
+  NOTIFICATION_TYPE,
 } = require('./postConstants');
 const { awardDailyLimitedPoints, revokeActivityPoints } = require('../common/activityPoint');
 
@@ -49,7 +50,7 @@ function createPostRepository(pool) {
     );
   }
 
-  /** 작성자를 즐겨찾기한 회원(탈퇴 회원 제외)에게 새 공고 알림을 한 번에 보냅니다. 작성자 본인은 대상이 아닙니다. */
+  /** 작성자를 즐겨찾기한 회원(탈퇴 회원 제외)에게 새 공고 알림을 한 번에 보냅니다. 작성자 본인·작성자가 차단한 회원은 대상이 아닙니다. */
   async function notifyFavoriteFollowers(connection, { authorId, postId, notice }) {
     const [[author]] = await connection.query('SELECT nickname FROM member WHERE id = ?', [authorId]);
     if (!author?.nickname) return;
@@ -57,14 +58,15 @@ function createPostRepository(pool) {
       `INSERT INTO notification (member_id, type, message, post_id)
        SELECT fm.member_id, ?, ?, ?
          FROM favorite_member fm JOIN member m ON m.id = fm.member_id
-        WHERE fm.target_member_id = ? AND fm.member_id <> ? AND m.status <> 'WITHDRAWN'`,
-      [notice.type, notice.message(author.nickname), postId, authorId, authorId],
+        WHERE fm.target_member_id = ? AND fm.member_id <> ? AND m.status <> 'WITHDRAWN'
+          AND fm.member_id NOT IN (SELECT mb.target_member_id FROM member_block mb WHERE mb.member_id = ?)`,
+      [notice.type, notice.message(author.nickname), postId, authorId, authorId, authorId],
     );
   }
 
   /**
    * 이 공고의 게임(상세 분류를 지정했다면 그 분류)을 관심 알림으로 켜 둔 회원에게 알립니다.
-   * 작성자 본인·탈퇴 회원은 제외하고, 같은 공고로 이미 「즐겨찾기 새 공고」 알림을 받는 회원에게는 중복으로 보내지 않습니다.
+   * 작성자 본인·탈퇴 회원·작성자가 차단한 회원은 제외하고, 같은 공고로 이미 「즐겨찾기 새 공고」 알림을 받는 회원에게는 중복으로 보내지 않습니다.
    */
   async function notifyInterestedMembers(connection, { post, postId, notice }) {
     const [[game]] = await connection.query('SELECT name FROM game WHERE id = ?', [post.gameId]);
@@ -76,8 +78,9 @@ function createPostRepository(pool) {
         WHERE s.enabled = TRUE AND s.game_id = ?
           AND (s.game_content_id IS NULL OR s.game_content_id <=> ?)
           AND s.member_id <> ? AND m.status <> 'WITHDRAWN'
-          AND s.member_id NOT IN (SELECT fm.member_id FROM favorite_member fm WHERE fm.target_member_id = ?)`,
-      [notice.type, notice.message(game.name), postId, post.gameId, post.gameContentId, post.authorId, post.authorId],
+          AND s.member_id NOT IN (SELECT fm.member_id FROM favorite_member fm WHERE fm.target_member_id = ?)
+          AND s.member_id NOT IN (SELECT mb.target_member_id FROM member_block mb WHERE mb.member_id = ?)`,
+      [notice.type, notice.message(game.name), postId, post.gameId, post.gameContentId, post.authorId, post.authorId, post.authorId],
     );
   }
 
@@ -219,7 +222,7 @@ function createPostRepository(pool) {
   }
 
   /**
-   * 공고를 소프트 삭제(status = DELETED, deleted_at)하고 스크랩을 정리합니다. 신청·댓글·리뷰는 그대로 둡니다.
+   * 공고를 소프트 삭제(status = DELETED, deleted_at)하고 스크랩과 남은 파티 초대 알림을 정리합니다. 신청·댓글·리뷰는 그대로 둡니다.
    * notice 가 있으면 같은 트랜잭션에서 대기 중·수락된 신청자에게 알립니다(공고가 사라졌으니 post_id 는 비움).
    * @returns {Promise<boolean>} 삭제했으면 true, 그 사이 이미 삭제됐으면 false
    */
@@ -234,6 +237,8 @@ function createPostRepository(pool) {
       );
       if (result.affectedRows > 0) {
         await connection.query('DELETE FROM post_scrap WHERE post_id = ?', [postId]);
+        // 해산(삭제)된 공고로는 수락할 수 없으니 아직 남은 파티 초대 알림을 지웁니다.
+        await connection.query('DELETE FROM notification WHERE post_id = ? AND type = ?', [postId, NOTIFICATION_TYPE.partyInvite]);
         // 이 공고로 받은 작성 점수를 회수합니다 (결정 사항 8-2).
         await revokeActivityPoints(connection, 'POST_CREATE', [postId]);
         if (notice) await notifyApplicants(connection, { postId, linkPostId: null, notice });

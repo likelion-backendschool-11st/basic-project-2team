@@ -333,23 +333,6 @@ CREATE TABLE post_application (
   CONSTRAINT fk_post_application_applicant FOREIGN KEY (applicant_id) REFERENCES member (id) ON DELETE RESTRICT
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '파티 신청 (ACCEPTED = 파티원)';
 
-CREATE TABLE party_invitation (
-  id            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  post_id       BIGINT UNSIGNED NOT NULL,
-  inviter_id    BIGINT UNSIGNED NOT NULL COMMENT '초대한 파티장(공고 작성자)',
-  invitee_id    BIGINT UNSIGNED NOT NULL,
-  status        VARCHAR(20)     NOT NULL DEFAULT 'PENDING' COMMENT 'PENDING / ACCEPTED / DECLINED',
-  responded_at  DATETIME        NULL,
-  created_at    DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at    DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (id),
-  CONSTRAINT uq_party_invitation UNIQUE (post_id, invitee_id),
-  INDEX idx_party_invitation_invitee (invitee_id, status),
-  CONSTRAINT fk_party_invitation_post    FOREIGN KEY (post_id)    REFERENCES post (id)   ON DELETE RESTRICT,
-  CONSTRAINT fk_party_invitation_inviter FOREIGN KEY (inviter_id) REFERENCES member (id) ON DELETE RESTRICT,
-  CONSTRAINT fk_party_invitation_invitee FOREIGN KEY (invitee_id) REFERENCES member (id) ON DELETE RESTRICT
-) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '파티 초대 (수락하면 post_application 에 ACCEPTED 로 등록, 공고·회원당 1행)';
-
 -- =====================================================================
 -- 댓글 · 평가 · 즐겨찾기
 -- =====================================================================
@@ -468,6 +451,16 @@ CREATE TABLE favorite_member (
   CONSTRAINT fk_favorite_member_target FOREIGN KEY (target_member_id) REFERENCES member (id) ON DELETE CASCADE
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '사용자 즐겨찾기';
 
+CREATE TABLE member_block (
+  member_id         BIGINT UNSIGNED NOT NULL COMMENT '차단한 회원',
+  target_member_id  BIGINT UNSIGNED NOT NULL COMMENT '차단당한 회원. 차단한 회원의 공고를 볼 수 없음',
+  created_at        DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (member_id, target_member_id),
+  INDEX idx_member_block_target (target_member_id),
+  CONSTRAINT fk_member_block_member FOREIGN KEY (member_id)        REFERENCES member (id) ON DELETE CASCADE,
+  CONSTRAINT fk_member_block_target FOREIGN KEY (target_member_id) REFERENCES member (id) ON DELETE CASCADE
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '사용자 차단';
+
 -- =====================================================================
 -- 알림
 -- =====================================================================
@@ -475,7 +468,7 @@ CREATE TABLE favorite_member (
 CREATE TABLE notification (
   id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   member_id   BIGINT UNSIGNED NOT NULL,
-  type        VARCHAR(30)     NOT NULL COMMENT 'APPLICATION_RECEIVED / APPLICATION_RESULT / APPLICATION_CANCELED / POST_UPDATED / INTEREST_POST / FAVORITE_AUTHOR_POST / POST_DELETED / SANCTION / PARTY_INVITE / INVITE_RESULT',
+  type        VARCHAR(30)     NOT NULL COMMENT 'APPLICATION_RECEIVED / APPLICATION_RESULT / APPLICATION_CANCELED / POST_UPDATED / INTEREST_POST / FAVORITE_AUTHOR_POST / POST_DELETED / SANCTION / NO_SHOW / POLL_CONFIRMED / POLL_REMINDER / PARTY_INVITE / INVITE_ACCEPTED',
   message     VARCHAR(200)    NOT NULL,
   post_id     BIGINT UNSIGNED NULL,
   is_read     BOOLEAN         NOT NULL DEFAULT FALSE,

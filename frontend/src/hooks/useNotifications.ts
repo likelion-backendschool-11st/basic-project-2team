@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { errorMessageOf, hasAccessToken } from '../api/http';
+import { acceptPartyInvite } from '../api/postApi';
 import { deleteNotification, getNotifications, markAllNotificationsRead, markNotificationRead, notifyNotificationsChanged, toNotificationView, UNREAD_COUNT_CHANGED_EVENT } from '../api/notificationApi';
-import { respondInvitation } from '../api/postApi';
 import { NOTIFICATION_PAGE_SIZE, notificationText, type NotificationView } from '../data/notificationData';
 import { paths } from '../data/routes';
 
@@ -21,7 +21,8 @@ export function useNotifications() {
   const [reloadKey, setReloadKey] = useState(0);
   const [actionError, setActionError] = useState<string | null>(null);
   const [markingAll, setMarkingAll] = useState(false);
-  const [respondingId, setRespondingId] = useState<string | null>(null);
+  /** 수락 요청 중인 초대 알림 id */
+  const [accepting, setAccepting] = useState<string | null>(null);
   const loggedIn = hasAccessToken();
   const navigate = useNavigate();
   const reload = useCallback(() => setReloadKey((k) => k + 1), []);
@@ -92,6 +93,31 @@ export function useNotifications() {
     if (item.postId !== null) navigate(paths.postDetail(String(item.postId)));
   };
 
+  /**
+   * 파티 초대 수락: 서버에서 파티원(ACCEPTED)이 되면 서버가 초대 알림을 지우므로 목록에서도 빼고, 초대받은 공고 상세로 이동합니다.
+   * 이미 수락한 초대(joined)는 요청 없이 공고로만 이동합니다.
+   */
+  const acceptInvite = async (item: NotificationView) => {
+    if (item.postId === null || accepting) return;
+    if (item.invite?.joined) {
+      open(item);
+      return;
+    }
+    setActionError(null);
+    setAccepting(item.id);
+    try {
+      await acceptPartyInvite(String(item.postId));
+      setItems((prev) => prev.filter((n) => n.id !== item.id));
+      if (!item.read) setUnreadCount((c) => Math.max(0, c - 1));
+      notifyNotificationsChanged(); // 초대 알림이 지워졌으므로 헤더 배지도 다시 셉니다.
+      navigate(paths.postDetail(String(item.postId)));
+    } catch (err) {
+      setActionError(errorMessageOf(err, notificationText.inviteAcceptFailed));
+    } finally {
+      setAccepting(null);
+    }
+  };
+
   /** 알림 삭제(복구 불가). 화면에서 바로 빼고, 끝나면 목록을 다시 불러와 다음 알림으로 빈자리를 채웁니다. */
   const remove = (item: NotificationView) => {
     setActionError(null);
@@ -103,31 +129,6 @@ export function useNotifications() {
         reload();
         notifyNotificationsChanged();
       });
-  };
-
-  /**
-   * 파티 초대 알림의 「참여」·「거절」 (PATCH /api/posts/{postId}/invitations/me).
-   * 참여하면 바로 파티원이 되므로 그 공고 상세로 이동하고, 거절하면 그 줄을 「거절함」으로 바꿉니다.
-   */
-  const respond = async (item: NotificationView, status: 'ACCEPTED' | 'DECLINED') => {
-    if (item.postId === null || item.invitation !== 'PENDING' || respondingId !== null) return;
-    setActionError(null);
-    setRespondingId(item.id);
-    try {
-      await respondInvitation(item.postId, status);
-      notifyNotificationsChanged();
-      if (status === 'ACCEPTED') {
-        navigate(paths.postDetail(String(item.postId)));
-        return;
-      }
-      if (!item.read) setUnreadCount((c) => Math.max(0, c - 1));
-      setItems((prev) => prev.map((n) => (n.id === item.id ? { ...n, read: true, invitation: status } : n)));
-    } catch (err) {
-      setActionError(errorMessageOf(err, notificationText.inviteRespondFailed));
-      reload();
-    } finally {
-      setRespondingId(null);
-    }
   };
 
   /** 「모두 읽음」: 서버에서 처리한 뒤 목록을 다시 불러옵니다(안 읽은 알림 필터에서는 목록이 비게 됩니다). */
@@ -162,11 +163,11 @@ export function useNotifications() {
     actionError,
     markingAll,
     open,
+    acceptInvite,
+    accepting,
     markRead,
     remove,
     markAllRead,
-    respondingId,
-    respond: (item: NotificationView, status: 'ACCEPTED' | 'DECLINED') => void respond(item, status),
     pager: {
       page,
       pages: Array.from({ length: size }, (_, i) => start + i),

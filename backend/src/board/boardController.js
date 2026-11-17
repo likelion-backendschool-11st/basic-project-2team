@@ -22,7 +22,7 @@ function createBoardController(boardService, { postEvents, heartbeatMs = HEARTBE
   async function related(req, res) {
     const postId = parsePostId(req.params.postId);
     if (postId === null) throw new ApiError(404, 'POST_NOT_FOUND', boardMessages.postNotFound);
-    return sendSuccess(res, 200, await boardService.listRelated(postId, req.query));
+    return sendSuccess(res, 200, await boardService.listRelated(postId, req.query, req.auth?.memberId ?? null));
   }
 
   /**
@@ -64,11 +64,12 @@ function createBoardController(boardService, { postEvents, heartbeatMs = HEARTBE
   }
 
   async function list(req, res) {
-    const data = await boardService.listPosts(req.query);
+    const data = await boardService.listPosts(req.query, req.auth?.memberId ?? null);
     return sendSuccess(res, 200, data);
   }
 
-  const featured = (kind) => async (req, res) => sendSuccess(res, 200, await boardService.listFeatured(kind, req.query));
+  const featured = (kind) => async (req, res) =>
+    sendSuccess(res, 200, await boardService.listFeatured(kind, req.query, req.auth?.memberId ?? null));
 
   return { getDetail, related, events, list, popular: featured('popular'), urgent: featured('urgent') };
 }

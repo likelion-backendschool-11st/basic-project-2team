@@ -1,7 +1,7 @@
 'use strict';
 
 const { ApiError } = require('../common/ApiError');
-const { MAX_SUBSCRIPTIONS, notificationMessages: m } = require('./notificationConstants');
+const { MAX_SUBSCRIPTIONS, PARTY_INVITE_TYPE, notificationMessages: m } = require('./notificationConstants');
 const { parseId, parseListQuery, parseSubscriptionBody, parseEnabledBody } = require('./notificationValidator');
 
 const toIso = (value) => (value ? new Date(value).toISOString() : null);
@@ -26,7 +26,8 @@ function createNotificationService({ notificationRepository }) {
         postId: row.postId ?? null,
         read: Boolean(row.isRead),
         createdAt: toIso(row.createdAt),
-        invitationStatus: row.invitationStatus ?? null,
+        // 파티 초대만: 이미 수락해 파티원이 됐는지 (공고가 지워졌으면 수락할 수 없으므로 null)
+        invite: row.type === PARTY_INVITE_TYPE && row.postId ? { joined: row.applicationStatus === 'ACCEPTED' } : null,
       })),
       page,
       size,
