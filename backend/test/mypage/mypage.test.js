@@ -4,6 +4,7 @@ const { describe, it, before, after, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
 const { createApp } = require('../../src/app');
 const { createTokenProvider } = require('../../src/common/tokenProvider');
+const { createRecordingEvents } = require('../helpers/recordingEvents');
 
 const AUTH = Object.freeze({
   jwtSecret: 'test-secret',
@@ -59,6 +60,8 @@ function createFakeRepository() {
     scraps: [],
     favorites: new Set(),
     blocks: new Set(),
+    /** 차단할 때 신청이 정리됐다고 돌려줄 공고 id */
+    canceledOnBlock: [],
     calls: [],
   };
   const slice = (rows, { limit, offset }) => ({ rows: rows.slice(offset, offset + limit), totalCount: rows.length });
@@ -144,8 +147,10 @@ function createFakeRepository() {
     async isBlocked(memberId, targetMemberId) {
       return state.blocks.has(`${memberId}:${targetMemberId}`);
     },
-    async addBlock(memberId, targetMemberId) {
+    async addBlock(memberId, targetMemberId, now) {
+      state.calls.push({ name: 'addBlock', memberId, targetMemberId, now });
       state.blocks.add(`${memberId}:${targetMemberId}`);
+      return state.canceledOnBlock;
     },
     async removeBlock(memberId, targetMemberId) {
       state.blocks.delete(`${memberId}:${targetMemberId}`);
@@ -157,10 +162,11 @@ describe('마이페이지 API (/api/members)', () => {
   let server;
   let baseUrl;
   const repo = createFakeRepository();
+  const events = createRecordingEvents();
   const tokens = createTokenProvider(AUTH);
 
   before(async () => {
-    const app = createApp({ mypageRepository: repo, corsOrigins: [], bcryptRounds: 4, auth: AUTH, now: () => new Date('2026-11-16T00:00:00Z') });
+    const app = createApp({ mypageRepository: repo, postEvents: events, corsOrigins: [], bcryptRounds: 4, auth: AUTH, now: () => new Date('2026-11-16T00:00:00Z') });
     await new Promise((resolve) => {
       server = app.listen(0, resolve);
     });
@@ -180,7 +186,9 @@ describe('마이페이지 API (/api/members)', () => {
     state.scraps = [];
     state.favorites.clear();
     state.blocks.clear();
+    state.canceledOnBlock = [];
     state.calls = [];
+    events.log.length = 0;
 
     state.members.set(ME, memberRow());
     state.members.set(OTHER, memberRow({ id: OTHER, nickname: '철수', bio: null, ageRangePublic: 1, level: 52, mannerTemp: '36.5', reviewCount: 0 }));
@@ -664,6 +672,13 @@ describe('마이페이지 API (/api/members)', () => {
       assert.equal((await get('/me/blocks')).status, 401);
       assert.equal((await request('POST', `/me/blocks/${OTHER}`)).status, 401);
       assert.equal((await request('DELETE', `/me/blocks/${OTHER}`)).status, 401);
+    });
+
+    it('차단하면 그 유저의 신청이 정리된 공고에 post 신호를 보낸다', async () => {
+      repo.state.canceledOnBlock = [11, 12];
+      assert.equal((await request('POST', `/me/blocks/${OTHER}`, as(ME))).status, 204);
+      assert.deepEqual(repo.state.calls.at(-1), { name: 'addBlock', memberId: ME, targetMemberId: OTHER, now: new Date('2026-11-16T00:00:00Z') });
+      assert.deepEqual(events.log, [[11, 'post'], [12, 'post']]);
     });
 
     it('나를 차단한 회원의 공고 목록은 비어 있고, 비로그인·다른 회원에게는 그대로 보인다', async () => {

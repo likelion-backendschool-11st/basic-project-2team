@@ -15,7 +15,7 @@ const C = 4;
 
 /** DB 대신 메모리에 저장하는 가짜 repository. 승인·취소의 인원 계산은 실제 repository 와 같은 규칙입니다. */
 function createFakeRepository() {
-  const state = { posts: new Map(), members: new Map(), applications: [], notifications: [], topTags: new Map(), nextId: 1 };
+  const state = { posts: new Map(), members: new Map(), applications: [], notifications: [], topTags: new Map(), blocks: new Set(), nextId: 1 };
   const notify = (memberId, type, message) => state.notifications.push({ memberId, type, message });
   const dropInvites = (postId, memberId) => {
     state.notifications = state.notifications.filter((n) => !(n.memberId === memberId && n.type === 'PARTY_INVITE' && n.postId === postId));
@@ -27,6 +27,9 @@ function createFakeRepository() {
     async findPost(postId) {
       const p = state.posts.get(postId);
       return p && p.status !== 'DELETED' ? { id: postId, ...p } : null;
+    },
+    async isBlockedBy(blockerId, memberId) {
+      return state.blocks.has(`${blockerId}:${memberId}`);
     },
     async findMemberStatus(memberId) {
       return { nickname: `회원${memberId}`, status: 'ACTIVE', suspendedUntil: null, ...state.members.get(memberId) };
@@ -166,6 +169,7 @@ describe('party application API', () => {
     memberEvents.log.length = 0;
     Object.assign(repo.state, { applications: [], notifications: [], nextId: 1 });
     repo.state.topTags.clear();
+    repo.state.blocks.clear();
     repo.state.members.clear();
     repo.state.posts.clear();
     repo.state.posts.set(1, { authorId: HOST, title: '카멘 하드 숙련팟', status: 'OPEN', headcount: 3, currentCount: 1, scheduleAt: new Date('2026-11-14T12:00:00Z') });
@@ -182,6 +186,16 @@ describe('party application API', () => {
   const decide = (id, status, memberId = HOST) => call('PATCH', `/1/applications/${id}`, { status }, memberId);
 
   describe('POST /:postId/applications', () => {
+    it('공고 작성자에게 차단당한 회원이면 404 POST_NOT_FOUND 이고 신청이 남지 않는다', async () => {
+      repo.state.blocks.add(`${HOST}:${A}`);
+      const res = await apply(A);
+      assert.equal(res.status, 404);
+      assert.equal((await json(res)).error.code, 'POST_NOT_FOUND');
+      assert.equal(repo.state.applications.length, 0);
+      assert.equal(repo.state.notifications.length, 0);
+      assert.equal((await apply(B)).status, 201);
+    });
+
     it('신청하면 201 PENDING 이고 포지션·메시지는 다듬어 저장한다', async () => {
       const res = await apply(A, { role: ' 서포터 ', message: '' });
       assert.equal(res.status, 201);
@@ -591,6 +605,23 @@ describe('party application API', () => {
       assert.equal(res.status, 201);
       assert.deepEqual((await json(res)).data, { postId: 1, memberId: A });
       assert.deepEqual(invites(), [{ memberId: A, type: 'PARTY_INVITE', message: "회원1님이 '카멘 하드 숙련팟' 파티에 초대했습니다.", postId: 1 }]);
+    });
+
+    it('공대장이 차단한 회원은 409 INVITEE_BLOCKED 로 초대할 수 없다', async () => {
+      repo.state.blocks.add(`${HOST}:${A}`);
+      const res = await invite(A);
+      assert.equal(res.status, 409);
+      assert.equal((await json(res)).error.code, 'INVITEE_BLOCKED');
+      assert.deepEqual(invites(), []);
+    });
+
+    it('초대받은 뒤 공대장에게 차단당하면 수락은 404 POST_NOT_FOUND', async () => {
+      await invite(A);
+      repo.state.blocks.add(`${HOST}:${A}`);
+      const res = await accept(A);
+      assert.equal(res.status, 404);
+      assert.equal((await json(res)).error.code, 'POST_NOT_FOUND');
+      assert.equal(repo.state.posts.get(1).currentCount, 1);
     });
 
     it('공대장이 아니면 403, 본인 초대는 403, memberId 가 잘못되면 400, 로그인 안 하면 401', async () => {

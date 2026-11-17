@@ -500,7 +500,7 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 - 공고가 **해산(삭제 — 작성자 `DELETE` · 관리자 삭제)되거나 완료(`COMPLETED`)되면** 같은 트랜잭션에서 그 공고의 남은 초대 알림(`PARTY_INVITE`)을 모두 지웁니다(더는 수락할 수 없으므로).
 - 초대(또는 신청)로 들어왔다가 **파티를 나간**(`CANCELED`) 회원은 다시 초대할 수 있습니다. 참가를 취소하면 같은 트랜잭션에서 남은 초대 알림을 지우고, 옛 초대가 남아 있더라도 나간 회원이면 지우고 새 초대를 보냅니다.
 - 모집 중·일시 중단 공고만, 정원이 남아 있을 때만 보낼 수 있습니다.
-- 오류: 400 `INVALID_INPUT`(`memberId` 가 1 이상의 정수가 아님), 401, 403 `NOT_POST_AUTHOR` · `CANNOT_INVITE_SELF`, 404 `POST_NOT_FOUND` · `MEMBER_NOT_FOUND`(없음·탈퇴), 409 `ALREADY_MEMBER` · `ALREADY_INVITED` · `INVITEE_UNAVAILABLE`(정지·영구 정지) · `POST_CLOSED` · `PARTY_FULL`.
+- 오류: 400 `INVALID_INPUT`(`memberId` 가 1 이상의 정수가 아님), 401, 403 `NOT_POST_AUTHOR` · `CANNOT_INVITE_SELF`, 404 `POST_NOT_FOUND` · `MEMBER_NOT_FOUND`(없음·탈퇴), 409 `ALREADY_MEMBER` · `ALREADY_INVITED` · `INVITEE_UNAVAILABLE`(정지·영구 정지) · `INVITEE_BLOCKED`(내가 차단한 회원) · `POST_CLOSED` · `PARTY_FULL`.
 
 **초대 수락 (`POST /api/posts/{postId}/invitations/accept`)** — 본문 없음 → `200` `{ "postId": 7, "status": "ACCEPTED", "current": 3, "max": 4, "postStatus": "OPEN", "alreadyMember": false }`
 
@@ -1003,6 +1003,8 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 **차단 (`/me/blocks`)**
 
 - 내가 차단한 회원은 **내 공고를 볼 수 없습니다** — 로그인한 그 회원에게는 목록·검색·메인·관련 공고·내 프로필의 공고 목록에서 빠지고, 상세는 404 `POST_NOT_FOUND`, 내 새 공고 알림(즐겨찾기·관심 게임)도 가지 않습니다. 반대로 나는 그 회원의 공고를 그대로 봅니다.
+- 차단당한 회원은 내 공고에 **댓글·대댓글을 달거나 참가 신청·초대 수락을 할 수 없습니다** (모두 404 `POST_NOT_FOUND`). 나도 차단한 회원을 내 공고에 초대할 수 없습니다 (409 `INVITEE_BLOCKED`).
+- 차단하는 순간 내 진행 중인 공고(삭제·활동 완료 제외)에 남아 있던 그 회원의 **대기 중 신청은 취소되고, 수락된 파티원이면 파티에서 빠집니다** (`CANCELED`, 늦은 취소로 치지 않음). 확정 인원이 1 줄고, 정원이 차서 마감됐던 공고는 다시 모집 중(`OPEN`)이 됩니다. 남아 있던 파티 초대도 지워집니다. 차단당한 회원에게 따로 알림은 보내지 않습니다. 차단 전에 남긴 댓글과 활동 완료된 파티 기록은 그대로 둡니다.
 - 다른 회원 프로필(`GET /api/members/{memberId}`)의 `viewer.blocked` 로 내가 차단했는지 알 수 있습니다.
 - 목록은 배열이며 최근 차단순, 탈퇴한 회원은 빠집니다. 차단·해제는 `204` 이고 멱등입니다.
 - 차단 오류: 400 `CANNOT_BLOCK_SELF` (자기 자신), 404 `MEMBER_NOT_FOUND` (없음·탈퇴·잘못된 id).

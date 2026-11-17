@@ -27,7 +27,7 @@ const members = () =>
 
 /** DB 대신 메모리에 저장하는 가짜 repository */
 function createFakeRepository() {
-  const state = { posts: new Map(), members: new Map(), comments: [], reports: [], party: [], applications: [], seconds: 0 };
+  const state = { posts: new Map(), members: new Map(), comments: [], reports: [], party: [], applications: [], blocks: new Set(), seconds: 0 };
   const alive = (c) => c.status !== 'DELETED';
   const withAuthor = (c) => {
     const m = state.members.get(c.authorId);
@@ -73,6 +73,9 @@ function createFakeRepository() {
     async findPost(postId) {
       const post = state.posts.get(postId);
       return post && post.status !== 'DELETED' ? { id: post.id, authorId: post.authorId } : null;
+    },
+    async isBlockedBy(blockerId, memberId) {
+      return state.blocks.has(`${blockerId}:${memberId}`);
     },
     async findMemberStatus(memberId) {
       const m = state.members.get(memberId);
@@ -189,6 +192,7 @@ describe('댓글 API /api/posts/:postId/comments', () => {
     repo.state.members = members();
     repo.state.party = [];
     repo.state.applications = [];
+    repo.state.blocks.clear();
   });
 
   const as = (memberId) => ({ Authorization: `Bearer ${tokens.createAccessToken(memberId)}` });
@@ -225,6 +229,18 @@ describe('댓글 API /api/posts/:postId/comments', () => {
   });
 
   describe('댓글 달기', () => {
+    it('공고 작성자에게 차단당한 회원은 댓글·대댓글 모두 404 POST_NOT_FOUND 이고 저장되지 않는다', async () => {
+      await write({ text: '먼저 단 댓글' }, HOST_ID);
+      const parentId = repo.state.comments[0].id;
+      repo.state.blocks.add(`${HOST_ID}:${ALICE}`);
+      for (const body of [{ text: '차단 후 댓글' }, { text: '차단 후 답글', parentId }]) {
+        const res = await write(body);
+        assert.equal(res.status, 404);
+        assert.equal(res.body.error.code, 'POST_NOT_FOUND');
+      }
+      assert.equal(repo.state.comments.length, 1);
+    });
+
     it('욕설이 들어 있으면 400 (text 필드), 저장하지 않는다', async () => {
       const { status, body } = await write({ text: '개새끼들 ㅋㅋ' });
       assert.equal(status, 400);
