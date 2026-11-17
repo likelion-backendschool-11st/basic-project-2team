@@ -1,6 +1,7 @@
 'use strict';
 
 const { ApiError } = require('../common/ApiError');
+const { POST_EVENT, NO_EVENTS } = require('../common/postEvents');
 const { levelProgress } = require('../common/activityPoint');
 const { KST_OFFSET_HOURS, TOP_TAG_LIMIT, RECENT_RATING_LIMIT, RECENT_PLAYER_LIMIT, mypageMessages } = require('./mypageConstants');
 const { RATING_DELTA_TENTHS, applyRatings } = require('../review/mannerTemp');
@@ -139,7 +140,7 @@ const toTopTags = (tags, ratingCount) =>
  * 마이페이지 조회·즐겨찾기 비즈니스 로직.
  * @param {{ mypageRepository: ReturnType<typeof import('./mypageRepository').createMypageRepository> }} deps
  */
-function createMypageService({ mypageRepository, now = () => new Date() }) {
+function createMypageService({ mypageRepository, postEvents = NO_EVENTS, now = () => new Date() }) {
   /** 프로필 공통 응답. includePrivate 이면 비공개 항목(나이대)도 그대로 담습니다. */
   async function buildProfile(member, { includePrivate }) {
     const [games, stats, tags] = await Promise.all([
@@ -361,14 +362,19 @@ function createMypageService({ mypageRepository, now = () => new Date() }) {
     return rows.map(toBlock);
   }
 
-  /** POST /api/members/me/blocks/{memberId} — 차단한 유저는 내 공고를 볼 수 없습니다. 이미 차단했어도 성공으로 처리합니다. */
+  /**
+   * POST /api/members/me/blocks/{memberId} — 차단한 유저는 내 공고를 볼 수 없습니다. 이미 차단했어도 성공으로 처리합니다.
+   * 내 진행 중인 공고에 남아 있던 그 유저의 신청(대기·수락)은 취소되고 파티에서 빠집니다.
+   */
   async function addBlock(memberId, targetMemberId) {
     if (memberId === targetMemberId) {
       throw new ApiError(400, 'CANNOT_BLOCK_SELF', mypageMessages.cannotBlockSelf);
     }
     const target = await mypageRepository.findMember(targetMemberId);
     if (!target || target.status === WITHDRAWN) throw memberNotFound();
-    await mypageRepository.addBlock(memberId, targetMemberId);
+    const changedPostIds = await mypageRepository.addBlock(memberId, targetMemberId, now());
+    // 인원·신청자 목록이 바뀐 공고를 보고 있는 화면이 다시 불러오게 합니다.
+    for (const postId of changedPostIds ?? []) postEvents.publish(postId, POST_EVENT.post);
   }
 
   /** DELETE /api/members/me/blocks/{memberId} — 차단하지 않은 유저여도 성공으로 처리합니다. */

@@ -46,6 +46,15 @@ function createPartyRepository(pool) {
     return rows[0] ?? null;
   }
 
+  /** blockerId 가 memberId 를 차단했는지 (member_block) */
+  async function isBlockedBy(blockerId, memberId) {
+    const [rows] = await pool.query(
+      'SELECT EXISTS (SELECT 1 FROM member_block WHERE member_id = ? AND target_member_id = ?) AS blocked',
+      [blockerId, memberId],
+    );
+    return Boolean(rows[0]?.blocked);
+  }
+
   /** 신청자의 계정 상태. 없으면 null */
   async function findMemberStatus(memberId) {
     const [rows] = await pool.query('SELECT nickname, status, suspended_until AS suspendedUntil FROM member WHERE id = ? LIMIT 1', [memberId]);
@@ -345,6 +354,7 @@ function createPartyRepository(pool) {
 
   return {
     findPost,
+    isBlockedBy,
     findMemberStatus,
     findMyApplication,
     createApplication,

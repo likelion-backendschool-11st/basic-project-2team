@@ -103,6 +103,15 @@ export interface FavoriteUser {
   readonly manner: string;
 }
 
+export interface BlockedUser {
+  readonly id: number;
+  readonly name: string;
+  readonly level: number;
+  readonly avatarUrl: string | null;
+  /** 차단한 날짜 `MM-DD` */
+  readonly blockedDate: string;
+}
+
 /** 「최근 함께한 플레이어」 카드 (GET /api/members/me/recent-players) */
 export interface RecentPlayer {
   readonly id: number;
@@ -197,7 +206,7 @@ export const memberProfileText = {
   blocked: '차단 해제',
   blockDialog: {
     title: '이 회원을 차단할까요?',
-    description: '차단한 회원은 내 공고를 목록·검색·상세에서 볼 수 없습니다. 프로필에서 언제든 해제할 수 있어요.',
+    description: '차단한 회원은 내 공고를 볼 수도, 댓글을 달거나 신청할 수도 없습니다. 진행 중인 내 공고에 신청했거나 참여 중이면 자동으로 취소되고 파티에서 빠집니다.',
     confirm: '차단',
     cancel: '취소',
   },
@@ -337,5 +346,19 @@ export const favoritesText = {
   removed: (name: string) => `${name}님을 즐겨찾기에서 해제했습니다.`,
   removeFailed: '즐겨찾기 해제에 실패했습니다.',
   empty: '아직 즐겨찾기한 유저가 없습니다.',
+  avatarAltSuffix: ' 아바타',
+};
+
+export const blocksText = {
+  title: '차단한 유저 목록',
+  countSuffix: '명',
+  levelPrefix: 'Lv.',
+  note: '차단한 유저는 내 공고를 볼 수 없습니다.',
+  blockedDatePrefix: '차단일 ',
+  viewProfile: '프로필 보기',
+  remove: '차단 해제',
+  removed: (name: string) => `${name}님의 차단을 해제했습니다.`,
+  removeFailed: '차단 해제에 실패했습니다.',
+  empty: '차단한 유저가 없습니다.',
   avatarAltSuffix: ' 아바타',
 };

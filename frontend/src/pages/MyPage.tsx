@@ -4,6 +4,7 @@ import AccountMenu from '../components/mypage/AccountMenu';
 import ProfileSummaryCard from '../components/mypage/ProfileSummaryCard';
 import ActivitySection from '../components/mypage/ActivitySection';
 import FavoriteUsersSection from '../components/mypage/FavoriteUsersSection';
+import BlockedUsersSection from '../components/mypage/BlockedUsersSection';
 import PartyInviteModal from '../components/mypage/PartyInviteModal';
 import RecentPlayersSection from '../components/mypage/RecentPlayersSection';
 import NoShowReportDialog from '../components/post/NoShowReportDialog';
@@ -21,7 +22,7 @@ interface MyPageProps {
 /** Stitch screen: "마이페이지" (039af8fe5b43489da44f096130276df6) */
 export const MyPage: React.FC<MyPageProps> = () => {
   const page = useMyPage();
-  const { profile, activity, favorites, recentPlayers, invite, review, complete } = page;
+  const { profile, activity, favorites, blocks, recentPlayers, invite, review, complete } = page;
 
   return (
     <LoggedInLayout contained={false}>
@@ -63,6 +64,7 @@ export const MyPage: React.FC<MyPageProps> = () => {
               onInvite={invite.open}
             />
             <FavoriteUsersSection users={favorites.users} loading={favorites.loading} onRemove={(u) => void favorites.remove(u)} />
+            <BlockedUsersSection users={blocks.users} loading={blocks.loading} onRemove={(u) => void blocks.remove(u)} />
           </section>
         </div>
       </div>

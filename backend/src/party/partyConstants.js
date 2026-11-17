@@ -70,6 +70,7 @@ const partyMessages = Object.freeze({
   alreadyMember: '이미 이 파티의 파티원입니다.',
   alreadyInvited: '이미 초대를 보낸 회원입니다. 초대 알림이 남아 있는 동안은 다시 보낼 수 없습니다.',
   inviteeUnavailable: '정지되었거나 탈퇴한 회원은 초대할 수 없습니다.',
+  inviteeBlocked: '차단한 회원은 초대할 수 없습니다. 차단을 해제한 뒤 초대해 주세요.',
   invitationNotFound: '받은 파티 초대가 없습니다. 초대 알림을 지웠다면 공대장에게 다시 요청해 주세요.',
   /** 알림함 문구. title 은 공고 제목(잘린 것), nickname 은 신청자 닉네임 */
   notice: Object.freeze({

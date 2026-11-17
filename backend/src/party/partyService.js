@@ -60,18 +60,24 @@ function createPartyService({ partyRepository, postEvents = NO_EVENTS, memberEve
     return post;
   }
 
+  /** 작성자에게 차단당한 회원에게는 공고 상세처럼 없는 공고(404)로 보입니다. */
+  async function assertNotBlocked(post, memberId) {
+    if (await partyRepository.isBlockedBy(post.authorId, memberId)) throw postNotFound();
+  }
+
   async function loadOwnedPost(rawPostId, memberId) {
     const post = await loadPost(rawPostId);
     if (post.authorId !== memberId) throw new ApiError(403, 'NOT_POST_AUTHOR', m.notPostAuthor);
     return post;
   }
 
-  /** POST /api/posts/:postId/applications — 마감·가득 찬 공고, 본인 공고, 중복 신청은 거절. 취소했던 신청은 같은 행을 되살립니다. */
+  /** POST /api/posts/:postId/applications — 마감·가득 찬 공고, 본인 공고, 중복 신청, 작성자에게 차단당한 회원은 거절. 취소했던 신청은 같은 행을 되살립니다. */
   async function apply(rawPostId, memberId, body) {
     const input = validateApply(body);
     const applicant = await partyRepository.findMemberStatus(memberId);
     assertCanApply(applicant, now());
     const post = await loadPost(rawPostId);
+    await assertNotBlocked(post, memberId);
 
     if (post.authorId === memberId) throw new ApiError(403, 'CANNOT_APPLY_OWN_POST', m.cannotApplyOwnPost);
     if (post.currentCount >= post.headcount) throw new ApiError(409, 'PARTY_FULL', m.partyFull);
@@ -220,6 +226,8 @@ function createPartyService({ partyRepository, postEvents = NO_EVENTS, memberEve
     } catch {
       throw new ApiError(409, 'INVITEE_UNAVAILABLE', m.inviteeUnavailable);
     }
+    // 내가 차단한 회원은 이 공고를 볼 수도 수락할 수도 없으므로 초대하지 않습니다.
+    if (await partyRepository.isBlockedBy(hostId, memberId)) throw new ApiError(409, 'INVITEE_BLOCKED', m.inviteeBlocked);
     assertJoinable(post);
     const application = await partyRepository.findMyApplication(post.id, memberId);
     if (application?.status === S.accepted) throw new ApiError(409, 'ALREADY_MEMBER', m.alreadyMember);
@@ -242,6 +250,7 @@ function createPartyService({ partyRepository, postEvents = NO_EVENTS, memberEve
     const me = await partyRepository.findMemberStatus(memberId);
     assertCanApply(me, now());
     const post = await loadPost(rawPostId);
+    await assertNotBlocked(post, memberId);
     if (post.authorId === memberId) throw new ApiError(403, 'CANNOT_APPLY_OWN_POST', m.cannotApplyOwnPost);
     if (!(await partyRepository.hasInvitation(post.id, memberId))) throw new ApiError(404, 'INVITATION_NOT_FOUND', m.invitationNotFound);
 

@@ -339,9 +339,61 @@ function createMypageRepository(pool) {
     return Boolean(rows[0]?.blocked);
   }
 
-  /** 차단. 이미 있으면 그대로 둡니다. */
-  async function addBlock(memberId, targetMemberId) {
-    await pool.query('INSERT IGNORE INTO member_block (member_id, target_member_id) VALUES (?, ?)', [memberId, targetMemberId]);
+  /**
+   * 차단하고, 같은 트랜잭션에서 차단한 회원을 내 진행 중인 공고(삭제·활동 완료 제외)에서 정리합니다.
+   * - 대기 중·수락된 신청은 CANCELED 로 바꿉니다 (본인이 취소한 게 아니므로 늦은 취소로 치지 않습니다).
+   * - 수락돼 있었으면 확정 인원을 1 줄이고, 정원이 차서 마감됐던 공고는 다시 모집 중으로 돌립니다.
+   * - 남아 있던 파티 초대 알림을 지웁니다.
+   * 이미 차단했어도 정리는 다시 합니다(멱등).
+   * @returns {Promise<number[]>} 신청이 정리된 공고 id
+   */
+  async function addBlock(memberId, targetMemberId, now) {
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+      await connection.query('INSERT IGNORE INTO member_block (member_id, target_member_id) VALUES (?, ?)', [memberId, targetMemberId]);
+
+      // 인원 계산이 승인·취소 처리와 겹치지 않게 공고 행부터 잠급니다 (party cancelApplication 과 같은 순서).
+      const [posts] = await connection.query(
+        `SELECT p.id, p.status, p.headcount, p.current_count AS current
+           FROM post p
+          WHERE p.author_id = ? AND ${ALIVE_POST} AND p.status <> 'COMPLETED'
+            AND EXISTS (SELECT 1 FROM post_application a
+                         WHERE a.post_id = p.id AND a.applicant_id = ? AND a.status IN ('PENDING', 'ACCEPTED'))
+          ORDER BY p.id
+          FOR UPDATE`,
+        [memberId, targetMemberId],
+      );
+      const changedPostIds = [];
+      for (const post of posts) {
+        const [[application]] = await connection.query(
+          "SELECT id, status FROM post_application WHERE post_id = ? AND applicant_id = ? AND status IN ('PENDING', 'ACCEPTED') FOR UPDATE",
+          [post.id, targetMemberId],
+        );
+        if (!application) continue;
+        await connection.query("UPDATE post_application SET status = 'CANCELED', canceled_at = ? WHERE id = ?", [now, application.id]);
+        if (application.status === 'ACCEPTED') {
+          const reopen = post.status === 'CLOSED' && post.current >= post.headcount;
+          await connection.query(
+            `UPDATE post SET current_count = GREATEST(current_count - 1, 1)${reopen ? ", status = 'OPEN'" : ''} WHERE id = ?`,
+            [post.id],
+          );
+        }
+        changedPostIds.push(post.id);
+      }
+
+      await connection.query(
+        "DELETE FROM notification WHERE member_id = ? AND type = 'PARTY_INVITE' AND post_id IN (SELECT id FROM post WHERE author_id = ?)",
+        [targetMemberId, memberId],
+      );
+      await connection.commit();
+      return changedPostIds;
+    } catch (err) {
+      await connection.rollback();
+      throw err;
+    } finally {
+      connection.release();
+    }
   }
 
   /** 차단 해제. 없으면 아무것도 하지 않습니다. */

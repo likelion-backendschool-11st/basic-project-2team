@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { errorMessageOf } from '../api/http';
 import { changePostStatus, removeScrap } from '../api/postApi';
 import { activityText, completeText, type ActivityPost } from '../data/myPageData';
+import { useBlockedUsers } from './useBlockedUsers';
 import { useFavoriteUsers } from './useFavoriteUsers';
 import { useModal } from './useModal';
 import { useMyActivity } from './useMyActivity';
@@ -21,6 +22,7 @@ export function useMyPage() {
   const profile = useMyProfile();
   const activity = useMyActivity();
   const favorites = useFavoriteUsers(toast.show);
+  const blocks = useBlockedUsers(toast.show);
   const recentPlayers = useRecentPlayers();
   const invite = usePartyInvite(toast.show);
   const refresh = () => {
@@ -90,6 +92,7 @@ export function useMyPage() {
     profile,
     activity,
     favorites,
+    blocks,
     recentPlayers,
     invite,
     review,
