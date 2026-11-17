@@ -30,6 +30,7 @@ OurParty 서비스의 테이블 설계안입니다. [요구사항 명세](./02-r
 | 투표 | `poll`, `poll_option`, `poll_vote` | 공대장이 댓글 영역에 올리는 파티 의견 조율 투표, 항목, 투표 기록 |
 | 평가 | `review`, `review_tag_map` | 별점, 한 줄 평, 태그 |
 | 즐겨찾기 | `favorite_member` | 사용자 즐겨찾기 |
+| 차단 | `member_block` | 사용자 차단. 차단당한 회원은 차단한 회원의 공고를 볼 수 없음 |
 | 알림 | `notification`, `notification_subscription` | 알림함, 관심 알림 설정 |
 | 신고·관리 | `report`, `sanction`, `admin_account`, `admin_action_log` | 신고, 제재, 관리자 계정, 처리·접근 이력 |
 
@@ -251,6 +252,7 @@ API의 `level`은 **서비스 활동 레벨**(`member.level`)입니다. 공고 �
 | `review` | id, post_id FK, reviewer_id FK, target_id FK, rating TINYINT, comment VARCHAR(500), created_at | UNIQUE(post_id, reviewer_id, target_id). CHECK rating 1~5, CHECK reviewer ≠ target | MySQL은 8.0.16부터 CHECK 제약을 실제로 검사합니다 |
 | `review_tag_map` | review_id, review_tag_id | PK(review_id, review_tag_id) | |
 | `favorite_member` | member_id, target_member_id, created_at | PK(member_id, target_member_id) | FAV-002. 자기 자신 즐겨찾기 금지는 애플리케이션에서 검증 (MySQL은 CASCADE FK 컬럼에 CHECK를 걸 수 없음) |
+| `member_block` | member_id(차단한 회원), target_member_id(차단당한 회원), created_at | PK(member_id, target_member_id) | 차단당한 회원에게는 차단한 회원의 공고가 목록·검색·메인·관련 공고·프로필에서 빠지고 상세는 404. 새 공고 알림도 보내지 않음. 자기 자신 차단 금지는 애플리케이션에서 검증 |
 
 ### 2.12 알림
 
@@ -276,7 +278,7 @@ API의 `level`은 **서비스 활동 레벨**(`member.level`)입니다. 공고 �
 | --- | --- | --- | --- | --- |
 | member | post, comment, post_application, review, report, sanction | 1:N | RESTRICT | 회원은 소프트 삭제라 실제 행이 지워지지 않습니다. 기록을 보존해야 합니다. |
 | member | member_agreement, member_game_profile, post_draft, refresh_token, password_reset_token, notification, notification_subscription, activity_point_log | 1:N | CASCADE | 회원에게만 딸린 데이터 |
-| member | favorite_member, post_scrap | N:M | CASCADE | |
+| member | favorite_member, member_block, post_scrap | N:M | CASCADE | |
 | category, game, game_content, tag, review_tag | 이 마스터 테이블을 참조하는 모든 FK (game, game_content, post, member_game_profile, post_tag, review_tag_map, notification_subscription) | 1:N | RESTRICT | 마스터 데이터. 사용 중인 행은 지우지 않고 `is_active=false`로 숨김 |
 | post | post_application, comment, review, report, poll | 1:N | RESTRICT | 공고는 소프트 삭제라 함께 보존 |
 | post | post_tag, post_scrap | 1:N | CASCADE | |
@@ -320,6 +322,7 @@ PK와 UNIQUE는 그 자체가 인덱스라서, 중복되는 인덱스는 따로 
 | review | (target_id, created_at) | 매너 온도 재계산, 이달의 파티장 (MAIN-010) | 특정 회원이 기간 안에 받은 평가만 범위로 조회 |
 | review_tag_map | (review_tag_id) | 태그 통계 | |
 | favorite_member | (target_member_id) | 회원 탈퇴 시 정리, 즐겨찾기한 사람 수 | |
+| member_block | (target_member_id) | 회원 탈퇴 시 정리 | 공고 필터는 PK(member_id, target_member_id)로 찾습니다. |
 | notification | (member_id, is_read, created_at) | 안 읽은 알림 수, 알림 목록 | |
 | notification_subscription | UQ(member_id, game_id, game_content_id) / (game_id, game_content_id, enabled) | 중복 설정 방지 / 공고 등록 시 알림 받을 대상 조회 | game_content_id가 NULL이면 UNIQUE가 중복을 막지 못합니다. 애플리케이션에서도 검사해야 합니다. |
 | report | UQ(reporter_id, target_type, target_id) | 중복 신고 제한 (REPORT-005) | 같은 사람이 같은 대상을 신고하는 것은 영구히 한 번만 가능 |

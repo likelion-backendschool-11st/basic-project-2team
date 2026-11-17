@@ -27,7 +27,7 @@ const REVIEW_PROGRESS_COLUMNS = `(SELECT COUNT(*) FROM member host
 
 /**
  * 마이페이지·회원 프로필 조회용 테이블 접근:
- * member · member_game_profile · game · post · post_application · post_scrap · comment · review · review_tag_map · review_tag · favorite_member
+ * member · member_game_profile · game · post · post_application · post_scrap · comment · review · review_tag_map · review_tag · favorite_member · member_block
  * @param {import('mysql2/promise').Pool} pool
  */
 function createMypageRepository(pool) {
@@ -128,10 +128,18 @@ function createMypageRepository(pool) {
     return { rows, totalCount: Number(totalCount) };
   }
 
-  /** 다른 회원이 볼 수 있는 작성 공고 한 페이지와 전체 건수 (삭제되지 않은 공고, 최신순) */
-  async function findMemberPostPage({ memberId, limit, offset }) {
-    const condition = `p.author_id = ? AND ${ALIVE_POST}`;
-    const [[{ totalCount }]] = await pool.query(`SELECT COUNT(*) AS totalCount FROM post p WHERE ${condition}`, [memberId]);
+  /**
+   * 다른 회원이 볼 수 있는 작성 공고 한 페이지와 전체 건수 (삭제되지 않은 공고, 최신순).
+   * 작성자가 조회자(viewerId)를 차단했으면 빈 목록입니다.
+   */
+  async function findMemberPostPage({ memberId, viewerId = null, limit, offset }) {
+    let condition = `p.author_id = ? AND ${ALIVE_POST}`;
+    const params = [memberId];
+    if (viewerId !== null) {
+      condition += ' AND NOT EXISTS (SELECT 1 FROM member_block mb WHERE mb.member_id = p.author_id AND mb.target_member_id = ?)';
+      params.push(viewerId);
+    }
+    const [[{ totalCount }]] = await pool.query(`SELECT COUNT(*) AS totalCount FROM post p WHERE ${condition}`, params);
     const [rows] = await pool.query(
       `SELECT ${POST_COLUMNS}, p.view_count AS viewCount, p.comment_count AS commentCount, p.created_at AS createdAt
          FROM post p
@@ -139,7 +147,7 @@ function createMypageRepository(pool) {
         WHERE ${condition}
         ORDER BY p.created_at DESC, p.id DESC
         LIMIT ? OFFSET ?`,
-      [memberId, limit, offset],
+      [...params, limit, offset],
     );
     return { rows, totalCount: Number(totalCount) };
   }
@@ -267,6 +275,37 @@ function createMypageRepository(pool) {
     ]);
   }
 
+  /** 내가 차단한 유저 (최근 차단순, 탈퇴 회원 제외) */
+  async function findBlocks(memberId) {
+    const [rows] = await pool.query(
+      `SELECT m.id, m.nickname, m.avatar_url AS avatarUrl, m.level, mb.created_at AS blockedAt
+         FROM member_block mb
+         JOIN member m ON m.id = mb.target_member_id
+        WHERE mb.member_id = ? AND m.status <> 'WITHDRAWN'
+        ORDER BY mb.created_at DESC, m.id DESC`,
+      [memberId],
+    );
+    return rows;
+  }
+
+  async function isBlocked(memberId, targetMemberId) {
+    const [rows] = await pool.query(
+      'SELECT EXISTS (SELECT 1 FROM member_block WHERE member_id = ? AND target_member_id = ?) AS blocked',
+      [memberId, targetMemberId],
+    );
+    return Boolean(rows[0]?.blocked);
+  }
+
+  /** 차단. 이미 있으면 그대로 둡니다. */
+  async function addBlock(memberId, targetMemberId) {
+    await pool.query('INSERT IGNORE INTO member_block (member_id, target_member_id) VALUES (?, ?)', [memberId, targetMemberId]);
+  }
+
+  /** 차단 해제. 없으면 아무것도 하지 않습니다. */
+  async function removeBlock(memberId, targetMemberId) {
+    await pool.query('DELETE FROM member_block WHERE member_id = ? AND target_member_id = ?', [memberId, targetMemberId]);
+  }
+
   return {
     findMember,
     findLevel,
@@ -283,6 +322,10 @@ function createMypageRepository(pool) {
     isFavorite,
     addFavorite,
     removeFavorite,
+    findBlocks,
+    isBlocked,
+    addBlock,
+    removeBlock,
   };
 }
 

@@ -8,12 +8,13 @@ const { Router } = require('express');
  */
 function createBoardRouter(boardController, { optionalAuth, commentRouter }) {
   const router = Router();
-  router.get('/', boardController.list);
+  // 로그인했으면 나를 차단한 작성자의 공고를 빼야 해서 목록류에도 optionalAuth 를 붙입니다.
+  router.get('/', optionalAuth, boardController.list);
   // 고정 경로는 /:postId 보다 먼저 둡니다 (아니면 postId 로 해석돼 404 가 됩니다).
-  router.get('/popular', boardController.popular);
-  router.get('/urgent', boardController.urgent);
+  router.get('/popular', optionalAuth, boardController.popular);
+  router.get('/urgent', optionalAuth, boardController.urgent);
   router.use('/:postId/comments', commentRouter);
-  router.get('/:postId/related', boardController.related);
+  router.get('/:postId/related', optionalAuth, boardController.related);
   router.get('/:postId/events', boardController.events);
   router.get('/:postId', optionalAuth, boardController.getDetail);
   return router;

@@ -344,6 +344,7 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 - `q`: 검색어(50자 이하). 제목 · 파티명 · 게임명 · 태그 중 하나라도 포함하는 공고만 조회합니다 (`%`·`_` 는 문자 그대로 검색).
 - `tags`: 쉼표로 구분한 태그(최대 5개, `#` 는 있어도 됨). 지정한 태그를 **모두** 가진 공고만 조회합니다.
 - `page`(기본 1) · `size`(기본 8, 최대 50), `excludeClosed=true` 이면 모집 중(`OPEN`) 공고만 조회합니다 (기본 `false`).
+- **차단**: 로그인해서 조회하면(`Authorization` 헤더를 보내면) **나를 차단한 회원의 공고**는 목록·검색·인기·마감 임박·관련 공고·회원 공고 목록(`GET /api/members/{memberId}/posts`)에서 빠지고, 상세(`GET /api/posts/{postId}`)는 404 `POST_NOT_FOUND` 입니다. 그 회원의 새 공고 알림도 받지 않습니다. 비로그인 조회는 영향이 없습니다 (차단은 8절 `/me/blocks`).
 - `urgent`: 출발 시간이 가까운 순(일정 미정은 뒤), 남은 자리가 적은 순입니다. `recent` 는 최신순, `views` 는 조회수순입니다.
 - **인기·마감 임박** (`GET /api/posts/popular`, `GET /api/posts/urgent`): 응답은 목록 아이템(위 `GET /api/posts` 의 `items[]`)과 같은 모양의 **배열**입니다. `category`(생략 시 전체), `limit`(기본 4, 1~20, 그 밖은 400 `INVALID_INPUT`). 둘 다 **모집 중(`OPEN`)이고 아직 출발하지 않은**(일정 미정 포함) 공고만 대상입니다.
   - `popular`: 조회수 → 댓글 수 순
@@ -861,6 +862,8 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 | GET | `/api/members/me/scraps?page=&size=` | 내가 스크랩한 공고 | 🔒 |
 | GET | `/api/members/me/favorites` | 즐겨찾는 유저 목록 | 🔒 |
 | POST / DELETE | `/api/members/me/favorites/{memberId}` | 즐겨찾기 추가 / 해제 → `204` | 🔒 |
+| GET | `/api/members/me/blocks` | 내가 차단한 유저 목록 | 🔒 |
+| POST / DELETE | `/api/members/me/blocks/{memberId}` | 차단 / 차단 해제 → `204`. 차단당한 회원은 내 공고를 볼 수 없음 | 🔒 |
 | GET | `/api/members/{memberId}` | 회원 프로필 (로그인하면 `viewer` 포함) | |
 | GET | `/api/members/{memberId}/posts?page=&size=` | 그 회원이 쓴 공고 (삭제되지 않은 공고, 최신순). 아이템은 `/me/posts` 에서 `canComplete`·`review` 를 뺀 형태 | |
 | GET | `/api/members/{memberId}/manner-history?days=` | 최근 N일(기본 30, 최대 90, 가입한 지 N일이 안 됐으면 가입일부터) 매너 온도 변화 → `{ days, current, points: [{ date, temp, reviewCount }] }` | |
@@ -901,7 +904,7 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
   "createdAt": "2026-10-01T00:00:00.000Z",
   "ageRangePublic": false,
   "exp": { "activityPoint": 57000, "current": 600, "required": 2400, "percent": 25 },
-  "viewer": { "isMe": false, "favorited": true }
+  "viewer": { "isMe": false, "favorited": true, "blocked": false }
 }
 ```
 
@@ -995,6 +998,17 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
   { "id": 2, "nickname": "철수", "avatarUrl": null, "level": 52, "mannerTemp": 36.5,
     "mainGame": { "code": "lostark", "name": "로스트아크" }, "playStyle": "hard", "favoritedAt": "2026-11-01T00:00:00.000Z" }
 ]
+```
+
+**차단 (`/me/blocks`)**
+
+- 내가 차단한 회원은 **내 공고를 볼 수 없습니다** — 로그인한 그 회원에게는 목록·검색·메인·관련 공고·내 프로필의 공고 목록에서 빠지고, 상세는 404 `POST_NOT_FOUND`, 내 새 공고 알림(즐겨찾기·관심 게임)도 가지 않습니다. 반대로 나는 그 회원의 공고를 그대로 봅니다.
+- 다른 회원 프로필(`GET /api/members/{memberId}`)의 `viewer.blocked` 로 내가 차단했는지 알 수 있습니다.
+- 목록은 배열이며 최근 차단순, 탈퇴한 회원은 빠집니다. 차단·해제는 `204` 이고 멱등입니다.
+- 차단 오류: 400 `CANNOT_BLOCK_SELF` (자기 자신), 404 `MEMBER_NOT_FOUND` (없음·탈퇴·잘못된 id).
+
+```json
+[{ "id": 2, "nickname": "철수", "avatarUrl": null, "level": 52, "blockedAt": "2026-11-01T00:00:00.000Z" }]
 ```
 
 ## 9. 관리자 (Admin) 🛡️

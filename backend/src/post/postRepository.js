@@ -50,7 +50,7 @@ function createPostRepository(pool) {
     );
   }
 
-  /** 작성자를 즐겨찾기한 회원(탈퇴 회원 제외)에게 새 공고 알림을 한 번에 보냅니다. 작성자 본인은 대상이 아닙니다. */
+  /** 작성자를 즐겨찾기한 회원(탈퇴 회원 제외)에게 새 공고 알림을 한 번에 보냅니다. 작성자 본인·작성자가 차단한 회원은 대상이 아닙니다. */
   async function notifyFavoriteFollowers(connection, { authorId, postId, notice }) {
     const [[author]] = await connection.query('SELECT nickname FROM member WHERE id = ?', [authorId]);
     if (!author?.nickname) return;
@@ -58,14 +58,15 @@ function createPostRepository(pool) {
       `INSERT INTO notification (member_id, type, message, post_id)
        SELECT fm.member_id, ?, ?, ?
          FROM favorite_member fm JOIN member m ON m.id = fm.member_id
-        WHERE fm.target_member_id = ? AND fm.member_id <> ? AND m.status <> 'WITHDRAWN'`,
-      [notice.type, notice.message(author.nickname), postId, authorId, authorId],
+        WHERE fm.target_member_id = ? AND fm.member_id <> ? AND m.status <> 'WITHDRAWN'
+          AND fm.member_id NOT IN (SELECT mb.target_member_id FROM member_block mb WHERE mb.member_id = ?)`,
+      [notice.type, notice.message(author.nickname), postId, authorId, authorId, authorId],
     );
   }
 
   /**
    * 이 공고의 게임(상세 분류를 지정했다면 그 분류)을 관심 알림으로 켜 둔 회원에게 알립니다.
-   * 작성자 본인·탈퇴 회원은 제외하고, 같은 공고로 이미 「즐겨찾기 새 공고」 알림을 받는 회원에게는 중복으로 보내지 않습니다.
+   * 작성자 본인·탈퇴 회원·작성자가 차단한 회원은 제외하고, 같은 공고로 이미 「즐겨찾기 새 공고」 알림을 받는 회원에게는 중복으로 보내지 않습니다.
    */
   async function notifyInterestedMembers(connection, { post, postId, notice }) {
     const [[game]] = await connection.query('SELECT name FROM game WHERE id = ?', [post.gameId]);
@@ -77,8 +78,9 @@ function createPostRepository(pool) {
         WHERE s.enabled = TRUE AND s.game_id = ?
           AND (s.game_content_id IS NULL OR s.game_content_id <=> ?)
           AND s.member_id <> ? AND m.status <> 'WITHDRAWN'
-          AND s.member_id NOT IN (SELECT fm.member_id FROM favorite_member fm WHERE fm.target_member_id = ?)`,
-      [notice.type, notice.message(game.name), postId, post.gameId, post.gameContentId, post.authorId, post.authorId],
+          AND s.member_id NOT IN (SELECT fm.member_id FROM favorite_member fm WHERE fm.target_member_id = ?)
+          AND s.member_id NOT IN (SELECT mb.target_member_id FROM member_block mb WHERE mb.member_id = ?)`,
+      [notice.type, notice.message(game.name), postId, post.gameId, post.gameContentId, post.authorId, post.authorId, post.authorId],
     );
   }
 

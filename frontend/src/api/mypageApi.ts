@@ -160,9 +160,9 @@ export function toExpGauge(exp: LevelExp): ExpGaugeView {
 }
 
 /** GET /api/members/{memberId} — 다른 회원의 공개 프로필 (내 요약과 같은 필드, 비공개 항목 제외) */
-/** GET /api/members/{memberId}. viewer 는 로그인했을 때만 옵니다(favorited: 내가 즐겨찾기한 회원인지). */
+/** GET /api/members/{memberId}. viewer 는 로그인했을 때만 옵니다(favorited: 내가 즐겨찾기한 회원인지, blocked: 내가 차단한 회원인지). */
 export type MemberProfileResponse = Omit<MySummaryResponse, 'ageRangePublic' | 'exp'> & {
-  readonly viewer?: { readonly isMe: boolean; readonly favorited: boolean } | null;
+  readonly viewer?: { readonly isMe: boolean; readonly favorited: boolean; readonly blocked: boolean } | null;
 };
 
 export const getMemberProfile = (memberId: number) => request<MemberProfileResponse>('GET', `/api/members/${memberId}`);
@@ -199,6 +199,11 @@ export const getMyFavorites =() => request<readonly FavoriteItem[]>('GET', '/api
 export const addFavorite = (memberId: number) => request<void>('POST', `/api/members/me/favorites/${memberId}`);
 
 export const removeFavorite = (memberId: number) => request<void>('DELETE', `/api/members/me/favorites/${memberId}`);
+
+/** 차단한 회원은 내 공고를 볼 수 없습니다 (docs/API_SPEC.md 8절 「차단」). */
+export const addBlock = (memberId: number) => request<void>('POST', `/api/members/me/blocks/${memberId}`);
+
+export const removeBlock = (memberId: number) => request<void>('DELETE', `/api/members/me/blocks/${memberId}`);
 
 /* ── 화면용 변환 ── */
 

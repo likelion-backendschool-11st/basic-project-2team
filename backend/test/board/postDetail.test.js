@@ -50,7 +50,7 @@ const baseRow = () => ({
 
 /** DB 대신 메모리에 저장하는 가짜 repository */
 function createFakeRepository() {
-  const state = { posts: new Map(), tags: new Map(), scraps: new Set(), applications: new Map(), reports: new Set() };
+  const state = { posts: new Map(), tags: new Map(), scraps: new Set(), applications: new Map(), reports: new Set(), blocks: new Set() };
   const isAlive = (row) => row && row.status !== 'DELETED';
   return {
     state,
@@ -60,8 +60,9 @@ function createFakeRepository() {
       row.viewCount += 1;
       return true;
     },
-    async findPostDetail(postId) {
+    async findPostDetail(postId, viewerId = null) {
       const row = state.posts.get(postId);
+      if (isAlive(row) && state.blocks.has(`${row.hostId}:${viewerId}`)) return null;
       return isAlive(row) ? { ...row } : null;
     },
     async findTagNames(postId) {
@@ -97,12 +98,23 @@ describe('GET /api/posts/:postId', () => {
     repo.state.scraps.clear();
     repo.state.applications.clear();
     repo.state.reports.clear();
+    repo.state.blocks.clear();
     repo.state.posts.set(1, baseRow());
     repo.state.tags.set(1, ['숙련', '디코필수']);
   });
 
   const get = (postId, headers = {}) => fetch(`${baseUrl}/api/posts/${postId}`, { headers });
   const as = (memberId) => ({ Authorization: `Bearer ${tokens.createAccessToken(memberId)}` });
+
+  it('작성자에게 차단당한 회원이면 404 POST_NOT_FOUND 이고 조회수도 오르지 않는다 (비로그인·다른 회원은 그대로)', async () => {
+    repo.state.blocks.add(`${HOST_ID}:${VIEWER_ID}`);
+    const res = await get(1, as(VIEWER_ID));
+    assert.equal(res.status, 404);
+    assert.equal((await res.json()).error.code, 'POST_NOT_FOUND');
+    assert.equal(repo.state.posts.get(1).viewCount, baseRow().viewCount);
+    assert.equal((await get(1)).status, 200);
+    assert.equal((await get(1, as(VIEWER_ID + 1))).status, 200);
+  });
 
   it('비로그인: 공고 상세를 돌려주고 viewer 는 null 이다', async () => {
     const res = await get(1);

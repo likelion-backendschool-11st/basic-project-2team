@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toProfileSummary } from '../api/mypageApi';
 import ReportDialog from '../components/comments/ReportDialog';
+import ConfirmDialog from '../components/ui/ConfirmDialog';
 import MannerTempChart from '../components/mypage/MannerTempChart';
 import MemberPostsSection from '../components/mypage/MemberPostsSection';
 import ProfileSummaryCard from '../components/mypage/ProfileSummaryCard';
@@ -13,11 +14,11 @@ import { useMemberProfile } from '../hooks/useMemberProfile';
 
 const styleLabelOf = (style: string | null) => styleChoices.find((s) => s.id === style)?.label ?? null;
 
-/** 다른 회원의 프로필 페이지 (/members/:memberId): 프로필 카드 + 게이머 프로필(게임별) + 즐겨찾기 */
+/** 다른 회원의 프로필 페이지 (/members/:memberId): 프로필 카드 + 게이머 프로필(게임별) + 즐겨찾기·차단 */
 export const MemberProfilePage: React.FC = () => {
   const { memberId } = useParams();
   const navigate = useNavigate();
-  const { profile, error, favorited, pending, toggleFavorite, report, reportDialog, reload, toast } = useMemberProfile(memberId);
+  const { profile, error, favorited, blocked, pending, toggleFavorite, toggleBlock, blockDialog, report, reportDialog, reload, toast } = useMemberProfile(memberId);
   const summary = useMemo(() => (profile ? toProfileSummary(profile) : null), [profile]);
 
   return (
@@ -37,6 +38,18 @@ export const MemberProfilePage: React.FC = () => {
             >
               <i className="fa-regular fa-flag" />
               {memberProfileText.report}
+            </button>
+            <button
+              type="button"
+              onClick={blocked ? () => void toggleBlock() : blockDialog.open}
+              disabled={pending}
+              aria-pressed={blocked}
+              className={`h-10 px-4 rounded-xl text-sm font-semibold flex items-center gap-2 border transition-colors disabled:opacity-60 ${
+                blocked ? 'bg-roseAccent/10 border-roseAccent/40 text-roseAccent' : 'border-night-borderLight text-fog-sub hover:text-roseAccent hover:bg-roseAccent/10'
+              }`}
+            >
+              <i className="fa-solid fa-ban" />
+              {blocked ? memberProfileText.blocked : memberProfileText.block}
             </button>
             <button
               type="button"
@@ -93,6 +106,16 @@ export const MemberProfilePage: React.FC = () => {
         )}
       </div>
       <ReportDialog isOpen={reportDialog.isOpen} title={memberProfileText.reportTitle} onConfirm={(reason, detail) => void report(reason, detail)} onClose={reportDialog.close} />
+      <ConfirmDialog
+        isOpen={blockDialog.isOpen}
+        title={memberProfileText.blockDialog.title}
+        description={memberProfileText.blockDialog.description}
+        confirmLabel={memberProfileText.blockDialog.confirm}
+        cancelLabel={memberProfileText.blockDialog.cancel}
+        icon="fa-ban"
+        onConfirm={() => void toggleBlock()}
+        onCancel={blockDialog.close}
+      />
       <Toast message={toast.message} />
     </LoggedInLayout>
   );
