@@ -20,7 +20,7 @@ const RECENT_RATING_LIMIT = 30;
 const RECENT_PLAYER_LIMIT = 10;
 
 /** post_application.status 값. GET /api/members/me/applications?status= 필터에 씁니다. */
-const APPLICATION_STATUSES = Object.freeze(['PENDING', 'ACCEPTED', 'REJECTED', 'CANCELED', 'NO_SHOW']);
+const APPLICATION_STATUSES = Object.freeze(['PENDING', 'ACCEPTED', 'REJECTED', 'CANCELED', 'KICKED', 'NO_SHOW']);
 
 const mypageMessages = Object.freeze({
   invalidInput: '입력값을 확인해주세요.',

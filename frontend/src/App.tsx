@@ -1,6 +1,8 @@
+
 import { Navigate, useRoutes } from 'react-router-dom';
 import LoginPromptHost from './components/auth/LoginPromptHost';
 import ProfileSetupGuard from './components/auth/ProfileSetupGuard';
+import KickedNoticeHost from './components/post/KickedNoticeHost';
 import { ROUTES } from './data/routes';
 import { adminRoutes } from './routes/adminRoutes';
 import { authRoutes } from './routes/authRoutes';
@@ -28,6 +30,7 @@ export default function App() {
     <ProfileSetupGuard>
       {routes}
       <LoginPromptHost />
+      <KickedNoticeHost />
     </ProfileSetupGuard>
   );
 }

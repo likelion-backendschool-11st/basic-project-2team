@@ -13,9 +13,9 @@ const toIso = (value) => (value ? new Date(value).toISOString() : null);
 function createNotificationService({ notificationRepository }) {
   /** GET /api/notifications — 최신순 목록과 안 읽은 알림 수 */
   async function list(memberId, query) {
-    const { page, size, unreadOnly } = parseListQuery(query);
+    const { page, size, unreadOnly, type } = parseListQuery(query);
     const [{ rows, totalCount }, unreadCount] = await Promise.all([
-      notificationRepository.findPage({ memberId, unreadOnly, limit: size, offset: (page - 1) * size }),
+      notificationRepository.findPage({ memberId, unreadOnly, type, limit: size, offset: (page - 1) * size }),
       notificationRepository.countUnread(memberId),
     ]);
     return {

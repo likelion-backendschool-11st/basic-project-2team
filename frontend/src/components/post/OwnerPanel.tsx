@@ -12,12 +12,13 @@ interface OwnerPanelProps {
   readonly onClose: () => void;
   readonly onTogglePause: () => void;
   readonly onDisband: () => void;
+  readonly onKick: (participant: Participant) => void;
 }
 
 /** Owner view: participants roster + conditions + recruit controls. */
-export const OwnerPanel: React.FC<OwnerPanelProps> = ({ detail, participants, noShow, state, onClose, onTogglePause, onDisband }) => (
+export const OwnerPanel: React.FC<OwnerPanelProps> = ({ detail, participants, noShow, state, onClose, onTogglePause, onDisband, onKick }) => (
   <>
-    <ParticipantsCard participants={participants} max={detail.max} noShow={noShow} />
+    <ParticipantsCard participants={participants} max={detail.max} noShow={noShow} onKick={onKick} />
     <section className="rounded-2xl border border-night-borderLight bg-night-surface p-5">
       <h2 className="text-sm font-bold text-white mb-3">{postText.conditionsTitle}</h2>
       <dl className="divide-y divide-night-borderLight text-xs">

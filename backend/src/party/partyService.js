@@ -5,6 +5,7 @@ const { POST_EVENT, NO_EVENTS } = require('../common/postEvents');
 const { MEMBER_EVENT } = require('../common/memberEvents');
 const {
   APPLICATION_STATUS: S,
+  REAPPLY_STATUSES,
   POST_STATUS,
   MEMBER_STATUS,
   LATE_CANCEL_HOURS,
@@ -13,7 +14,7 @@ const {
   NOTIFICATION_TITLE_MAX,
   partyMessages: m,
 } = require('./partyConstants');
-const { parseId, validateApply, validateDecision, validatePostStatus, parseListStatus, validateInvite } = require('./partyValidator');
+const { parseId, validateApply, validateKick, validateDecision, validatePostStatus, parseListStatus, validateInvite } = require('./partyValidator');
 
 const toIso = (value) => (value ? new Date(value).toISOString() : null);
 const postNotFound = () => new ApiError(404, 'POST_NOT_FOUND', m.postNotFound);
@@ -71,7 +72,7 @@ function createPartyService({ partyRepository, postEvents = NO_EVENTS, memberEve
     return post;
   }
 
-  /** POST /api/posts/:postId/applications — 마감·가득 찬 공고, 본인 공고, 중복 신청, 작성자에게 차단당한 회원은 거절. 취소했던 신청은 같은 행을 되살립니다. */
+  /** POST /api/posts/:postId/applications — 마감·가득 찬 공고, 본인 공고, 중복 신청, 작성자에게 차단당한 회원은 거절. 취소·추방됐던 신청은 같은 행을 되살립니다. */
   async function apply(rawPostId, memberId, body) {
     const input = validateApply(body);
     const applicant = await partyRepository.findMemberStatus(memberId);
@@ -93,7 +94,7 @@ function createPartyService({ partyRepository, postEvents = NO_EVENTS, memberEve
     const alreadyApplied = () => new ApiError(409, 'ALREADY_APPLIED', m.alreadyApplied);
     if (existing) {
       if ([S.pending, S.accepted].includes(existing.status)) throw alreadyApplied();
-      if (existing.status !== S.canceled) throw new ApiError(403, 'REAPPLY_NOT_ALLOWED', m.reapplyNotAllowed);
+      if (!REAPPLY_STATUSES.includes(existing.status)) throw new ApiError(403, 'REAPPLY_NOT_ALLOWED', m.reapplyNotAllowed);
       if (!(await partyRepository.reapply({ id: existing.id, postId: post.id, notice, ...input }))) throw alreadyApplied();
       changed(post.id);
       notified(post.authorId);
@@ -279,7 +280,26 @@ function createPartyService({ partyRepository, postEvents = NO_EVENTS, memberEve
     }
   }
 
-  return { apply, cancelMine, listApplications, decide, changeStatus, listParticipants, invite, acceptInvitation };
+  /**
+   * DELETE /api/posts/:postId/participants/:memberId { reason? } — 작성자만. 수락된 파티원을 내보냅니다.
+   * 신청은 KICKED 가 되고(탈퇴처럼 다시 신청 가능) 확정 인원이 1 줄며, 추방된 회원에게 알립니다(late_cancel 은 남기지 않음). 남아 있던 초대는 지웁니다.
+   */
+  async function kick(rawPostId, rawMemberId, memberId, body) {
+    const { reason } = validateKick(body);
+    const post = await loadOwnedPost(rawPostId, memberId);
+    const targetId = parseId(rawMemberId);
+    if (targetId === null) throw new ApiError(404, 'PARTICIPANT_NOT_FOUND', m.participantNotFound);
+    if (targetId === post.authorId) throw new ApiError(400, 'CANNOT_KICK_HOST', m.cannotKickHost);
+    if (post.status === POST_STATUS.completed) throw new ApiError(409, 'POST_COMPLETED', m.kickNotAllowed);
+
+    const notice = { memberId: targetId, type: NOTIFICATION_TYPE.partyKicked, message: m.notice.kicked(clipTitle(post.title), reason) };
+    const kicked = await partyRepository.kickParticipant({ postId: post.id, applicantId: targetId, canceledAt: now(), notice });
+    if (!kicked) throw new ApiError(404, 'PARTICIPANT_NOT_FOUND', m.participantNotFound);
+    changed(post.id);
+    notified(targetId); // 추방된 회원의 알림 배지·추방 안내 모달을 바로 갱신
+  }
+
+  return { apply, cancelMine, listApplications, decide, changeStatus, listParticipants, invite, acceptInvitation, kick };
 }
 
 module.exports = { createPartyService };

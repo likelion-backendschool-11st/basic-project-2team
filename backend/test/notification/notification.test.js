@@ -16,8 +16,8 @@ function createFakeRepository() {
   const mine = (memberId) => state.rows.filter((r) => r.memberId === memberId);
   return {
     state,
-    async findPage({ memberId, unreadOnly, limit, offset }) {
-      const rows = mine(memberId).filter((r) => !unreadOnly || !r.isRead).sort((a, b) => b.id - a.id);
+    async findPage({ memberId, unreadOnly, type = null, limit, offset }) {
+      const rows = mine(memberId).filter((r) => (!unreadOnly || !r.isRead) && (!type || r.type === type)).sort((a, b) => b.id - a.id);
       return { rows: rows.slice(offset, offset + limit), totalCount: rows.length };
     },
     async countUnread(memberId) {
@@ -158,10 +158,17 @@ describe('notification inbox API', () => {
     assert.deepEqual([paged.items.map((n) => n.id), paged.totalPages], [[1], 2]);
   });
 
-  it('잘못된 page · size · unread 는 필드별 400', async () => {
-    const res = await call('GET', '?page=0&size=51&unread=maybe');
+  it('type 을 주면 그 유형의 알림만 주고, unreadCount 는 전체 안 읽은 수 그대로다', async () => {
+    repo.state.rows.push({ id: 5, memberId: ME, type: 'PARTY_KICKED', message: '추방', postId: 1, isRead: 0, createdAt: new Date('2026-11-13T05:00:00Z') });
+    repo.state.rows.push({ id: 6, memberId: OTHER, type: 'PARTY_KICKED', message: '남의 추방', postId: 1, isRead: 0, createdAt: new Date('2026-11-13T06:00:00Z') });
+    const { data } = await json(await call('GET', '?unread=true&type=PARTY_KICKED'));
+    assert.deepEqual([data.items.map((n) => n.id), data.totalCount, data.unreadCount], [[5], 1, 3]);
+  });
+
+  it('잘못된 page · size · unread · type 은 필드별 400', async () => {
+    const res = await call('GET', '?page=0&size=51&unread=maybe&type=party-kicked');
     assert.equal(res.status, 400);
-    assert.deepEqual((await json(res)).error.fields.map((f) => f.field), ['page', 'size', 'unread']);
+    assert.deepEqual((await json(res)).error.fields.map((f) => f.field), ['page', 'size', 'unread', 'type']);
   });
 
   it('안 읽은 알림 수만 가볍게 조회할 수 있다', async () => {

@@ -456,12 +456,13 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 | GET | `/api/posts/{postId}/participants` | 확정 파티원 목록 (`Participant[]`) | |
 | POST | `/api/posts/{postId}/invitations` | 파티 초대 `{ memberId }` → 받은 회원에게 `PARTY_INVITE` 알림 | 🔒 작성자 |
 | POST | `/api/posts/{postId}/invitations/accept` | 받은 초대 수락 → 바로 파티원(`ACCEPTED`) | 🔒 |
+| DELETE | `/api/posts/{postId}/participants/{memberId}` | 파티원 추방 `{ reason? }` | 🔒 작성자 |
 
 구현: `backend/src/party/` (`/api/posts` 에 마운트). 모두 🔒 이며 `participants` 만 비로그인도 조회할 수 있습니다. `postId`·`applicationId` 가 1 이상의 정수가 아니거나 삭제된 공고면 404 입니다.
 
 **참가 신청 (`POST /api/posts/{postId}/applications`)** — 본문 `{ "role": "서포터", "message": "잘 부탁드려요" }` (둘 다 선택, `role` 30자·`message` 200자 이하) → `201` `{ "id": 3, "status": "PENDING" }`
 
-- 취소(`CANCELED`)했던 신청은 같은 행을 `PENDING` 으로 되살립니다. 이때 `late_cancel` · `canceled_at` 취소 기록은 지우지 않습니다. 거절(`REJECTED`)·노쇼(`NO_SHOW`)된 신청은 다시 할 수 없습니다.
+- 취소(`CANCELED`)했거나 추방(`KICKED`)된 신청은 같은 행을 `PENDING` 으로 되살립니다. 이때 `late_cancel` · `canceled_at` 취소 기록은 지우지 않습니다. 거절(`REJECTED`)·노쇼(`NO_SHOW`)된 신청은 다시 할 수 없습니다.
 - 오류: 400 `INVALID_INPUT`(필드별), 401 `UNAUTHORIZED`, 403 `CANNOT_APPLY_OWN_POST` · `REAPPLY_NOT_ALLOWED` · `ACCOUNT_BANNED` · `ACCOUNT_SUSPENDED`, 404 `POST_NOT_FOUND`, 409 `POST_CLOSED`(마감·완료) · `POST_PAUSED`(일시 중단) · `PARTY_FULL`(정원이 참) · `ALREADY_APPLIED`(대기 중·수락됨).
 
 **신청 취소 (`DELETE /api/posts/{postId}/applications/me`)** → `204`
@@ -516,6 +517,14 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
  { "id": 2, "nickname": "달빛힐러", "avatarUrl": null, "level": 3, "mannerTemp": 36.5, "reviewCount": 0, "role": "서포터", "isHost": false }]
 ```
 
+**파티원 추방 (`DELETE /api/posts/{postId}/participants/{memberId}`)** 🔒 작성자 — 본문 `{ "reason": "사전 고지 없는 지각" }` (선택, 100자 이하, 줄바꿈은 띄어쓰기로 바꿈) → `204`
+
+- 사유를 주면 `PARTY_KICKED` 알림 문구 둘째 줄에 `사유: …` 로 붙입니다(예: `'카멘 하드 숙련팟' 파티에서 파티장에 의해 추방되었습니다.` + 줄바꿈 + `사유: 사전 고지 없는 지각`). 프론트 추방 안내 모달은 이 형식으로 사유를 나눠 보여줍니다.
+
+- 수락(`ACCEPTED`)된 파티원만 추방할 수 있습니다. 신청은 `KICKED` 가 되고(`canceled_at` 기록, `late_cancel` 은 남기지 않음) 공고의 `current` 가 1 줄며, 정원이 차서 마감된 공고는 다시 `OPEN` 이 됩니다(신청 취소와 같은 규칙). 남아 있던 파티 초대(`PARTY_INVITE` 알림)도 지워, 추방된 회원이 그 초대를 수락해 승인 없이 다시 들어오지 못하게 합니다(참가 취소와 같은 규칙). 추방된 회원은 탈퇴처럼 다시 신청할 수 있고 파티장이 승인해야 합류합니다(파티장이 새로 초대할 수도 있음). 상세의 `viewer.applicationStatus` 는 `KICKED` 로 내려갑니다. 프론트(`KickedNoticeHost` · `useKickedNotice`)는 **안 읽은 `PARTY_KICKED` 알림**(`GET /api/notifications?unread=true&type=PARTY_KICKED`)을 기준으로 어느 화면에서든 추방 안내 모달을 띄우고, 확인하면 그 알림을 읽음 처리합니다. 추방된 회원에게는 실시간 알림 신호(`GET /api/notifications/stream`)를 보내므로 헤더가 안 읽은 수 변화를 알아채면 바로 확인하고, 그 밖에 로그인 직후 · 화면을 보는 동안 5초마다 · 탭 복귀/포커스 때도 확인합니다. 공고 상세를 열어 둔 화면은 공고 실시간 신호로 `ACCEPTED → KICKED` 를 알아채 바로 확인합니다. 추방 순간의 신호에만 기대지 않으므로 추방 직후 페이지를 옮기거나 새로고침해도 모달이 뜹니다.
+- 추방된 회원에게 `PARTY_KICKED` 알림을 보내고, 공고 이벤트를 발행해 열려 있는 상세 화면이 새로고침 없이 바뀝니다.
+- 오류: 400 `INVALID_INPUT`(`reason`) · `CANNOT_KICK_HOST`(파티장 본인), 401, 403 `NOT_POST_AUTHOR`, 404 `POST_NOT_FOUND` · `PARTICIPANT_NOT_FOUND`(수락된 파티원이 아님, 형식이 틀린 id), 409 `POST_COMPLETED`(완료된 파티).
+
 **알림 전송** — 아래 파티 이벤트가 일어나면 같은 트랜잭션 안에서 `notification` 에 한 건씩 저장합니다(이벤트가 실패해 롤백되면 알림도 남지 않음). 문구는 `partyConstants.js` 의 `partyMessages.notice`, 공고 제목은 40자에서 줄임표로 자릅니다.
 
 | 이벤트 | 받는 사람 | `type` |
@@ -523,6 +532,7 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 | 참가 신청 · 재신청 | 파티장 | `APPLICATION_RECEIVED` |
 | 신청 승인/거절 | 신청자 | `APPLICATION_RESULT` |
 | 수락된 파티원의 신청 취소 (대기 중 취소는 알리지 않음) | 파티장 | `APPLICATION_CANCELED` |
+| 파티장이 파티원을 추방 | 추방된 회원 | `PARTY_KICKED` |
 | 승인으로 정원이 차서 자동 마감 | 아직 대기 중인 신청자 | `POST_UPDATED` |
 | 공대장이 파티 초대 | 초대받은 회원 | `PARTY_INVITE` |
 | 초대 수락 (수락으로 정원이 차면 위 자동 마감 알림도) | 파티장 | `INVITE_ACCEPTED` |
@@ -539,13 +549,13 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 **실시간 알림 신호 (`GET /api/notifications/stream`)** — 로그인한 회원 전용 SSE 입니다. `Authorization` 헤더가 필요해 브라우저는 `EventSource` 대신 `fetch` 스트림으로 받습니다(토큰을 URL 에 넣지 않으려고).
 
 - 연결하면 `: connected` 주석 줄, 이후 25초마다 `: ping` 을 보냅니다. 내 알림함이 바뀌면 `event: notifications` + `data: {}` 가 옵니다(내용 없음 — 받으면 `unread-count`·목록을 다시 조회).
-- 신호를 보내는 경우: 파티 초대(받은 회원), 초대 수락(공대장 · 수락한 회원), 참가 신청·재신청(공대장), 참가 취소(공대장 · 취소한 회원). 그 밖의 알림은 폴링으로 반영됩니다.
+- 신호를 보내는 경우: 파티 초대(받은 회원), 초대 수락(공대장 · 수락한 회원), 참가 신청·재신청(공대장), 참가 취소(공대장 · 취소한 회원), 파티원 추방(추방된 회원). 그 밖의 알림은 폴링으로 반영됩니다.
 - 허브는 프로세스 메모리(`common/memberEvents.js`)라 서버를 여러 대로 늘리거나 서버리스(Vercel)에서는 신호가 닿지 않을 수 있고, 그때는 폴링만으로 동작합니다. 서버 전체 연결이 2000개를 넘으면 503 `TOO_MANY_CONNECTIONS`.
 - 오류: 401 `UNAUTHORIZED` · `TOKEN_EXPIRED`(프론트가 재발급 후 다시 연결), 503 `TOO_MANY_CONNECTIONS`.
 
 | Method | URI | 설명 |
 | --- | --- | --- |
-| GET | `/api/notifications?page=&size=&unread=` | 내 알림 목록(최신순). `size` 기본 20 · 최대 50, `unread=true` 면 안 읽은 알림만 |
+| GET | `/api/notifications?page=&size=&unread=&type=` | 내 알림 목록(최신순). `size` 기본 20 · 최대 50, `unread=true` 면 안 읽은 알림만, `type` 을 주면 그 유형만(예: `PARTY_KICKED`, 영문 대문자·`_` 30자 이하) |
 | GET | `/api/notifications/unread-count` | 안 읽은 알림 수 `{ count }` (헤더 배지 폴링용) |
 | GET | `/api/notifications/stream` | 내 알림 변경 신호(SSE, `text/event-stream`). 아래 「실시간 알림 신호」 참고 |
 | PATCH | `/api/notifications/{notificationId}/read` | 알림 하나를 읽음 처리 → `204` (이미 읽은 알림도 `204`) |
@@ -569,7 +579,7 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 - `invite` 는 `PARTY_INVITE` 알림에만 붙고(그 외·공고가 삭제된 초대는 `null`), `joined` 는 받은 회원이 그 공고에 `ACCEPTED` 인지입니다. 프론트는 `false` 면 「파티 참여 수락」(→ `POST /api/posts/{postId}/invitations/accept` 후 목록에서 빼고 공고로 이동), `true` 면 「참여 중 · 공고 보기」 버튼을 보여줍니다(수락하면 알림이 지워지므로 `true` 는 다른 경로로 이미 파티원이 된 경우뿐).
 - `postId` 는 연결된 공고가 없거나 공고가 삭제돼 연결이 끊어지면 `null` 입니다. `unreadCount` 는 `unread` 필터와 상관없이 내 전체 안 읽은 알림 수입니다.
 - **관심 알림 설정**(REQ-NOTI-001): 회원당 최대 20개, 같은 대상(게임 + 상세 분류)은 한 번만 등록합니다. 오류: 400 `INVALID_INPUT`(`game` · `detail` · `enabled`), 404 `GAME_NOT_FOUND` · `GAME_CONTENT_NOT_FOUND` · `SUBSCRIPTION_NOT_FOUND`(없음, 남의 설정, 형식이 틀린 id), 409 `SUBSCRIPTION_EXISTS` · `SUBSCRIPTION_LIMIT`.
-- 오류: 400 `INVALID_INPUT`(`page` · `size` · `unread`), 401 `UNAUTHORIZED`, 404 `NOTIFICATION_NOT_FOUND`(없음, 남의 알림, 형식이 틀린 id — 남의 알림은 존재 여부를 알리지 않으려고 404).
+- 오류: 400 `INVALID_INPUT`(`page` · `size` · `unread` · `type`), 401 `UNAUTHORIZED`, 404 `NOTIFICATION_NOT_FOUND`(없음, 남의 알림, 형식이 틀린 id — 남의 알림은 존재 여부를 알리지 않으려고 404).
 
 ## 5. 댓글 (Comment)
 

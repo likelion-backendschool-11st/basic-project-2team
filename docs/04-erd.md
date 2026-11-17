@@ -283,7 +283,7 @@ erDiagram
         bigint applicant_id FK
         varchar(30) role "포지션"
         varchar(200) message
-        varchar(20) status "PENDING / ACCEPTED / REJECTED / CANCELED / NO_SHOW"
+        varchar(20) status "PENDING / ACCEPTED / REJECTED / CANCELED / KICKED / NO_SHOW"
         boolean late_cancel "기본 FALSE"
         datetime decided_at
         datetime canceled_at
@@ -436,7 +436,7 @@ erDiagram
     notification {
         bigint id PK
         bigint member_id FK
-        varchar(30) type "APPLICATION_RECEIVED / APPLICATION_RESULT / APPLICATION_CANCELED / POST_UPDATED / INTEREST_POST / POST_DELETED / SANCTION / NO_SHOW / POLL_CONFIRMED / POLL_REMINDER / PARTY_INVITE / INVITE_ACCEPTED"
+        varchar(30) type "APPLICATION_RECEIVED / APPLICATION_RESULT / APPLICATION_CANCELED / PARTY_KICKED / POST_UPDATED / INTEREST_POST / POST_DELETED / SANCTION / NO_SHOW / POLL_CONFIRMED / POLL_REMINDER / PARTY_INVITE / INVITE_ACCEPTED"
         varchar(200) message
         bigint post_id FK "NULL 허용"
         boolean is_read

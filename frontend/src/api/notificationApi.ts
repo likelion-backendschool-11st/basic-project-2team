@@ -30,8 +30,9 @@ export interface NotificationPage {
   readonly unreadCount: number;
 }
 
-export const getNotifications = (page: number, size: number, unreadOnly: boolean) =>
-  request<NotificationPage>('GET', `/api/notifications?page=${page}&size=${size}${unreadOnly ? '&unread=true' : ''}`);
+/** type 을 주면 그 유형의 알림만 가져옵니다 (예: 추방 안내 모달은 안 읽은 PARTY_KICKED 만 확인) */
+export const getNotifications = (page: number, size: number, unreadOnly: boolean, type?: NotificationType) =>
+  request<NotificationPage>('GET', `/api/notifications?page=${page}&size=${size}${unreadOnly ? '&unread=true' : ''}${type ? `&type=${type}` : ''}`);
 
 /** GET /api/notifications/unread-count — 안 읽은 알림 수 (헤더 배지용) */
 export const getUnreadCount = () => request<{ readonly count: number }>('GET', '/api/notifications/unread-count').then((res) => res.count);

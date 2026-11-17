@@ -1,6 +1,6 @@
 'use strict';
 
-const { APPLICATION_STATUS: S, POST_STATUS, NOTIFICATION_TYPE } = require('./partyConstants');
+const { APPLICATION_STATUS: S, REAPPLY_STATUSES, POST_STATUS, NOTIFICATION_TYPE } = require('./partyConstants');
 const { awardActivityPoints } = require('../common/activityPoint');
 
 const ALIVE_POST = "p.deleted_at IS NULL AND p.status <> 'DELETED'";
@@ -90,15 +90,15 @@ function createPartyRepository(pool) {
   }
 
   /**
-   * 취소했던 신청을 같은 행에서 다시 PENDING 으로 되돌립니다. 그 사이 상태가 바뀌었으면 false.
+   * 취소·추방됐던 신청을 같은 행에서 다시 PENDING 으로 되돌립니다. 그 사이 상태가 바뀌었으면 false.
    * 취소 기록(late_cancel · canceled_at)은 지우지 않습니다. 직전 취소 이력을 재신청으로 지울 수 없게 하기 위해서입니다.
    */
   async function reapply({ id, role, message, postId, notice }) {
     return inTransaction(async (connection) => {
       const [result] = await connection.query(
         `UPDATE post_application SET status = '${S.pending}', role = ?, message = ?, decided_at = NULL
-          WHERE id = ? AND status = '${S.canceled}'`,
-        [role, message, id],
+          WHERE id = ? AND status IN (?)`,
+        [role, message, id, REAPPLY_STATUSES],
       );
       if (result.affectedRows === 0) return false;
       await insertNotification(connection, { ...notice, postId });
@@ -144,11 +144,36 @@ function createPartyRepository(pool) {
       );
       if (wasAccepted) {
         await insertNotification(connection, { ...notice, postId }); // 수락됐던 파티원이 빠지면 파티장에게 알립니다.
-        // 정원이 차서 마감된 공고에서 자리가 나면 다시 모집 중으로 돌립니다.
-        const reopen = post.status === POST_STATUS.closed && post.current >= post.headcount;
-        await connection.query(`UPDATE post SET current_count = GREATEST(current_count - 1, 1)${reopen ? `, status = '${POST_STATUS.open}'` : ''} WHERE id = ?`, [postId]);
+        await releaseSeat(connection, post, postId);
       }
       // 남아 있던 초대로 공대장 모르게 다시 들어오지 않도록 지웁니다. 다시 들어오려면 새 초대나 재신청이 필요합니다.
+      await deleteInvitations(connection, { postId, memberId: applicantId });
+      return true;
+    });
+  }
+
+  /** 수락된 파티원이 빠진 자리만큼 확정 인원을 1 줄입니다. 정원이 차서 마감된 공고에서 자리가 나면 다시 모집 중으로 돌립니다. */
+  async function releaseSeat(connection, post, postId) {
+    const reopen = post.status === POST_STATUS.closed && post.current >= post.headcount;
+    await connection.query(`UPDATE post SET current_count = GREATEST(current_count - 1, 1)${reopen ? `, status = '${POST_STATUS.open}'` : ''} WHERE id = ?`, [postId]);
+  }
+
+  /**
+   * 파티장이 수락된 파티원을 내보냅니다. 신청을 KICKED 로 바꾸고(canceled_at 기록, late_cancel 은 그대로) 확정 인원을 1 줄인 뒤 추방된 회원에게 알립니다.
+   * 파티를 나갈 때처럼 남아 있던 초대도 지웁니다(그 초대를 수락해 공대장 승인 없이 다시 들어오지 않도록).
+   * @returns {Promise<boolean>} 내보냈으면 true, 이 공고의 수락된 파티원이 아니면 false
+   */
+  async function kickParticipant({ postId, applicantId, canceledAt, notice }) {
+    return inTransaction(async (connection) => {
+      const [[post]] = await connection.query('SELECT status, headcount, current_count AS current FROM post WHERE id = ? FOR UPDATE', [postId]);
+      const [[application]] = await connection.query(
+        'SELECT id, status FROM post_application WHERE post_id = ? AND applicant_id = ? FOR UPDATE',
+        [postId, applicantId],
+      );
+      if (!post || !application || application.status !== S.accepted) return false;
+      await connection.query(`UPDATE post_application SET status = '${S.kicked}', canceled_at = ? WHERE id = ?`, [canceledAt, application.id]);
+      await releaseSeat(connection, post, postId);
+      await insertNotification(connection, { ...notice, postId });
       await deleteInvitations(connection, { postId, memberId: applicantId });
       return true;
     });
@@ -360,6 +385,7 @@ function createPartyRepository(pool) {
     createApplication,
     reapply,
     cancelApplication,
+    kickParticipant,
     findApplications,
     findTopTagsByMembers,
     decideApplication,

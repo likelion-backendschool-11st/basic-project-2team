@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ApiRequestError, errorMessageOf, hasAccessToken } from '../api/http';
 import { promptLogin } from '../api/loginPrompt';
+import { notifyNotificationsChanged } from '../api/notificationApi';
 import { addFavorite, getMemberProfile, removeFavorite } from '../api/mypageApi';
 import {
   addScrap,
@@ -13,11 +14,12 @@ import {
   getParticipants,
   getPendingApplications,
   getRelatedPosts,
+  kickParticipant,
   removeScrap,
   reportPost,
 } from '../api/postApi';
 import { getPostDetail, toHostProfile, toPostDetail } from '../api/postDetailApi';
-import { postDetailText, postText, type HostProfile, type Participant, type PostDetail, type PostStatus, type RelatedPost } from '../data/postData';
+import { postDetailText, postText, type ApplicationStatus, type HostProfile, type Participant, type PostDetail, type PostStatus, type RelatedPost } from '../data/postData';
 import { paths, ROUTES } from '../data/routes';
 import { useModal } from './useModal';
 import { useToast } from './useToast';
@@ -71,6 +73,10 @@ export function usePostDetail(postId: string) {
   const [hostProfile, setHostProfile] = useState<HostProfile | null>(null);
   const [applicants, setApplicants] = useState<readonly Applicant[]>([]);
   const [participants, setParticipants] = useState<readonly Participant[]>([]);
+  /** 추방 확인 창에 띄울 파티원 (창이 닫혀 있으면 null) */
+  const [kickTarget, setKickTarget] = useState<Participant | null>(null);
+  /** 추방 확인 창에 적는 사유 (선택, 추방 알림·안내 모달에 실림) */
+  const [kickReason, setKickReason] = useState('');
   const toast = useToast();
   const applicantsDialog = useModal(false);
   const remove = useModal(false);
@@ -78,6 +84,8 @@ export function usePostDetail(postId: string) {
   const leave = useModal(false);
   const closeRecruit = useModal(false);
   const reportDialog = useModal(false);
+  /** 직전에 불러온 내 신청 상태. 화면을 연 채로 ACCEPTED → KICKED 가 되면 추방 안내(KickedNoticeHost)를 바로 확인시킵니다. */
+  const lastStatus = useRef<ApplicationStatus | null>(null);
   const reload = useCallback(() => setVersion((v) => v + 1), []);
 
   useEffect(() => {
@@ -86,7 +94,11 @@ export function usePostDetail(postId: string) {
     getPostDetail(postId, version === 0 && markViewed(postId))
       .then((res) => {
         if (cancelled) return;
-        setDetail(toPostDetail(res));
+        const next = toPostDetail(res);
+        // 실시간 신호로 추방을 알아채면, 추방 안내(useKickedNotice)의 5초 확인 주기를 기다리지 않고 바로 확인하게 합니다.
+        if (lastStatus.current === 'ACCEPTED' && next.applicationStatus === 'KICKED') notifyNotificationsChanged();
+        lastStatus.current = next.applicationStatus;
+        setDetail(next);
         setError(null);
       })
       .catch((err: unknown) => {
@@ -161,7 +173,17 @@ export function usePostDetail(postId: string) {
     getParticipants(postId)
       .then((items) => {
         if (cancelled) return;
-        setParticipants(items.map((p) => ({ id: p.id, name: p.nickname, avatarUrl: p.avatarUrl, role: p.isHost ? postDetailText.leaderRole : (p.role ?? postDetailText.slotRole), leader: p.isHost })));
+        setParticipants(
+          items.map((p) => ({
+            id: p.id,
+            name: p.nickname,
+            avatarUrl: p.avatarUrl,
+            role: p.isHost ? postDetailText.leaderRole : (p.role ?? postDetailText.slotRole),
+            leader: p.isHost,
+            level: p.level,
+            mannerTemp: p.mannerTemp,
+          })),
+        );
       })
       .catch(() => !cancelled && setParticipants([]));
     return () => {
@@ -255,6 +277,20 @@ export function usePostDetail(postId: string) {
       accepted ? `${applicant.name}님을 승인했습니다.` : `${applicant.name}님의 신청을 거절했습니다.`,
     );
 
+  // 공대장이 확정 파티원을 추방합니다. 추방된 회원의 신청은 탈퇴 상태가 되고, 그 회원 화면은 공고 이벤트로 새로고침 없이 바뀝니다.
+  const askKick = (participant: Participant) => {
+    setKickReason('');
+    setKickTarget(participant);
+  };
+  const cancelKick = () => setKickTarget(null);
+  const confirmKick = async () => {
+    const target = kickTarget;
+    setKickTarget(null);
+    if (target?.id === undefined) return;
+    const memberId = target.id;
+    await run(() => kickParticipant(postId, memberId, kickReason.trim()), postText.kick.done(target.name));
+  };
+
   const toggleFollow = async () => {
     if (hostId === undefined) return;
     const next = !following;
@@ -269,7 +305,7 @@ export function usePostDetail(postId: string) {
     applied: accepted || detail?.applicationStatus === 'PENDING', accepted,
     apply, scrapped, toggleScrap, copyLink, reported, askReport, confirmReport, reportDialog,
     hostProfile, following, toggleFollow, state, togglePause: () => setStatus(state === 'open' ? 'PAUSED' : 'OPEN'),
-    applicants, resolveApplicant, applicantsDialog, participants,
+    applicants, resolveApplicant, applicantsDialog, participants, kickTarget, kickReason, setKickReason, askKick, cancelKick, confirmKick,
     filled, percent: detail ? Math.round((filled / detail.max) * 100) : 0, toast,
     remove, disband, leave, closeRecruit, confirmLeave, confirmRemove, confirmDisband, confirmClose,
   };

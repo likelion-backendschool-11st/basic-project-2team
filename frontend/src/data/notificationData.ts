@@ -4,6 +4,7 @@ export type NotificationType =
   | 'APPLICATION_RECEIVED'
   | 'APPLICATION_RESULT'
   | 'APPLICATION_CANCELED'
+  | 'PARTY_KICKED'
   | 'POST_UPDATED'
   | 'POST_DELETED'
   | 'FAVORITE_AUTHOR_POST'
@@ -52,6 +53,7 @@ export const notificationTypes: Readonly<Record<NotificationType, { label: strin
   APPLICATION_RECEIVED: { label: '새 신청', icon: 'fa-solid fa-user-plus', tone: toneBrand },
   APPLICATION_RESULT: { label: '신청 결과', icon: 'fa-solid fa-circle-check', tone: toneOk },
   APPLICATION_CANCELED: { label: '신청 취소', icon: 'fa-solid fa-user-minus', tone: toneMuted },
+  PARTY_KICKED: { label: '파티 추방', icon: 'fa-solid fa-user-xmark', tone: toneDanger },
   POST_UPDATED: { label: '공고 변경', icon: 'fa-solid fa-pen-to-square', tone: toneWarn },
   POST_DELETED: { label: '공고 삭제', icon: 'fa-solid fa-trash', tone: toneDanger },
   FAVORITE_AUTHOR_POST: { label: '즐겨찾기 새 공고', icon: 'fa-solid fa-star', tone: toneBrand },

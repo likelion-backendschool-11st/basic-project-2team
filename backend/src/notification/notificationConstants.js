@@ -7,6 +7,8 @@ const MAX_PAGE_SIZE = 50;
 /** 관심 알림(notification_subscription) 규칙 (docs/API_SPEC.md 4절 알림함) */
 const MAX_SUBSCRIPTIONS = 20;
 const CODE_PATTERN = /^[a-z0-9_-]{1,30}$/;
+/** 알림 목록 ?type= 필터 (notification.type VARCHAR(30), 예: PARTY_KICKED) */
+const TYPE_PATTERN = /^[A-Z_]{1,30}$/;
 
 /** GET /api/notifications/stream: 서버 전체 연결 상한(넘으면 503, 화면은 폴링으로 대신)과 유휴 연결 유지용 주석 주기 */
 const MAX_STREAM_CONNECTIONS = 2000;
@@ -20,6 +22,7 @@ const notificationMessages = Object.freeze({
   pageInvalid: 'page 는 1 이상의 정수여야 합니다.',
   sizeInvalid: `size 는 1~${MAX_PAGE_SIZE} 사이의 정수여야 합니다.`,
   unreadInvalid: 'unread 는 true/false 여야 합니다.',
+  typeInvalid: 'type 은 알림 유형 코드(영문 대문자·_, 30자 이하)여야 합니다.',
   notFound: '존재하지 않는 알림입니다.',
   subscriptionNotFound: '존재하지 않는 관심 알림 설정입니다.',
   gameInvalid: 'game 은 게임 코드(영문 소문자·숫자·_-, 30자 이하)여야 합니다.',
@@ -32,4 +35,4 @@ const notificationMessages = Object.freeze({
   subscriptionLimit: `관심 알림은 최대 ${MAX_SUBSCRIPTIONS}개까지 설정할 수 있습니다.`,
 });
 
-module.exports = { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, MAX_SUBSCRIPTIONS, CODE_PATTERN, PARTY_INVITE_TYPE, MAX_STREAM_CONNECTIONS, STREAM_HEARTBEAT_MS, notificationMessages };
+module.exports = { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, MAX_SUBSCRIPTIONS, CODE_PATTERN, TYPE_PATTERN, PARTY_INVITE_TYPE, MAX_STREAM_CONNECTIONS, STREAM_HEARTBEAT_MS, notificationMessages };
