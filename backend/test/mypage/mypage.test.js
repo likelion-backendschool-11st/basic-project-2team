@@ -58,6 +58,7 @@ function createFakeRepository() {
     comments: [],
     scraps: [],
     favorites: new Set(),
+    recentPlayers: [],
     blocks: new Set(),
     calls: [],
   };
@@ -125,6 +126,10 @@ function createFakeRepository() {
           favoritedAt: new Date('2026-11-01T00:00:00Z'),
         }));
     },
+    async findRecentPlayers(memberId, limit) {
+      state.calls.push({ name: 'findRecentPlayers', memberId, limit });
+      return state.recentPlayers.slice(0, limit);
+    },
     async isFavorite(memberId, targetMemberId) {
       return state.favorites.has(`${memberId}:${targetMemberId}`);
     },
@@ -179,6 +184,7 @@ describe('마이페이지 API (/api/members)', () => {
     state.comments = [];
     state.scraps = [];
     state.favorites.clear();
+    state.recentPlayers = [];
     state.blocks.clear();
     state.calls = [];
 
@@ -578,6 +584,44 @@ describe('마이페이지 API (/api/members)', () => {
     it('토큰이 없으면 401', async () => {
       const res = await get('/me/scraps');
       assert.equal(res.status, 401);
+    });
+  });
+
+  describe('GET /me/recent-players', () => {
+    it('함께한 플레이어를 최대 10명까지 돌려준다 (마지막 파티 정보 포함)', async () => {
+      repo.state.recentPlayers = [
+        {
+          id: OTHER,
+          nickname: '철수',
+          avatarUrl: null,
+          level: 52,
+          mannerTemp: '36.5',
+          playCount: 3,
+          lastPlayedAt: new Date('2026-11-15T12:00:00Z'),
+          lastPostId: 10,
+          lastPostTitle: '[카멘] 숙련 서폿 구해요',
+          lastGameCode: 'lostark',
+          lastGameName: '로스트아크',
+        },
+      ];
+      const res = await get('/me/recent-players', as(ME));
+      assert.equal(res.status, 200);
+      assert.deepEqual((await res.json()).data, [
+        {
+          id: OTHER,
+          nickname: '철수',
+          avatarUrl: null,
+          level: 52,
+          mannerTemp: 36.5,
+          playCount: 3,
+          lastParty: { postId: 10, title: '[카멘] 숙련 서폿 구해요', game: 'lostark', gameName: '로스트아크', playedAt: '2026-11-15T12:00:00.000Z' },
+        },
+      ]);
+      assert.deepEqual(repo.state.calls.find((c) => c.name === 'findRecentPlayers'), { name: 'findRecentPlayers', memberId: ME, limit: 10 });
+    });
+
+    it('토큰이 없으면 401', async () => {
+      assert.equal((await get('/me/recent-players')).status, 401);
     });
   });
 

@@ -55,6 +55,10 @@ function createMypageController(mypageService) {
     return sendSuccess(res, 200, await mypageService.listFavorites(req.auth.memberId));
   }
 
+  async function listRecentPlayers(req, res) {
+    return sendSuccess(res, 200, await mypageService.listRecentPlayers(req.auth.memberId));
+  }
+
   async function addFavorite(req, res) {
     await mypageService.addFavorite(req.auth.memberId, requireMemberIdParam(req));
     return res.status(204).end();
@@ -90,6 +94,7 @@ function createMypageController(mypageService) {
     listMyComments,
     listMyScraps,
     listFavorites,
+    listRecentPlayers,
     addFavorite,
     removeFavorite,
     listBlocks,
