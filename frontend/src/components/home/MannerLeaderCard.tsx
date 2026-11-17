@@ -18,7 +18,9 @@ export const MannerLeaderCard: React.FC<MannerLeaderCardProps> = ({ leader }) =>
     <div className="flex items-center gap-3">
       <div className="relative">
         <div className={`w-10 h-10 rounded-full border flex items-center justify-center font-bold text-white text-sm ${avatarStyles[leader.accent]}`}>
-          <Avatar url={leader.avatarUrl} name={leader.name} className="w-full h-full rounded-full flex items-center justify-center" />
+          <Link to={paths.memberProfile(leader.id)} aria-label={leader.name} className="w-full h-full rounded-full">
+            <Avatar url={leader.avatarUrl} name={leader.name} className="w-full h-full rounded-full flex items-center justify-center" />
+          </Link>
         </div>
         <span
           className={`absolute -bottom-1 -right-1 w-4 h-4 text-[9px] font-black rounded-full flex items-center justify-center shadow ${rankBadgeStyles[leader.rank]}`}

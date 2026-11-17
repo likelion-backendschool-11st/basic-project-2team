@@ -12,6 +12,8 @@ export interface PostListItem {
   readonly current: number;
   readonly max: number;
   readonly tags: readonly string[];
+  /** 작성자 회원 id. 탈퇴한 작성자면 null */
+  readonly authorId: number | null;
   readonly author: string;
   readonly schedule: string | null;
   readonly scheduleTbd: boolean;
@@ -115,6 +117,7 @@ export function toBoardPost(item: PostListItem, order: number): BoardPost {
     membersTone: closed ? 'urgent' : membersToneOf(remaining),
     badge: badgeOf(item, remaining),
     tags: item.tags,
+    authorId: item.authorId,
     author: item.author,
     date: toShortDate(item.createdAt),
     views: item.views,

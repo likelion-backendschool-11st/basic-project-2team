@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import type { PostDetail } from '../../data/postData';
 import { postText } from '../../data/postData';
 import { ROUTES } from '../../data/routes';
+import ProfileLink from '../ui/ProfileLink';
 import type { PartyState } from '../../hooks/usePostDetail';
 
 interface PostHeaderProps {
@@ -48,11 +49,13 @@ export const PostHeader: React.FC<PostHeaderProps> = ({ detail, filled, state, s
     <h1 className="text-2xl md:text-3xl font-bold text-white leading-snug">{detail.title}</h1>
     <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-fog-muted">
       <div className="flex items-center gap-3">
-        <span className="w-10 h-10 rounded-xl bg-night-card flex items-center justify-center text-mercury-light"><i className="fa-solid fa-shield-halved" /></span>
+        <ProfileLink memberId={detail.host.id} ariaLabel={`${detail.host.name} ${postText.viewProfile}`} className="w-10 h-10 rounded-xl bg-night-card flex items-center justify-center text-mercury-light hover:ring-2 hover:ring-mercury/50">
+          <i className="fa-solid fa-shield-halved" />
+        </ProfileLink>
         <div>
           <div className="text-sm text-white font-semibold flex items-center gap-2">
             {detail.isOwner && <span className="text-fog-muted font-normal">{postText.hostLabel}</span>}
-            {detail.host.name}
+            <ProfileLink memberId={detail.host.id}>{detail.host.name}</ProfileLink>
             <span className="text-[10px] px-1.5 rounded bg-mercury/20 text-mercury-light">Lv.{detail.host.level}</span>
             <span className="text-[10px] px-1.5 rounded bg-emeraldAccent/15 text-emerald-300">매너 {detail.host.manner}</span>
           </div>

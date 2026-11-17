@@ -6,6 +6,7 @@ import { Avatar } from '../ui/Avatar';
 import CommentComposer from './CommentComposer';
 import { PartyMemberBadges } from './PartyChannel';
 import UserPopover from './UserPopover';
+import ProfileLink from '../ui/ProfileLink';
 
 interface CommentItemProps {
   readonly comment: PostComment;
@@ -59,7 +60,7 @@ export const CommentItem: React.FC<CommentItemProps> = (p) => {
       <div ref={profileAnchor} className="relative">
       <div className="flex flex-wrap items-center gap-2 text-xs">
         <button type="button" onClick={p.onTogglePopover} className="w-7 h-7 rounded-full bg-mercury/25 text-white text-[11px] font-bold hover:ring-2 hover:ring-mercury/50" aria-label={`${c.author} 프로필`} aria-expanded={p.popoverOpen} aria-haspopup="dialog"><Avatar url={c.avatarUrl} name={c.author} className="w-full h-full rounded-full flex items-center justify-center" /></button>
-        <span className="font-bold text-white">{c.author}</span>
+        <ProfileLink memberId={c.authorId} className="font-bold text-white">{c.author}</ProfileLink>
         {c.badge === 'mine' && <span className="px-1.5 rounded bg-emeraldAccent/15 text-emerald-300 text-[10px]">{commentText.mine}</span>}
         {c.solved && <span className="px-1.5 rounded bg-emeraldAccent/15 text-emerald-300 text-[10px] inline-flex items-center gap-1"><i className="fa-solid fa-circle-check" />{commentText.solvedBadge}</span>}
         {c.accepted && <span className="px-1.5 rounded bg-emeraldAccent/15 text-emerald-300 text-[10px] inline-flex items-center gap-1"><i className="fa-solid fa-circle-check" />{commentText.acceptedBadge}</span>}
@@ -114,7 +115,7 @@ export const CommentItem: React.FC<CommentItemProps> = (p) => {
           <div className="flex items-center gap-2 text-xs">
             <span className="inline-flex items-center gap-1 font-bold text-emerald-300"><i className="fa-solid fa-circle-check" />{commentText.pinnedTitle}</span>
             <Avatar url={pinned.avatarUrl} name={pinned.author} className="w-5 h-5 shrink-0 rounded-full bg-mercury/25 text-white text-[10px] font-bold flex items-center justify-center" />
-            <span className="font-bold text-white">{pinned.author}</span>
+            <ProfileLink memberId={pinned.authorId} className="font-bold text-white">{pinned.author}</ProfileLink>
             <span className="text-fog-muted">{ago(pinned.ageMin)}</span>
           </div>
           <p className="mt-2 text-sm leading-6 text-fog-headline whitespace-pre-wrap break-words">{pinned.text}</p>

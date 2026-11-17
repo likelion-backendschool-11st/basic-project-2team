@@ -157,6 +157,7 @@ export const postText = {
   manageApplicants: '신청자 목록 관리 / 승인',
   applicantMannerTemp: (temp: number) => `매너온도 ${temp.toFixed(1)}℃`,
   applicantReviewCount: (n: number) => `평가 ${n}건`,
+  viewProfile: '프로필 보기',
   applicantNoTags: '아직 받은 평가 태그가 없어요',
   participantsTitle: '파티 참가자 명단',
   emptySlot: '모집 중',

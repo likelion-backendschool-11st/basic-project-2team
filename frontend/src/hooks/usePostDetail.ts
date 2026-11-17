@@ -40,7 +40,10 @@ function markViewed(postId: string) {
 export type PartyState = 'open' | 'paused' | 'closed';
 
 export interface Applicant {
+  /** 신청 id */
   readonly id: number;
+  /** 신청한 회원 id (프로필 링크) */
+  readonly memberId: number;
   readonly name: string;
   readonly avatarUrl: string | null;
   readonly spec: string;
@@ -136,6 +139,7 @@ export function usePostDetail(postId: string) {
         setApplicants(
           items.map((a) => ({
             id: a.id,
+            memberId: a.applicant.id,
             name: a.applicant.nickname,
             avatarUrl: a.applicant.avatarUrl,
             spec: [`Lv.${a.applicant.level}`, a.role, a.message].filter(Boolean).join(' · '),

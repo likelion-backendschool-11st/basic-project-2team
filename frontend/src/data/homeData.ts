@@ -18,6 +18,8 @@ export interface PopularPost {
   readonly time: string;
   readonly title: string;
   readonly voice: { readonly label: string; readonly icon: string; readonly highlight: boolean };
+  /** 작성자 회원 id (프로필 링크). 탈퇴한 작성자는 null */
+  readonly authorId?: number | null;
   readonly author: string;
   readonly members: string;
 }

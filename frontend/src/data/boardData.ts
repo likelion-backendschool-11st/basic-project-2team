@@ -35,6 +35,8 @@ export interface BoardPost {
   readonly membersTone: MembersTone;
   readonly badge?: PostBadge;
   readonly tags: readonly string[];
+  /** 작성자 회원 id (프로필 링크). 탈퇴한 작성자·목 데이터는 없음 */
+  readonly authorId?: number | null;
   readonly author: string;
   readonly date: string;
   readonly views: number;

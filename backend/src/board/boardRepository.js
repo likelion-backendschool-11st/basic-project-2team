@@ -27,7 +27,7 @@ const LIST_COLUMNS = `p.id, p.category_code AS categoryCode, g.code AS gameCode,
               p.party_type AS partyType, p.title, p.headcount, p.current_count AS currentCount,
               p.schedule_at AS scheduleAt, p.voice_required AS voiceRequired, p.status,
               p.view_count AS viewCount, p.comment_count AS commentCount, p.created_at AS createdAt,
-              m.nickname AS authorNickname, m.status AS authorStatus`;
+              p.author_id AS authorId, m.nickname AS authorNickname, m.status AS authorStatus`;
 const LIST_JOINS = `FROM post p
          JOIN game g ON g.id = p.game_id
          JOIN member m ON m.id = p.author_id`;

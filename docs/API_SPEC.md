@@ -432,14 +432,14 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 {
   "id": 7, "category": "mmorpg", "game": "lostark", "gameName": "로스트아크", "type": "raid",
   "title": "...", "current": 3, "max": 8, "tags": ["숙련"],
-  "author": "빛나는오더",
+  "authorId": 3, "author": "빛나는오더",
   "schedule": "2026-11-15T12:00:00.000Z", "scheduleTbd": false, "voiceRequired": true,
   "views": 128, "commentCount": 3, "status": "OPEN",
   "createdAt": "2026-11-12T11:30:00.000Z"
 }
 ```
 
-- `current` / `max` 는 파티장 포함 현재 인원 / 정원입니다. 탈퇴한 작성자는 `author` 가 `"탈퇴한 회원"` 입니다. 일정 미정이면 `schedule: null`, `scheduleTbd: true` 입니다.
+- `current` / `max` 는 파티장 포함 현재 인원 / 정원입니다. `authorId` 는 작성자 회원 id 로 프로필(`/members/{authorId}`) 링크에 씁니다. 탈퇴한 작성자는 `author` 가 `"탈퇴한 회원"`, `authorId` 가 `null` 입니다. 일정 미정이면 `schedule: null`, `scheduleTbd: true` 입니다.
 
 **욕설 필터 오류 코드** — 욕설 때문에 거절하면 `INVALID_INPUT` 이 아니라 400 `PROFANITY_DETECTED` 를 돌려줍니다(`error.fields` 형식은 같음). 프론트는 이 코드를 보고 경고 모달을 띄웁니다.
 

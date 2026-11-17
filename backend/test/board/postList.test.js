@@ -27,6 +27,7 @@ const row = (id, overrides = {}) => ({
   viewCount: 10,
   commentCount: 2,
   createdAt: new Date('2026-11-12T11:30:00Z'),
+  authorId: 7,
   authorNickname: '빛나는오더',
   authorStatus: 'ACTIVE',
   ...overrides,
@@ -93,6 +94,7 @@ describe('GET /api/posts (목록)', () => {
       current: 3,
       max: 8,
       tags: ['숙련', '디코필수'],
+      authorId: 7,
       author: '빛나는오더',
       schedule: '2026-11-15T12:00:00.000Z',
       scheduleTbd: false,
@@ -107,6 +109,7 @@ describe('GET /api/posts (목록)', () => {
   it('탈퇴한 작성자는 "탈퇴한 회원", 일정 미정은 schedule null, 태그 없으면 빈 배열', async () => {
     const { data } = await (await get()).json();
     assert.equal(data.items[0].author, '탈퇴한 회원');
+    assert.equal(data.items[0].authorId, null);
     assert.equal(data.items[0].schedule, null);
     assert.equal(data.items[0].scheduleTbd, true);
     assert.deepEqual(data.items[0].tags, []);

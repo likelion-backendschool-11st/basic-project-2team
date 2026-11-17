@@ -3,6 +3,7 @@ import { timeAgo } from '../../api/postDetailApi';
 import { votePercent, type PollPerson, type PollResponse } from '../../api/pollApi';
 import { pollText, type PollParticipantTab } from '../../data/pollData';
 import Modal from '../ui/Modal';
+import ProfileLink from '../ui/ProfileLink';
 
 interface PollParticipantsDialogProps {
   readonly poll: PollResponse;
@@ -108,7 +109,7 @@ export const PollParticipantsDialog: React.FC<PollParticipantsDialogProps> = ({ 
                   <Avatar person={v} mine={mine} />
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="truncate text-sm font-bold text-white">{v.nickname}</span>
+                      <ProfileLink memberId={v.memberId} className="truncate text-sm font-bold text-white">{v.nickname}</ProfileLink>
                       {v.isHost && <span className="rounded bg-mercury px-1.5 text-[10px] font-bold text-white">{t.host}</span>}
                       {mine && <span className="rounded-full border border-emeraldAccent/40 bg-emeraldAccent/20 px-2 py-0.5 text-[10px] font-bold text-emerald-300">{t.me}</span>}
                       <span className={tempChip}>{v.mannerTemp.toFixed(1)}°C</span>
@@ -132,7 +133,7 @@ export const PollParticipantsDialog: React.FC<PollParticipantsDialogProps> = ({ 
               <div className="flex min-w-0 items-center gap-3">
                 <Avatar person={n} mine={n.memberId === myId} />
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="truncate text-sm font-bold text-white">{n.nickname}</span>
+                  <ProfileLink memberId={n.memberId} className="truncate text-sm font-bold text-white">{n.nickname}</ProfileLink>
                   {n.isHost && <span className="rounded bg-mercury px-1.5 text-[10px] font-bold text-white">{t.host}</span>}
                   <span className={tempChip}>{n.mannerTemp.toFixed(1)}°C</span>
                 </div>

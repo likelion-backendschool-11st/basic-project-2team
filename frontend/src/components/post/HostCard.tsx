@@ -20,7 +20,9 @@ export const HostCard: React.FC<HostCardProps> = ({ host, profile, following, on
   <section className="rounded-2xl border border-night-borderLight bg-night-surface p-5 flex flex-col gap-3">
     <h2 className="text-sm font-bold text-white">{postText.hostProfile}</h2>
     <div className="flex items-center gap-3">
-      <Avatar url={host.avatarUrl} name={host.name} className="w-12 h-12 shrink-0 rounded-full bg-night-card flex items-center justify-center text-lg font-bold text-white" />
+      <Link to={paths.memberProfile(host.id)} aria-label={host.name} className="shrink-0 rounded-full hover:ring-2 hover:ring-mercury/50">
+        <Avatar url={host.avatarUrl} name={host.name} className="w-12 h-12 rounded-full bg-night-card flex items-center justify-center text-lg font-bold text-white" />
+      </Link>
       <div className="min-w-0">
         <Link to={paths.memberProfile(host.id)} className="font-bold text-white text-lg break-words hover:text-mercury-light hover:underline">{host.name}</Link>
         {profile?.gameLine && <div className="text-xs text-fog-muted break-words">{profile.gameLine}</div>}
