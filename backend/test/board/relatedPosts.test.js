@@ -69,7 +69,7 @@ describe('GET /api/posts/:postId/related', () => {
     assert.deepEqual(data[0].tags, ['숙련']);
     assert.deepEqual(data[1].tags, []);
     assert.equal(data[0].game, 'lostark');
-    assert.deepEqual(repo.state.last, { postId: 1, limit: 4, now: NOW });
+    assert.deepEqual(repo.state.last, { postId: 1, limit: 4, now: NOW, viewerId: null });
   });
 
   it('limit 를 받고 1~20 밖이거나 숫자가 아니면 400', async () => {

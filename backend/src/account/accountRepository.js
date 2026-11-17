@@ -31,7 +31,7 @@ async function inTransaction(pool, fn) {
 /**
  * 내 정보 조회·프로필 수정·비밀번호 변경·회원 탈퇴용 테이블 접근:
  * member · member_game_profile · game · refresh_token · password_reset_token · post · post_application · sanction ·
- * member_withdrawal · favorite_member · post_scrap · post_draft · notification_subscription
+ * member_withdrawal · favorite_member · member_block · post_scrap · post_draft · notification_subscription
  * @param {import('mysql2/promise').Pool} pool
  */
 function createAccountRepository(pool) {
@@ -197,6 +197,7 @@ function createAccountRepository(pool) {
         memberId,
         memberId,
       ]);
+      await connection.query('DELETE FROM member_block WHERE member_id = ? OR target_member_id = ?', [memberId, memberId]);
       await connection.query('DELETE FROM post_scrap WHERE member_id = ?', [memberId]);
       await connection.query('DELETE FROM post_draft WHERE member_id = ?', [memberId]);
       await connection.query('DELETE FROM notification_subscription WHERE member_id = ?', [memberId]);

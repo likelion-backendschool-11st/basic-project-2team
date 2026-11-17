@@ -78,12 +78,12 @@ function toPostListItem(row, tags) {
  */
 function createBoardService({ boardRepository, now = () => new Date() }) {
   /**
-   * GET /api/posts/{postId} — 조회수를 1 올리고 상세를 돌려줍니다.
+   * GET /api/posts/{postId} — 조회수를 1 올리고 상세를 돌려줍니다. 작성자가 조회자를 차단했으면 없는 공고(404)로 봅니다.
    * @param {number} postId
    * @param {number | null} memberId 비로그인이면 null
    */
   async function getPostDetail(postId, memberId, { countView = true } = {}) {
-    const row = await boardRepository.findPostDetail(postId);
+    const row = await boardRepository.findPostDetail(postId, memberId);
     if (!row) throw new ApiError(404, 'POST_NOT_FOUND', boardMessages.postNotFound);
 
     // 화면이 상태를 다시 불러올 때(?view=false)와 작성자 본인이 볼 때는 조회수를 올리지 않습니다.
@@ -103,8 +103,11 @@ function createBoardService({ boardRepository, now = () => new Date() }) {
     return toPostDetail(row, tags, viewer);
   }
 
-  /** GET /api/posts — 공고 목록 (페이지네이션 응답 `{ items, page, size, totalCount, totalPages }`) */
-  async function listPosts(query) {
+  /**
+   * GET /api/posts — 공고 목록 (페이지네이션 응답 `{ items, page, size, totalCount, totalPages }`)
+   * @param {number | null} viewerId 로그인했으면 나를 차단한 작성자의 공고를 뺍니다.
+   */
+  async function listPosts(query, viewerId = null) {
     const { category, game, time, type, detail, style, headcount, date, voice, q, sort, tags, page, size, excludeClosed } = parseListQuery(query);
     const { rows, totalCount } = await boardRepository.findPostPage({
       category,
@@ -120,6 +123,7 @@ function createBoardService({ boardRepository, now = () => new Date() }) {
       sort,
       tags,
       excludeClosed,
+      viewerId,
       limit: size,
       offset: (page - 1) * size,
     });
@@ -134,9 +138,9 @@ function createBoardService({ boardRepository, now = () => new Date() }) {
   }
 
   /** GET /api/posts/popular · urgent — 메인 화면용 공고 목록(배열, 목록 아이템과 같은 모양) */
-  async function listFeatured(kind, query) {
+  async function listFeatured(kind, query, viewerId = null) {
     const { category, limit } = parseFeaturedQuery(query);
-    const rows = await boardRepository.findFeaturedPosts({ kind, category, limit, now: now() });
+    const rows = await boardRepository.findFeaturedPosts({ kind, category, limit, now: now(), viewerId });
     const tagsByPost = await boardRepository.findTagNamesByPostIds(rows.map((row) => row.id));
     return rows.map((row) => toPostListItem(row, tagsByPost.get(row.id) ?? []));
   }
@@ -147,9 +151,9 @@ function createBoardService({ boardRepository, now = () => new Date() }) {
   }
 
   /** GET /api/posts/{postId}/related — 같은 게임의 다른 모집 중 공고(배열, 목록 아이템과 같은 모양). 조회수는 올리지 않습니다. */
-  async function listRelated(postId, query) {
+  async function listRelated(postId, query, viewerId = null) {
     const { limit } = parseRelatedQuery(query);
-    const rows = await boardRepository.findRelatedPosts({ postId, limit, now: now() });
+    const rows = await boardRepository.findRelatedPosts({ postId, limit, now: now(), viewerId });
     if (!rows) throw new ApiError(404, 'POST_NOT_FOUND', boardMessages.postNotFound);
     const tagsByPost = await boardRepository.findTagNamesByPostIds(rows.map((row) => row.id));
     return rows.map((row) => toPostListItem(row, tagsByPost.get(row.id) ?? []));

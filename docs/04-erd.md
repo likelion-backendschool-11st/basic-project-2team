@@ -67,6 +67,8 @@ erDiagram
     review_tag ||--o{ review_tag_map : ""
     member ||--o{ favorite_member : "즐겨찾기함"
     member ||--o{ favorite_member : "즐겨찾기됨"
+    member ||--o{ member_block : "차단함"
+    member ||--o{ member_block : "차단됨"
 
     member ||--o{ notification : ""
     post |o--o{ notification : ""
@@ -310,6 +312,8 @@ erDiagram
     review_tag ||--o{ review_tag_map : ""
     member ||--o{ favorite_member : "즐겨찾기함 (member_id)"
     member ||--o{ favorite_member : "즐겨찾기됨 (target_member_id)"
+    member ||--o{ member_block : "차단함 (member_id)"
+    member ||--o{ member_block : "차단됨 (target_member_id)"
 
     comment {
         bigint id PK
@@ -350,6 +354,12 @@ erDiagram
     favorite_member {
         bigint member_id PK, FK
         bigint target_member_id PK, FK "자기 자신 불가 (애플리케이션 검증)"
+    }
+
+    member_block {
+        bigint member_id PK, FK "차단한 회원"
+        bigint target_member_id PK, FK "차단당한 회원 (자기 자신 불가)"
+        datetime created_at
     }
 
     post {
@@ -576,6 +586,8 @@ erDiagram
 | review_tag_map.review_tag_id | review_tag | 1:N | RESTRICT |
 | favorite_member.member_id | member | 1:N | CASCADE |
 | favorite_member.target_member_id | member | 1:N | CASCADE |
+| member_block.member_id | member | 1:N | CASCADE |
+| member_block.target_member_id | member | 1:N | CASCADE |
 | notification.member_id | member | 1:N | CASCADE |
 | notification.post_id | post | 0..1:N | SET NULL |
 | notification_subscription.member_id | member | 1:N | CASCADE |

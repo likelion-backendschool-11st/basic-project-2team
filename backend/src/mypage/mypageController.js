@@ -28,7 +28,7 @@ function createMypageController(mypageService) {
   }
 
   async function listMemberPosts(req, res) {
-    return sendSuccess(res, 200, await mypageService.listMemberPosts(requireMemberIdParam(req), req.query));
+    return sendSuccess(res, 200, await mypageService.listMemberPosts(requireMemberIdParam(req), req.query, req.auth?.memberId ?? null));
   }
 
   async function getMannerHistory(req, res) {
@@ -65,6 +65,20 @@ function createMypageController(mypageService) {
     return res.status(204).end();
   }
 
+  async function listBlocks(req, res) {
+    return sendSuccess(res, 200, await mypageService.listBlocks(req.auth.memberId));
+  }
+
+  async function addBlock(req, res) {
+    await mypageService.addBlock(req.auth.memberId, requireMemberIdParam(req));
+    return res.status(204).end();
+  }
+
+  async function removeBlock(req, res) {
+    await mypageService.removeBlock(req.auth.memberId, requireMemberIdParam(req));
+    return res.status(204).end();
+  }
+
   return {
     getMySummary,
     getMyLevel,
@@ -78,6 +92,9 @@ function createMypageController(mypageService) {
     listFavorites,
     addFavorite,
     removeFavorite,
+    listBlocks,
+    addBlock,
+    removeBlock,
   };
 }
 

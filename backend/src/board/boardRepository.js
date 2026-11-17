@@ -5,6 +5,16 @@ const { POST_STATUS, URGENT_REMAINING_SEATS, URGENT_WITHIN_HOURS, TIME_SLOTS, HE
 /** 삭제되지 않은 공고만 대상으로 하는 조건 (소프트 삭제: deleted_at / status = DELETED) */
 const ALIVE_POST = `p.deleted_at IS NULL AND p.status <> '${POST_STATUS.deleted}'`;
 
+/** 작성자가 조회자를 차단하지 않은 공고 (member_block). 자리표시자에 조회자 회원 id 를 넣습니다. */
+const NOT_BLOCKED_BY_AUTHOR = 'NOT EXISTS (SELECT 1 FROM member_block mb WHERE mb.member_id = p.author_id AND mb.target_member_id = ?)';
+
+/** 조회자가 로그인했으면 작성자에게 차단당한 공고를 빼는 조건을 where·params 에 더합니다. */
+function excludeBlockedAuthors(where, params, viewerId) {
+  if (viewerId === null || viewerId === undefined) return;
+  where.push(NOT_BLOCKED_BY_AUTHOR);
+  params.push(viewerId);
+}
+
 /** 정렬은 SQL 에 직접 들어가므로 이 목록의 값만 씁니다. urgent: 출발이 가까운 순(일정 미정은 뒤), 남은 자리가 적은 순 */
 const LIST_ORDER = Object.freeze({
   recent: 'p.created_at DESC, p.id DESC',
@@ -35,8 +45,11 @@ function createBoardRepository(pool) {
     return result.affectedRows > 0;
   }
 
-  /** 공고 본문 + 게임/카테고리/상세 분류 + 작성자(파티장) 프로필. 없으면 null */
-  async function findPostDetail(postId) {
+  /** 공고 본문 + 게임/카테고리/상세 분류 + 작성자(파티장) 프로필. 없거나 작성자가 조회자(viewerId)를 차단했으면 null */
+  async function findPostDetail(postId, viewerId = null) {
+    const where = ['p.id = ?', ALIVE_POST];
+    const params = [postId];
+    excludeBlockedAuthors(where, params, viewerId);
     const [rows] = await pool.query(
       `SELECT p.id, p.category_code AS categoryCode, c.name AS categoryName,
               g.code AS gameCode, g.name AS gameName,
@@ -54,9 +67,9 @@ function createBoardRepository(pool) {
          JOIN game g ON g.id = p.game_id
          LEFT JOIN game_content gc ON gc.id = p.game_content_id
          JOIN member m ON m.id = p.author_id
-        WHERE p.id = ? AND ${ALIVE_POST}
+        WHERE ${where.join(' AND ')}
         LIMIT 1`,
-      [postId],
+      params,
     );
     return rows[0] ?? null;
   }
@@ -84,12 +97,14 @@ function createBoardRepository(pool) {
   }
 
   /**
-   * 공고 목록 한 페이지와 전체 건수. 삭제된 공고는 제외하고, tags 는 모두 가진 공고만(AND) 남깁니다.
-   * @param {{ category: string | null, q: string, sort: string, tags: string[], excludeClosed: boolean, limit: number, offset: number }} filter
+   * 공고 목록 한 페이지와 전체 건수. 삭제된 공고·작성자에게 차단당한 조회자(viewerId)에게는 그 작성자의 공고를 제외하고,
+   * tags 는 모두 가진 공고만(AND) 남깁니다.
+   * @param {{ category: string | null, q: string, sort: string, tags: string[], excludeClosed: boolean, viewerId?: number | null, limit: number, offset: number }} filter
    */
-  async function findPostPage({ category, game = null, time = null, type = null, detail = null, style = null, headcount = null, date = null, voice = false, q, sort, tags, excludeClosed, limit, offset }) {
+  async function findPostPage({ category, game = null, time = null, type = null, detail = null, style = null, headcount = null, date = null, voice = false, q, sort, tags, excludeClosed, viewerId = null, limit, offset }) {
     const where = [ALIVE_POST];
     const params = [];
+    excludeBlockedAuthors(where, params, viewerId);
     if (category) {
       where.push('p.category_code = ?');
       params.push(category);
@@ -168,11 +183,12 @@ function createBoardRepository(pool) {
    * 메인 화면용 인기·마감 임박 공고. 모집 중이고 아직 출발하지 않은(일정 미정 포함) 공고만 대상입니다.
    * - popular: 조회수 → 댓글 수 순
    * - urgent: 남은 자리가 적거나 출발이 곧인 공고를, 출발이 가까운 순(미정은 뒤) → 남은 자리가 적은 순
-   * @param {{ kind: 'popular' | 'urgent', category: string | null, limit: number, now: Date }} filter
+   * @param {{ kind: 'popular' | 'urgent', category: string | null, limit: number, now: Date, viewerId?: number | null }} filter
    */
-  async function findFeaturedPosts({ kind, category, limit, now }) {
+  async function findFeaturedPosts({ kind, category, limit, now, viewerId = null }) {
     const where = [ALIVE_POST, `p.status = '${POST_STATUS.open}'`, '(p.schedule_at IS NULL OR p.schedule_at > ?)'];
     const params = [now];
+    excludeBlockedAuthors(where, params, viewerId);
     if (category) {
       where.push('p.category_code = ?');
       params.push(category);
@@ -196,26 +212,28 @@ function createBoardRepository(pool) {
 
   /**
    * 한 공고의 관련 공고: 같은 게임의, 모집 중이고 아직 출발하지 않은(일정 미정 포함) 다른 공고.
-   * 같은 상세 분류 → 겹치는 태그가 많은 순 → 최신순으로 정렬합니다.
+   * 같은 상세 분류 → 겹치는 태그가 많은 순 → 최신순으로 정렬합니다. 조회자(viewerId)를 차단한 작성자의 공고는 뺍니다.
    * @returns {Promise<object[] | null>} 기준 공고가 없거나 삭제됐으면 null
    */
-  async function findRelatedPosts({ postId, limit, now }) {
+  async function findRelatedPosts({ postId, limit, now, viewerId = null }) {
     const [[source]] = await pool.query(
       `SELECT p.game_id AS gameId, p.game_content_id AS gameContentId FROM post p WHERE p.id = ? AND ${ALIVE_POST}`,
       [postId],
     );
     if (!source) return null;
+    const where = [ALIVE_POST, 'p.id <> ?', 'p.game_id = ?', `p.status = '${POST_STATUS.open}'`, '(p.schedule_at IS NULL OR p.schedule_at > ?)'];
+    const params = [postId, source.gameId, now];
+    excludeBlockedAuthors(where, params, viewerId);
     const [rows] = await pool.query(
       `SELECT ${LIST_COLUMNS}
          ${LIST_JOINS}
-        WHERE ${ALIVE_POST} AND p.id <> ? AND p.game_id = ? AND p.status = '${POST_STATUS.open}'
-          AND (p.schedule_at IS NULL OR p.schedule_at > ?)
+        WHERE ${where.join(' AND ')}
         ORDER BY (p.game_content_id <=> ?) DESC,
                  (SELECT COUNT(*) FROM post_tag pt WHERE pt.post_id = p.id
                      AND pt.tag_id IN (SELECT tag_id FROM post_tag WHERE post_id = ?)) DESC,
                  p.created_at DESC, p.id DESC
         LIMIT ?`,
-      [postId, source.gameId, now, source.gameContentId, postId, limit],
+      [...params, source.gameContentId, postId, limit],
     );
     return rows;
   }

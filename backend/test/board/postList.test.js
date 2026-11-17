@@ -3,6 +3,14 @@
 const { describe, it, before, after, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
 const { createApp } = require('../../src/app');
+const { createTokenProvider } = require('../../src/common/tokenProvider');
+
+const AUTH = Object.freeze({
+  jwtSecret: 'test-secret',
+  accessTokenTtlSeconds: 1800,
+  refreshTokenTtlDays: 1,
+  rememberMeTtlDays: 14,
+});
 
 const row = (id, overrides = {}) => ({
   id,
@@ -45,7 +53,7 @@ describe('GET /api/posts (목록)', () => {
   const repo = createFakeRepository();
 
   before(async () => {
-    const app = createApp({ boardRepository: repo, corsOrigins: [], bcryptRounds: 4 });
+    const app = createApp({ boardRepository: repo, corsOrigins: [], bcryptRounds: 4, auth: AUTH });
     await new Promise((resolve) => {
       server = app.listen(0, resolve);
     });
@@ -59,7 +67,13 @@ describe('GET /api/posts (목록)', () => {
     repo.state.lastFilter = null;
   });
 
-  const get = (query = '') => fetch(`${baseUrl}/api/posts${query}`);
+  const get = (query = '', headers = {}) => fetch(`${baseUrl}/api/posts${query}`, { headers });
+
+  it('로그인했으면 조회자 id(viewerId)를 넘겨 나를 차단한 작성자의 공고를 빼게 한다', async () => {
+    const tokens = createTokenProvider(AUTH);
+    assert.equal((await get('', { Authorization: `Bearer ${tokens.createAccessToken(9)}` })).status, 200);
+    assert.equal(repo.state.lastFilter.viewerId, 9);
+  });
 
   it('로그인 없이 목록을 페이지네이션 형식으로 돌려준다', async () => {
     const res = await get();
@@ -114,6 +128,7 @@ describe('GET /api/posts (목록)', () => {
       sort: 'recent',
       tags: [],
       excludeClosed: false,
+      viewerId: null,
       limit: 8,
       offset: 0,
     });
@@ -135,6 +150,7 @@ describe('GET /api/posts (목록)', () => {
       sort: 'urgent',
       tags: ['숙련', '디코필수'],
       excludeClosed: true,
+      viewerId: null,
       limit: 5,
       offset: 10,
     });

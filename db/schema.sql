@@ -451,6 +451,16 @@ CREATE TABLE favorite_member (
   CONSTRAINT fk_favorite_member_target FOREIGN KEY (target_member_id) REFERENCES member (id) ON DELETE CASCADE
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '사용자 즐겨찾기';
 
+CREATE TABLE member_block (
+  member_id         BIGINT UNSIGNED NOT NULL COMMENT '차단한 회원',
+  target_member_id  BIGINT UNSIGNED NOT NULL COMMENT '차단당한 회원. 차단한 회원의 공고를 볼 수 없음',
+  created_at        DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (member_id, target_member_id),
+  INDEX idx_member_block_target (target_member_id),
+  CONSTRAINT fk_member_block_member FOREIGN KEY (member_id)        REFERENCES member (id) ON DELETE CASCADE,
+  CONSTRAINT fk_member_block_target FOREIGN KEY (target_member_id) REFERENCES member (id) ON DELETE CASCADE
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '사용자 차단';
+
 -- =====================================================================
 -- 알림
 -- =====================================================================

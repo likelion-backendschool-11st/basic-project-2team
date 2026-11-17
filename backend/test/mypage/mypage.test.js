@@ -58,6 +58,7 @@ function createFakeRepository() {
     comments: [],
     scraps: [],
     favorites: new Set(),
+    blocks: new Set(),
     calls: [],
   };
   const slice = (rows, { limit, offset }) => ({ rows: rows.slice(offset, offset + limit), totalCount: rows.length });
@@ -84,6 +85,7 @@ function createFakeRepository() {
     },
     async findMemberPostPage(filter) {
       state.calls.push({ name: 'findMemberPostPage', ...filter });
+      if (filter.viewerId !== null && state.blocks.has(`${filter.memberId}:${filter.viewerId}`)) return { rows: [], totalCount: 0 };
       return slice(state.posts, filter);
     },
     async findRatingsSince(memberId, since) {
@@ -132,6 +134,22 @@ function createFakeRepository() {
     async removeFavorite(memberId, targetMemberId) {
       state.favorites.delete(`${memberId}:${targetMemberId}`);
     },
+    async findBlocks(memberId) {
+      return [...state.blocks]
+        .filter((key) => key.startsWith(`${memberId}:`))
+        .map((key) => state.members.get(Number(key.split(':')[1])))
+        .filter((row) => row && row.status !== 'WITHDRAWN')
+        .map((row) => ({ id: row.id, nickname: row.nickname, avatarUrl: row.avatarUrl, level: row.level, blockedAt: new Date('2026-11-02T00:00:00Z') }));
+    },
+    async isBlocked(memberId, targetMemberId) {
+      return state.blocks.has(`${memberId}:${targetMemberId}`);
+    },
+    async addBlock(memberId, targetMemberId) {
+      state.blocks.add(`${memberId}:${targetMemberId}`);
+    },
+    async removeBlock(memberId, targetMemberId) {
+      state.blocks.delete(`${memberId}:${targetMemberId}`);
+    },
   };
 }
 
@@ -161,6 +179,7 @@ describe('마이페이지 API (/api/members)', () => {
     state.comments = [];
     state.scraps = [];
     state.favorites.clear();
+    state.blocks.clear();
     state.calls = [];
 
     state.members.set(ME, memberRow());
@@ -275,15 +294,19 @@ describe('마이페이지 API (/api/members)', () => {
       assert.equal(data.ageRange, '20대');
     });
 
-    it('로그인: 즐겨찾기 여부를 viewer 에 담는다', async () => {
+    it('로그인: 즐겨찾기·차단 여부를 viewer 에 담는다', async () => {
       repo.state.favorites.add(`${ME}:${OTHER}`);
       const { data } = await (await get(`/${OTHER}`, as(ME))).json();
-      assert.deepEqual(data.viewer, { isMe: false, favorited: true });
+      assert.deepEqual(data.viewer, { isMe: false, favorited: true, blocked: false });
+
+      repo.state.blocks.add(`${ME}:${OTHER}`);
+      const { data: blocked } = await (await get(`/${OTHER}`, as(ME))).json();
+      assert.equal(blocked.viewer.blocked, true);
     });
 
     it('본인 프로필이면 viewer.isMe 가 true 이고 비공개 나이대도 보인다', async () => {
       const { data } = await (await get(`/${ME}`, as(ME))).json();
-      assert.deepEqual(data.viewer, { isMe: true, favorited: false });
+      assert.deepEqual(data.viewer, { isMe: true, favorited: false, blocked: false });
       assert.equal(data.ageRange, '20대');
     });
 
@@ -606,6 +629,53 @@ describe('마이페이지 API (/api/members)', () => {
       assert.equal((await request('DELETE', `/me/favorites/${OTHER}`)).status, 401);
     });
   });
+  describe('차단 /me/blocks', () => {
+    it('차단하면 204, 목록에 나타나고 다시 차단해도 204', async () => {
+      assert.equal((await request('POST', `/me/blocks/${OTHER}`, as(ME))).status, 204);
+      assert.equal((await request('POST', `/me/blocks/${OTHER}`, as(ME))).status, 204);
+
+      const { data } = await (await get('/me/blocks', as(ME))).json();
+      assert.deepEqual(data, [{ id: OTHER, nickname: '철수', avatarUrl: null, level: 52, blockedAt: '2026-11-02T00:00:00.000Z' }]);
+    });
+
+    it('해제하면 204, 차단하지 않은 유저를 해제해도 204', async () => {
+      repo.state.blocks.add(`${ME}:${OTHER}`);
+      assert.equal((await request('DELETE', `/me/blocks/${OTHER}`, as(ME))).status, 204);
+      assert.equal((await request('DELETE', `/me/blocks/${OTHER}`, as(ME))).status, 204);
+      assert.equal(repo.state.blocks.size, 0);
+    });
+
+    it('자기 자신은 400 CANNOT_BLOCK_SELF', async () => {
+      const res = await request('POST', `/me/blocks/${ME}`, as(ME));
+      assert.equal(res.status, 400);
+      assert.equal((await res.json()).error.code, 'CANNOT_BLOCK_SELF');
+    });
+
+    it('없는 회원·탈퇴 회원·잘못된 id 는 404 MEMBER_NOT_FOUND', async () => {
+      for (const id of ['999', String(WITHDRAWN), 'abc']) {
+        const res = await request('POST', `/me/blocks/${id}`, as(ME));
+        assert.equal(res.status, 404, id);
+        assert.equal((await res.json()).error.code, 'MEMBER_NOT_FOUND');
+      }
+      assert.equal(repo.state.blocks.size, 0);
+    });
+
+    it('토큰이 없으면 401', async () => {
+      assert.equal((await get('/me/blocks')).status, 401);
+      assert.equal((await request('POST', `/me/blocks/${OTHER}`)).status, 401);
+      assert.equal((await request('DELETE', `/me/blocks/${OTHER}`)).status, 401);
+    });
+
+    it('나를 차단한 회원의 공고 목록은 비어 있고, 비로그인·다른 회원에게는 그대로 보인다', async () => {
+      repo.state.posts = [postColumns({ viewCount: 5, commentCount: 1, createdAt: new Date('2026-11-01T00:00:00Z') })];
+      repo.state.blocks.add(`${OTHER}:${ME}`);
+      const { data } = await (await get(`/${OTHER}/posts`, as(ME))).json();
+      assert.equal(data.totalCount, 0);
+      assert.equal(repo.state.calls.at(-1).viewerId, ME);
+      assert.equal((await (await get(`/${OTHER}/posts`)).json()).data.totalCount, 1);
+    });
+  });
+
   describe('GET /{memberId}/posts, /{memberId}/manner-history (로그인 없이)', () => {
     it('다른 회원이 쓴 공고를 보여주고(내 전용 필드 제외) 탈퇴·없는 회원은 404', async () => {
       repo.state.posts = [postColumns({ viewCount: 5, commentCount: 1, createdAt: new Date('2026-11-01T00:00:00Z') })];

@@ -100,6 +100,14 @@ const toFavorite = (row) => ({
   favoritedAt: toIso(row.favoritedAt),
 });
 
+const toBlock = (row) => ({
+  id: row.id,
+  nickname: row.nickname,
+  avatarUrl: row.avatarUrl ?? null,
+  level: row.level,
+  blockedAt: toIso(row.blockedAt),
+});
+
 /** 받은 태그 [{ code, label, count }] → 순위와 비율(태그를 고른 평가 수 / 전체 평가 수) */
 const toTopTags = (tags, ratingCount) =>
   tags.map((tag, index) => ({
@@ -184,7 +192,10 @@ function createMypageService({ mypageRepository, now = () => new Date() }) {
 
     let viewer = null;
     if (viewerId !== null) {
-      viewer = { isMe, favorited: isMe ? false : await mypageRepository.isFavorite(viewerId, memberId) };
+      const [favorited, blocked] = isMe
+        ? [false, false]
+        : await Promise.all([mypageRepository.isFavorite(viewerId, memberId), mypageRepository.isBlocked(viewerId, memberId)]);
+      viewer = { isMe, favorited, blocked };
     }
     return { ...profile, viewer };
   }
@@ -196,11 +207,16 @@ function createMypageService({ mypageRepository, now = () => new Date() }) {
     return member;
   }
 
-  /** GET /api/members/{memberId}/posts — 다른 회원이 쓴 공고 (로그인 없이 조회) */
-  async function listMemberPosts(memberId, query) {
+  /** GET /api/members/{memberId}/posts — 다른 회원이 쓴 공고 (로그인 없이 조회). 그 회원이 나(viewerId)를 차단했으면 빈 목록 */
+  async function listMemberPosts(memberId, query, viewerId = null) {
     await requireVisibleMember(memberId);
     const paging = parsePageQuery(query);
-    const result = await mypageRepository.findMemberPostPage({ memberId, limit: paging.size, offset: (paging.page - 1) * paging.size });
+    const result = await mypageRepository.findMemberPostPage({
+      memberId,
+      viewerId,
+      limit: paging.size,
+      offset: (paging.page - 1) * paging.size,
+    });
     return toPage(result, paging, (row) => ({
       ...toPostSummary(row),
       views: row.viewCount,
@@ -316,6 +332,27 @@ function createMypageService({ mypageRepository, now = () => new Date() }) {
     await mypageRepository.removeFavorite(memberId, targetMemberId);
   }
 
+  /** GET /api/members/me/blocks — 내가 차단한 유저 목록 */
+  async function listBlocks(memberId) {
+    const rows = await mypageRepository.findBlocks(memberId);
+    return rows.map(toBlock);
+  }
+
+  /** POST /api/members/me/blocks/{memberId} — 차단한 유저는 내 공고를 볼 수 없습니다. 이미 차단했어도 성공으로 처리합니다. */
+  async function addBlock(memberId, targetMemberId) {
+    if (memberId === targetMemberId) {
+      throw new ApiError(400, 'CANNOT_BLOCK_SELF', mypageMessages.cannotBlockSelf);
+    }
+    const target = await mypageRepository.findMember(targetMemberId);
+    if (!target || target.status === WITHDRAWN) throw memberNotFound();
+    await mypageRepository.addBlock(memberId, targetMemberId);
+  }
+
+  /** DELETE /api/members/me/blocks/{memberId} — 차단하지 않은 유저여도 성공으로 처리합니다. */
+  async function removeBlock(memberId, targetMemberId) {
+    await mypageRepository.removeBlock(memberId, targetMemberId);
+  }
+
   return {
     getMySummary,
     getMyLevel,
@@ -329,6 +366,9 @@ function createMypageService({ mypageRepository, now = () => new Date() }) {
     listFavorites,
     addFavorite,
     removeFavorite,
+    listBlocks,
+    addBlock,
+    removeBlock,
   };
 }
 
