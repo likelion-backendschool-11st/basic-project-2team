@@ -12,7 +12,7 @@ OurParty 서비스의 테이블 설계안입니다. [요구사항 명세](./02-r
 | 엔진 / 문자셋 | InnoDB, `utf8mb4`, `utf8mb4_0900_ai_ci` | 한글과 이모지를 저장할 수 있습니다. 대소문자를 구분하지 않는 collation이라 `Healer`와 `healer`가 같은 값으로 취급되어 중복 검사에 걸립니다. |
 | PK | `id BIGINT UNSIGNED AUTO_INCREMENT` | API 예시의 `"u-healer"` 같은 문자열 ID는 목 데이터입니다. 실제 PK는 숫자로 둡니다. |
 | 시간 | `DATETIME`(초 단위), 애플리케이션에서 UTC로 저장 | `TIMESTAMP`는 2038년 문제가 있습니다. API 응답에서 `+09:00`으로 바꿔 내보냅니다. |
-| enum 값 | MySQL `ENUM` 대신 `VARCHAR(20)`, 값은 Java enum으로 관리 | MySQL `ENUM`은 값을 추가할 때마다 `ALTER`가 필요합니다. 상태값은 앞으로 늘어날 수 있습니다. |
+| enum 값 | MySQL `ENUM` 대신 `VARCHAR(20)`, 값은 백엔드 `xxxConstants.js` 의 상수(`Object.freeze`)로 관리 | MySQL `ENUM`은 값을 추가할 때마다 `ALTER`가 필요합니다. 상태값은 앞으로 늘어날 수 있습니다. |
 | 공통 컬럼 | `created_at`, `updated_at`. 소프트 삭제하는 테이블에만 `deleted_at` | – |
 | 소프트 삭제 대상 | 회원, 공고, 댓글 | 신고·제재·리뷰 기록이 이 행들을 참조하므로 행을 남겨야 합니다. |
 | 관리자 계정 | 회원과 **분리한 테이블** | ADMIN-001 "일반 사용자와 접근 경로·권한 분리". 관리자가 랭킹이나 검색에 섞여 나오지 않습니다. |
@@ -42,7 +42,7 @@ OurParty 서비스의 테이블 설계안입니다. [요구사항 명세](./02-r
 | --- | --- | --- | --- | --- |
 | id | BIGINT UNSIGNED | N | PK | |
 | login_id | VARCHAR(20) | Y | UNIQUE | SIGNUP-003. 영문 소문자·숫자 4~20자. 탈퇴 시 NULL로 비움 |
-| password_hash | VARCHAR(100) | Y | | BCrypt 결과 60자에 Spring `{bcrypt}` 접두사까지 고려한 여유 길이 |
+| password_hash | VARCHAR(100) | Y | | bcryptjs 해시 결과는 60자. 해시 방식이 바뀌어도 담을 수 있도록 여유 길이를 둠 |
 | nickname | VARCHAR(10) | Y | UNIQUE | 2~10자 (프론트 코드). 탈퇴 시 NULL로 비워서 다른 사람이 다시 쓸 수 있게 함 |
 | email | VARCHAR(100) | Y | UNIQUE | API의 중복 확인 대상. 탈퇴 시 NULL |
 | phone | VARCHAR(20) | Y | UNIQUE | 1인 1계정. 하이픈 없이 저장 |
@@ -260,7 +260,7 @@ API의 `level`은 **서비스 활동 레벨**(`member.level`)입니다. 공고 �
 
 | 테이블 | 컬럼 | 비고 |
 | --- | --- | --- |
-| `notification` | id, member_id FK, type VARCHAR(30), message VARCHAR(200), post_id FK NULL, is_read BOOLEAN, created_at | type 예: APPLICATION_RECEIVED, APPLICATION_RESULT, APPLICATION_CANCELED, PARTY_KICKED, POST_UPDATED, INTEREST_POST, POST_DELETED, SANCTION, NO_SHOW, POLL_CONFIRMED, POLL_REMINDER, PARTY_INVITE(파티 초대 — 이 행이 초대장 역할, 지우면 초대도 사라지고 수락하거나 공고가 삭제·완료되면 삭제됨), INVITE_ACCEPTED |
+| `notification` | id, member_id FK, type VARCHAR(30), message VARCHAR(200), post_id FK NULL, is_read BOOLEAN, created_at | type 예: APPLICATION_RECEIVED, APPLICATION_RESULT, APPLICATION_CANCELED, PARTY_KICKED, POST_UPDATED, INTEREST_POST, FAVORITE_AUTHOR_POST(즐겨찾는 회원의 새 공고), POST_DELETED, SANCTION, NO_SHOW, POLL_CONFIRMED, POLL_REMINDER, PARTY_INVITE(파티 초대 — 이 행이 초대장 역할, 지우면 초대도 사라지고 수락하거나 공고가 삭제·완료되면 삭제됨), INVITE_ACCEPTED |
 | `notification_subscription` | id, member_id FK, game_id FK, game_content_id FK NULL, enabled BOOLEAN | NOTI-001 관심 게임·레이드 |
 
 ### 2.13 신고 · 관리
