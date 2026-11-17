@@ -319,8 +319,7 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 
 | Method | URI | 설명 | 인증 |
 | --- | --- | --- | --- |
-| GET | `/api/posts?category=&sort=&tags=&page=&size=` | 공고 목록 | |
-| GET | `/api/posts/search?q=&tags=&page=&size=` | 공고 검색 | |
+| GET | `/api/posts?category=&q=&sort=&tags=&page=&size=` | 공고 목록 · 검색. 검색은 별도 주소 없이 `q`(검색어)를 붙여 같은 주소로 합니다. 상세 필터는 아래 참고 | |
 | GET | `/api/posts/popular?category=&limit=` | 인기 공고 (메인) | |
 | GET | `/api/posts/urgent?category=&limit=` | 마감 임박 공고 (메인) | |
 | GET | `/api/posts/{postId}` | 공고 상세 (조회수 +1, `?view=false` 이면 조회수를 올리지 않음 — 화면 자동 갱신용) | |

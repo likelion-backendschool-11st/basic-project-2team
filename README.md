@@ -4,7 +4,7 @@
 (멋쟁이사자처럼 백엔드 스쿨 11기 기본 프로젝트 2팀)
 
 - 프로젝트 가이드·구조·명령어: [CLAUDE.md](./CLAUDE.md)
-- 문서: [요구사항](./docs/02-requirements.md) · [DB 설계](./docs/03-db-design.md) · [ERD](./docs/04-erd.md) · [API 명세](./docs/API_SPEC.md) · [코딩 컨벤션](./docs/CODING_CONVENTION.md) · [시연 시나리오](./docs/demo-scenario.md)
+- 문서: [요구사항](./docs/02-requirements.md) · [DB 설계](./docs/03-db-design.md) · [ERD](./docs/04-erd.md) · [클래스 설계](./docs/05-class-design.md) · [API 명세](./docs/API_SPEC.md) · [코딩 컨벤션](./docs/CODING_CONVENTION.md) · [시연 시나리오](./docs/demo-scenario.md)
 
 ## 환경
 
