@@ -16,6 +16,8 @@ const KST_OFFSET_HOURS = 9;
 const TOP_TAG_LIMIT = 3;
 /** 평균 별점은 최근 N건의 평가로 계산합니다 (화면 문구 「최근 30건 반영」) */
 const RECENT_RATING_LIMIT = 30;
+/** 마이페이지 「최근 함께한 플레이어」 최대 인원 */
+const RECENT_PLAYER_LIMIT = 10;
 
 /** post_application.status 값. GET /api/members/me/applications?status= 필터에 씁니다. */
 const APPLICATION_STATUSES = Object.freeze(['PENDING', 'ACCEPTED', 'REJECTED', 'CANCELED', 'NO_SHOW']);
@@ -41,6 +43,7 @@ module.exports = {
   KST_OFFSET_HOURS,
   TOP_TAG_LIMIT,
   RECENT_RATING_LIMIT,
+  RECENT_PLAYER_LIMIT,
   APPLICATION_STATUSES,
   mypageMessages,
 };

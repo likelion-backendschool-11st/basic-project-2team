@@ -11,6 +11,8 @@ function createPartyRouter(partyController, { requireAuth }) {
   router.patch('/:postId/applications/:applicationId', requireAuth, partyController.decide);
   router.patch('/:postId/status', requireAuth, partyController.changeStatus);
   router.get('/:postId/participants', partyController.listParticipants);
+  router.post('/:postId/invitations', requireAuth, partyController.invite);
+  router.patch('/:postId/invitations/me', requireAuth, partyController.respondInvitation);
   return router;
 }
 

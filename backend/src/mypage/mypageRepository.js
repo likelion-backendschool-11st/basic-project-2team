@@ -243,6 +243,48 @@ function createMypageRepository(pool) {
     return rows;
   }
 
+  /**
+   * 함께 완료한 파티(COMPLETED, 삭제되지 않음)의 다른 구성원(파티장 + 승인된 신청자, 탈퇴 회원 제외).
+   * 회원마다 가장 최근에 함께한 파티 한 건과 함께한 횟수를 붙여 최근순으로 limit 명까지 돌려줍니다.
+   * 파티 시점은 출발 시간, 시간 미정이면 공고 수정 시각(완료 처리 시각)입니다.
+   */
+  async function findRecentPlayers(memberId, limit) {
+    const [rows] = await pool.query(
+      `WITH my_party AS (
+         SELECT p.id, p.author_id, COALESCE(p.schedule_at, p.updated_at) AS playedAt
+           FROM post p
+          WHERE p.status = 'COMPLETED' AND p.deleted_at IS NULL
+            AND (p.author_id = ?
+                 OR EXISTS (SELECT 1 FROM post_application me
+                             WHERE me.post_id = p.id AND me.applicant_id = ? AND me.status = 'ACCEPTED'))
+       ),
+       mate AS (
+         SELECT mp.id AS postId, mp.author_id AS memberId, mp.playedAt FROM my_party mp
+         UNION ALL
+         SELECT mp.id, pa.applicant_id, mp.playedAt
+           FROM my_party mp JOIN post_application pa ON pa.post_id = mp.id AND pa.status = 'ACCEPTED'
+       ),
+       ranked AS (
+         SELECT memberId, postId, playedAt,
+                COUNT(*) OVER (PARTITION BY memberId) AS playCount,
+                ROW_NUMBER() OVER (PARTITION BY memberId ORDER BY playedAt DESC, postId DESC) AS rn
+           FROM mate WHERE memberId <> ?
+       )
+       SELECT m.id, m.nickname, m.avatar_url AS avatarUrl, m.level, m.manner_temp AS mannerTemp,
+              r.playCount, r.playedAt AS lastPlayedAt, p.id AS lastPostId, p.title AS lastPostTitle,
+              g.code AS lastGameCode, g.name AS lastGameName
+         FROM ranked r
+         JOIN member m ON m.id = r.memberId
+         JOIN post p ON p.id = r.postId
+         JOIN game g ON g.id = p.game_id
+        WHERE r.rn = 1 AND m.status <> 'WITHDRAWN'
+        ORDER BY r.playedAt DESC, m.id DESC
+        LIMIT ?`,
+      [memberId, memberId, memberId, limit],
+    );
+    return rows;
+  }
+
   async function isFavorite(memberId, targetMemberId) {
     const [rows] = await pool.query(
       'SELECT EXISTS (SELECT 1 FROM favorite_member WHERE member_id = ? AND target_member_id = ?) AS favorited',
@@ -280,6 +322,7 @@ function createMypageRepository(pool) {
     findMyCommentPage,
     findMyScrapPage,
     findFavorites,
+    findRecentPlayers,
     isFavorite,
     addFavorite,
     removeFavorite,

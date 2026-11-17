@@ -31,7 +31,16 @@ function createPartyController(partyService) {
     return sendSuccess(res, 200, await partyService.listParticipants(req.params.postId));
   }
 
-  return { apply, cancelMine, listApplications, decide, changeStatus, listParticipants };
+  async function invite(req, res) {
+    await partyService.invite(req.params.postId, memberId(req), req.body);
+    return res.status(204).end();
+  }
+
+  async function respondInvitation(req, res) {
+    return sendSuccess(res, 200, await partyService.respondInvitation(req.params.postId, memberId(req), req.body));
+  }
+
+  return { apply, cancelMine, listApplications, decide, changeStatus, listParticipants, invite, respondInvitation };
 }
 
 module.exports = { createPartyController };

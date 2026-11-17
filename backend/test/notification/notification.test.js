@@ -122,6 +122,12 @@ describe('notification inbox API', () => {
     });
   const json = async (res) => res.json();
 
+  it('파티 초대 알림에는 초대의 지금 상태(invitationStatus)를 붙인다', async () => {
+    repo.state.rows.push({ id: 5, memberId: ME, type: 'PARTY_INVITE', message: '초대', postId: 1, isRead: 0, createdAt: new Date('2026-11-13T05:00:00Z'), invitationStatus: 'PENDING' });
+    const { data } = await json(await call('GET', ''));
+    assert.deepEqual([data.items[0].type, data.items[0].invitationStatus], ['PARTY_INVITE', 'PENDING']);
+  });
+
   it('내 알림을 최신순으로 돌려주고 안 읽은 수를 함께 준다 (남의 알림은 나오지 않음)', async () => {
     const res = await call('GET', '');
     assert.equal(res.status, 200);
@@ -134,6 +140,7 @@ describe('notification inbox API', () => {
       postId: null,
       read: false,
       createdAt: '2026-11-13T03:00:00.000Z',
+      invitationStatus: null,
     });
     assert.equal(data.items[2].read, true);
     assert.deepEqual([data.page, data.size, data.totalCount, data.totalPages, data.unreadCount], [1, 20, 3, 1, 2]);

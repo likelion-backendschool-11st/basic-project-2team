@@ -9,7 +9,12 @@ export type NotificationType =
   | 'FAVORITE_AUTHOR_POST'
   | 'INTEREST_POST'
   | 'SANCTION'
-  | 'NO_SHOW';
+  | 'NO_SHOW'
+  | 'PARTY_INVITE'
+  | 'INVITE_RESULT';
+
+/** 파티 초대 알림의 초대 상태 (party_invitation.status) */
+export type InvitationStatus = 'PENDING' | 'ACCEPTED' | 'DECLINED';
 
 export interface NotificationView {
   readonly id: string;
@@ -22,6 +27,8 @@ export interface NotificationView {
   readonly read: boolean;
   /** 연결된 공고. 없거나 삭제됐으면 null */
   readonly postId: number | null;
+  /** 파티 초대 알림이면 그 초대의 지금 상태(PENDING 이면 참여·거절 버튼), 아니면 null */
+  readonly invitation: InvitationStatus | null;
 }
 
 export const NOTIFICATION_PAGE_SIZE = 20;
@@ -52,6 +59,8 @@ export const notificationTypes: Readonly<Record<NotificationType, { label: strin
   INTEREST_POST: { label: '관심 게임 새 공고', icon: 'fa-solid fa-gamepad', tone: toneOk },
   SANCTION: { label: '제재 안내', icon: 'fa-solid fa-triangle-exclamation', tone: toneDanger },
   NO_SHOW: { label: '노쇼 확정', icon: 'fa-solid fa-user-slash', tone: toneDanger },
+  PARTY_INVITE: { label: '파티 초대', icon: 'fa-solid fa-envelope-open-text', tone: toneBrand },
+  INVITE_RESULT: { label: '초대 응답', icon: 'fa-solid fa-reply', tone: toneOk },
 };
 
 /** 알려지지 않은 유형(서버에 새 유형이 생겼을 때)의 기본 표시 */
@@ -69,6 +78,12 @@ export const notificationText = {
   markAllRead: '모두 읽음',
   markRead: '읽음으로 표시',
   delete: '삭제',
+  inviteAccept: '참여',
+  inviteDecline: '거절',
+  inviteResponding: '처리 중…',
+  inviteAccepted: '참여함',
+  inviteDeclined: '거절함',
+  inviteRespondFailed: '초대에 응답하지 못했습니다. 잠시 후 다시 시도해주세요.',
   deleteFailed: '알림을 삭제하지 못했습니다. 잠시 후 다시 시도해주세요.',
   markFailed: '알림을 읽음 처리하지 못했습니다. 잠시 후 다시 시도해주세요.',
   loading: '알림을 불러오는 중입니다...',

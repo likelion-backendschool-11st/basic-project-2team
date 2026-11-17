@@ -9,6 +9,11 @@ const APPLICATION_STATUS = Object.freeze({
   noShow: 'NO_SHOW',
 });
 
+/** party_invitation.status */
+const INVITATION_STATUS = Object.freeze({ pending: 'PENDING', accepted: 'ACCEPTED', declined: 'DECLINED' });
+/** 초대받은 회원이 내릴 수 있는 응답 */
+const INVITATION_RESPONSES = Object.freeze([INVITATION_STATUS.accepted, INVITATION_STATUS.declined]);
+
 /** 파티장이 내릴 수 있는 결정 */
 const DECISION_STATUSES = Object.freeze([APPLICATION_STATUS.accepted, APPLICATION_STATUS.rejected]);
 /** 신청자 목록에서 거를 수 있는 상태 (취소·노쇼는 목록에 나오지 않음) */
@@ -33,6 +38,8 @@ const NOTIFICATION_TYPE = Object.freeze({
   applicationResult: 'APPLICATION_RESULT',
   applicationCanceled: 'APPLICATION_CANCELED',
   postUpdated: 'POST_UPDATED',
+  partyInvite: 'PARTY_INVITE',
+  inviteResult: 'INVITE_RESULT',
 });
 /** notification.message VARCHAR(200). 공고 제목이 길면 잘라서 넣습니다. */
 const NOTIFICATION_TITLE_MAX = 40;
@@ -62,6 +69,18 @@ const partyMessages = Object.freeze({
   alreadyDecided: '이미 처리된 신청입니다.',
   cancelNotAllowed: '완료된 파티에서는 신청을 취소할 수 없습니다.',
   withdrawnMember: '탈퇴한 회원',
+  memberIdInvalid: 'memberId 는 1 이상의 정수여야 합니다.',
+  memberNotFound: '존재하지 않는 회원입니다.',
+  cannotInviteSelf: '자기 자신은 초대할 수 없습니다.',
+  inviteeUnavailable: '지금은 파티에 참가할 수 없는 회원입니다.',
+  alreadyInParty: '이미 이 공고에 신청했거나 참가 중인 회원입니다.',
+  inviteNotAllowed: '거절되었거나 노쇼로 처리된 회원은 다시 초대할 수 없습니다.',
+  alreadyInvited: '이미 이 공고에 초대해 응답을 기다리는 회원입니다.',
+  invitationNotFound: '받은 초대가 없습니다.',
+  alreadyResponded: '이미 응답한 초대입니다.',
+  alreadyJoined: '이미 이 파티에 신청했거나 참가 중입니다.',
+  joinNotAllowed: '거절되었거나 노쇼로 처리된 공고에는 참여할 수 없습니다.',
+  invitationStatusInvalid: `status 는 ${INVITATION_RESPONSES.join(', ')} 중 하나여야 합니다.`,
   /** 알림함 문구. title 은 공고 제목(잘린 것), nickname 은 신청자 닉네임 */
   notice: Object.freeze({
     applicationReceived: (nickname, title) => `${nickname}님이 '${title}' 공고에 참가를 신청했습니다.`,
@@ -70,11 +89,16 @@ const partyMessages = Object.freeze({
     rejected: (title) => `'${title}' 공고 참가 신청이 거절되었습니다.`,
     closed: (title) => `'${title}' 공고의 모집이 마감되었습니다.`,
     completed: (title) => `'${title}' 파티가 완료 처리되었습니다.`,
+    invited: (nickname, title) => `${nickname}님이 '${title}' 파티에 초대했습니다.`,
+    inviteAccepted: (nickname, title) => `${nickname}님이 '${title}' 파티 초대를 수락해 파티에 참여했습니다.`,
+    inviteDeclined: (nickname, title) => `${nickname}님이 '${title}' 파티 초대를 거절했습니다.`,
   }),
 });
 
 module.exports = {
   APPLICATION_STATUS,
+  INVITATION_STATUS,
+  INVITATION_RESPONSES,
   NOTIFICATION_TYPE,
   NOTIFICATION_TITLE_MAX,
   DECISION_STATUSES,

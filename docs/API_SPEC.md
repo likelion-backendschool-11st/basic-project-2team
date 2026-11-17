@@ -453,6 +453,8 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 | GET | `/api/posts/{postId}/applications` | 신청자 목록 | 🔒 작성자 |
 | PATCH | `/api/posts/{postId}/applications/{applicationId}` | 승인/거절 `{ status: "ACCEPTED" \| "REJECTED" }` | 🔒 작성자 |
 | GET | `/api/posts/{postId}/participants` | 확정 파티원 목록 (`Participant[]`) | |
+| POST | `/api/posts/{postId}/invitations` | 회원을 파티에 초대 `{ memberId }` → `204` (상대에게 알림) | 🔒 작성자 |
+| PATCH | `/api/posts/{postId}/invitations/me` | 받은 초대에 응답 `{ status: "ACCEPTED" \| "DECLINED" }` (수락하면 바로 파티원) | 🔒 |
 
 구현: `backend/src/party/` (`/api/posts` 에 마운트). 모두 🔒 이며 `participants` 만 비로그인도 조회할 수 있습니다. `postId`·`applicationId` 가 1 이상의 정수가 아니거나 삭제된 공고면 404 입니다.
 
@@ -498,6 +500,20 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
  { "id": 2, "nickname": "달빛힐러", "avatarUrl": null, "level": 3, "mannerTemp": 36.5, "reviewCount": 0, "role": "서포터", "isHost": false }]
 ```
 
+**파티 초대 (`POST /api/posts/{postId}/invitations`)** 🔒 작성자 — 본문 `{ "memberId": 2 }` → `204`
+
+- `party_invitation` 에 `PENDING` 초대를 저장하고 초대받은 회원에게 `PARTY_INVITE` 알림을 보냅니다(`postId` 는 그 공고). 받은 사람은 알림함에서 참여·거절합니다(아래 초대 응답). 마이페이지 「최근 함께한 플레이어」의 「파티 초대」에서 씁니다.
+- 모집 중(`OPEN`)이고 자리가 남은 공고만 초대할 수 있습니다. 응답을 기다리는 초대가 있으면 다시 보낼 수 없고, 수락·거절로 끝난 초대는 다시 보내면 같은 행을 `PENDING` 으로 되돌립니다(예전 초대 알림은 지우고 새 알림을 보냄).
+- 신청을 취소(`CANCELED`)했던 회원은 초대할 수 있고, 대기 중·수락된 회원과 거절·노쇼된 회원은 초대할 수 없습니다.
+- 오류: 400 `INVALID_INPUT`(`memberId` 가 1 이상의 정수가 아님) · `CANNOT_INVITE_SELF`, 401, 403 `NOT_POST_AUTHOR`, 404 `POST_NOT_FOUND` · `MEMBER_NOT_FOUND`(없음·탈퇴), 409 `PARTY_FULL` · `POST_PAUSED` · `POST_CLOSED` · `INVITEE_UNAVAILABLE`(정지·영구 정지 회원) · `ALREADY_IN_PARTY`(대기 중·수락됨) · `INVITE_NOT_ALLOWED`(거절·노쇼) · `ALREADY_INVITED`.
+
+**초대 응답 (`PATCH /api/posts/{postId}/invitations/me`)** 🔒 초대받은 회원 — 본문 `{ "status": "ACCEPTED" | "DECLINED" }` → `200` `{ "postId": 7, "status": "ACCEPTED", "current": 3, "max": 8, "postStatus": "OPEN" }`
+
+- **수락**: 파티장 승인 없이 바로 파티원이 됩니다. 공고 행을 잠근 채 같은 트랜잭션에서 신청을 `ACCEPTED` 로 만들고(신청 기록이 없으면 새로, 대기 중·취소한 신청이 있으면 그 행을) `current` 를 1 늘립니다. 승인과 같이 일시 중단(`PAUSED`) 중에도 수락할 수 있고, 마지막 자리면 공고가 `CLOSED` 가 되며 대기 중 신청자에게 마감 알림이 갑니다. 프론트는 수락 후 공고 상세로 이동합니다.
+- **거절**: 초대만 `DECLINED` 로 바꿉니다.
+- 수락·거절 모두 파티장에게 `INVITE_RESULT` 알림을 보내고, 받은 초대 알림은 읽음 처리합니다.
+- 오류: 400 `INVALID_INPUT`, 401, 403 `ACCOUNT_BANNED` · `ACCOUNT_SUSPENDED`(수락만), 404 `POST_NOT_FOUND` · `INVITATION_NOT_FOUND`, 409 `ALREADY_RESPONDED` · `POST_CLOSED` · `PARTY_FULL` · `ALREADY_IN_PARTY`(이미 파티원) · `INVITE_NOT_ALLOWED`(그 사이 신청이 거절·노쇼 처리됨) — 409 는 수락할 때만.
+
 **알림 전송** — 아래 파티 이벤트가 일어나면 같은 트랜잭션 안에서 `notification` 에 한 건씩 저장합니다(이벤트가 실패해 롤백되면 알림도 남지 않음). 문구는 `partyConstants.js` 의 `partyMessages.notice`, 공고 제목은 40자에서 줄임표로 자릅니다.
 
 | 이벤트 | 받는 사람 | `type` |
@@ -509,6 +525,8 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 | 작성자가 마감(`CLOSED`)·완료(`COMPLETED`) 처리 (재개는 알리지 않음) | 대기 중·수락된 신청자 | `POST_UPDATED` |
 | 작성자가 공고 수정(`PUT`)에서 **일정 · 게임 · 상세 분류를 바꿈** (제목·본문·태그만 고치면 알리지 않음) | 대기 중·수락된 신청자 | `POST_UPDATED` |
 | 작성자가 공고 삭제(`DELETE`) | 대기 중·수락된 신청자 | `POST_DELETED` (공고가 사라지므로 `postId` 는 `null`) |
+| 작성자가 회원을 파티에 초대(`POST .../invitations`) | 초대받은 회원 | `PARTY_INVITE` |
+| 초대받은 회원이 수락·거절(`PATCH .../invitations/me`) | 파티장 | `INVITE_RESULT` |
 | 새 공고 등록(`POST /api/posts`) — 그 공고의 **게임**(또는 **상세 분류**)을 관심 알림으로 **켜 둔** 회원(작성자 본인·탈퇴 회원 제외, 아래 즐겨찾기 알림을 받는 회원은 중복 제외) | 관심 알림 설정 회원 | `INTEREST_POST` (`postId` 는 새 공고) |
 | 즐겨찾기한 작성자가 새 공고 등록(`POST /api/posts`) (수정·임시저장은 알리지 않음) | 그 작성자를 즐겨찾기한 회원(탈퇴 회원 제외) | `FAVORITE_AUTHOR_POST` (`postId` 는 새 공고) — `backend/src/post` 의 `postMessages.notice.favoriteAuthorPosted` |
 
@@ -530,11 +548,12 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 
 ```json
 {
-  "items": [{ "id": 12, "type": "APPLICATION_RESULT", "message": "'카멘 하드 숙련팟' 공고 참가 신청이 수락되었습니다.", "postId": 7, "read": false, "createdAt": "2026-11-13T05:00:00.000Z" }],
+  "items": [{ "id": 12, "type": "APPLICATION_RESULT", "message": "'카멘 하드 숙련팟' 공고 참가 신청이 수락되었습니다.", "postId": 7, "read": false, "createdAt": "2026-11-13T05:00:00.000Z", "invitationStatus": null }],
   "page": 1, "size": 20, "totalCount": 1, "totalPages": 1, "unreadCount": 1
 }
 ```
 
+- `invitationStatus`: 파티 초대 알림(`PARTY_INVITE`)이면 그 초대의 지금 상태(`PENDING` · `ACCEPTED` · `DECLINED`), 아니면 `null`. `PENDING` 이면 알림함에 「참여」·「거절」 버튼을 보여줍니다.
 - `postId` 는 연결된 공고가 없거나 공고가 삭제돼 연결이 끊어지면 `null` 입니다. `unreadCount` 는 `unread` 필터와 상관없이 내 전체 안 읽은 알림 수입니다.
 - **관심 알림 설정**(REQ-NOTI-001): 회원당 최대 20개, 같은 대상(게임 + 상세 분류)은 한 번만 등록합니다. 오류: 400 `INVALID_INPUT`(`game` · `detail` · `enabled`), 404 `GAME_NOT_FOUND` · `GAME_CONTENT_NOT_FOUND` · `SUBSCRIPTION_NOT_FOUND`(없음, 남의 설정, 형식이 틀린 id), 409 `SUBSCRIPTION_EXISTS` · `SUBSCRIPTION_LIMIT`.
 - 오류: 400 `INVALID_INPUT`(`page` · `size` · `unread`), 401 `UNAUTHORIZED`, 404 `NOTIFICATION_NOT_FOUND`(없음, 남의 알림, 형식이 틀린 id — 남의 알림은 존재 여부를 알리지 않으려고 404).
@@ -830,6 +849,7 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
 | GET | `/api/members/me/scraps?page=&size=` | 내가 스크랩한 공고 | 🔒 |
 | GET | `/api/members/me/favorites` | 즐겨찾는 유저 목록 | 🔒 |
 | POST / DELETE | `/api/members/me/favorites/{memberId}` | 즐겨찾기 추가 / 해제 → `204` | 🔒 |
+| GET | `/api/members/me/recent-players` | 최근 함께한 플레이어 (최대 10명) | 🔒 |
 | GET | `/api/members/{memberId}` | 회원 프로필 (로그인하면 `viewer` 포함) | |
 | GET | `/api/members/{memberId}/posts?page=&size=` | 그 회원이 쓴 공고 (삭제되지 않은 공고, 최신순). 아이템은 `/me/posts` 에서 `canComplete`·`review` 를 뺀 형태 | |
 | GET | `/api/members/{memberId}/manner-history?days=` | 최근 N일(기본 30, 최대 90, 가입한 지 N일이 안 됐으면 가입일부터) 매너 온도 변화 → `{ days, current, points: [{ date, temp, reviewCount }] }` | |
@@ -951,6 +971,19 @@ OurParty 서비스의 REST API 정의서입니다. 프로젝트 개요와 개발
   "current": 3, "max": 8, "schedule": "2026-11-15T12:00:00.000Z", "scheduleTbd": false, "status": "OPEN",
   "host": "빛나는오더", "scrappedAt": "2026-11-14T00:00:00.000Z"
 }
+```
+
+**최근 함께한 플레이어 (`/me/recent-players`)**
+
+- 활동 완료(`COMPLETED`)한 공고에서 나와 함께한 구성원(파티장 + 승인된 신청자)을 배열로 돌려줍니다. 나와 탈퇴한 회원, 노쇼 처리된 회원, 삭제된 공고는 빠집니다.
+- 회원마다 가장 최근에 함께한 파티(`lastParty`)와 함께 완료한 횟수(`playCount`)를 붙이고, `lastParty.playedAt` 최신순으로 최대 10명입니다. `playedAt` 은 출발 시간, 시간 미정 공고면 공고가 마지막으로 바뀐 시각(완료 처리 시각)입니다.
+- 마이페이지에서 「프로필 보기」(`/members/{id}`)와 「파티 초대」(4절 `POST /api/posts/{postId}/invitations`, 상대는 알림함에서 `PATCH .../invitations/me` 로 응답)에 씁니다.
+
+```json
+[
+  { "id": 2, "nickname": "철수", "avatarUrl": null, "level": 52, "mannerTemp": 36.5, "playCount": 3,
+    "lastParty": { "postId": 7, "title": "[카멘] 숙련 서폿 구해요", "game": "lostark", "gameName": "로스트아크", "playedAt": "2026-11-15T12:00:00.000Z" } }
+]
 ```
 
 **즐겨찾기 (`/me/favorites`)**

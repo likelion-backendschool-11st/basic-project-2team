@@ -4,6 +4,7 @@ const { ApiError } = require('../common/ApiError');
 const { POST_EVENT, NO_EVENTS } = require('../common/postEvents');
 const {
   APPLICATION_STATUS: S,
+  INVITATION_STATUS: I,
   POST_STATUS,
   MEMBER_STATUS,
   LATE_CANCEL_HOURS,
@@ -12,7 +13,7 @@ const {
   NOTIFICATION_TITLE_MAX,
   partyMessages: m,
 } = require('./partyConstants');
-const { parseId, validateApply, validateDecision, validatePostStatus, parseListStatus } = require('./partyValidator');
+const { parseId, validateApply, validateDecision, validatePostStatus, parseListStatus, validateInvite, validateInvitationResponse } = require('./partyValidator');
 
 const toIso = (value) => (value ? new Date(value).toISOString() : null);
 const postNotFound = () => new ApiError(404, 'POST_NOT_FOUND', m.postNotFound);
@@ -196,7 +197,82 @@ function createPartyService({ partyRepository, postEvents = NO_EVENTS, now = () 
     return rows.map((row) => ({ ...toMember(row), role: row.role, isHost: Boolean(row.isHost) }));
   }
 
-  return { apply, cancelMine, listApplications, decide, changeStatus, listParticipants };
+  /**
+   * POST /api/posts/:postId/invitations — 작성자가 모집 중인 공고에 회원을 초대합니다.
+   * 초대받은 회원에게 PARTY_INVITE 알림을 보내고, 회원은 알림함에서 수락(바로 파티원)·거절합니다.
+   */
+  async function invite(rawPostId, memberId, body) {
+    const { memberId: inviteeId } = validateInvite(body);
+    const post = await loadOwnedPost(rawPostId, memberId);
+    if (inviteeId === memberId) throw new ApiError(400, 'CANNOT_INVITE_SELF', m.cannotInviteSelf);
+    if (post.currentCount >= post.headcount) throw new ApiError(409, 'PARTY_FULL', m.partyFull);
+    if (post.status === POST_STATUS.paused) throw new ApiError(409, 'POST_PAUSED', m.postPaused);
+    if (post.status !== POST_STATUS.open) throw new ApiError(409, 'POST_CLOSED', m.postClosed);
+
+    const invitee = await partyRepository.findMemberStatus(inviteeId);
+    if (!invitee || invitee.status === MEMBER_STATUS.withdrawn) throw new ApiError(404, 'MEMBER_NOT_FOUND', m.memberNotFound);
+    try {
+      assertCanApply(invitee, now());
+    } catch {
+      throw new ApiError(409, 'INVITEE_UNAVAILABLE', m.inviteeUnavailable);
+    }
+
+    const existing = await partyRepository.findMyApplication(post.id, inviteeId);
+    if (existing && [S.pending, S.accepted].includes(existing.status)) throw new ApiError(409, 'ALREADY_IN_PARTY', m.alreadyInParty);
+    if (existing && existing.status !== S.canceled) throw new ApiError(409, 'INVITE_NOT_ALLOWED', m.inviteNotAllowed);
+    const alreadyInvited = () => new ApiError(409, 'ALREADY_INVITED', m.alreadyInvited);
+    const invitation = await partyRepository.findInvitation(post.id, inviteeId);
+    if (invitation?.status === I.pending) throw alreadyInvited();
+
+    const host = await partyRepository.findMemberStatus(memberId);
+    const created = await partyRepository.createInvitation({
+      postId: post.id,
+      inviterId: memberId,
+      inviteeId,
+      notice: m.notice.invited(host?.nickname ?? m.withdrawnMember, clipTitle(post.title)),
+    });
+    if (!created) throw alreadyInvited();
+  }
+
+  /**
+   * PATCH /api/posts/:postId/invitations/me — 받은 초대에 응답합니다 { status: ACCEPTED | DECLINED }.
+   * 수락하면 파티장 승인 없이 바로 파티원(ACCEPTED)이 됩니다.
+   */
+  async function respondInvitation(rawPostId, memberId, body) {
+    const { status } = validateInvitationResponse(body);
+    const invitee = await partyRepository.findMemberStatus(memberId);
+    if (status === I.accepted) assertCanApply(invitee, now());
+    const post = await loadPost(rawPostId);
+
+    const nickname = invitee?.nickname ?? m.withdrawnMember;
+    const title = clipTitle(post.title);
+    const outcome = await partyRepository.respondInvitation({
+      postId: post.id,
+      inviteeId: memberId,
+      status,
+      respondedAt: now(),
+      notices: { accepted: m.notice.inviteAccepted(nickname, title), declined: m.notice.inviteDeclined(nickname, title), closed: m.notice.closed(title) },
+    });
+    switch (outcome.result) {
+      case 'OK':
+        if (status === I.accepted) changed(post.id);
+        return { postId: post.id, status, current: outcome.current, max: outcome.max, postStatus: outcome.postStatus };
+      case 'ALREADY_RESPONDED':
+        throw new ApiError(409, 'ALREADY_RESPONDED', m.alreadyResponded);
+      case 'POST_CLOSED':
+        throw new ApiError(409, 'POST_CLOSED', m.postClosed);
+      case 'FULL':
+        throw new ApiError(409, 'PARTY_FULL', m.partyFull);
+      case 'ALREADY_JOINED':
+        throw new ApiError(409, 'ALREADY_IN_PARTY', m.alreadyJoined);
+      case 'NOT_ALLOWED':
+        throw new ApiError(409, 'INVITE_NOT_ALLOWED', m.joinNotAllowed);
+      default:
+        throw new ApiError(404, 'INVITATION_NOT_FOUND', m.invitationNotFound);
+    }
+  }
+
+  return { apply, cancelMine, listApplications, decide, changeStatus, listParticipants, invite, respondInvitation };
 }
 
 module.exports = { createPartyService };

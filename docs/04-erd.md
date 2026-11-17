@@ -203,6 +203,8 @@ erDiagram
     post ||--o{ post_scrap : "스크랩됨"
     post ||--o{ post_application : "신청 받음"
     member ||--o{ post_application : "신청"
+    post ||--o{ party_invitation : "초대"
+    member ||--o{ party_invitation : "초대함 / 초대받음"
 
     category {
         varchar(20) code PK "mmorpg, fps ..."
@@ -285,6 +287,15 @@ erDiagram
         boolean late_cancel "기본 FALSE"
         datetime decided_at
         datetime canceled_at
+    }
+
+    party_invitation {
+        bigint id PK
+        bigint post_id FK "UQ(post_id, invitee_id)"
+        bigint inviter_id FK "초대한 파티장"
+        bigint invitee_id FK
+        varchar(20) status "PENDING / ACCEPTED / DECLINED"
+        datetime responded_at
     }
 
     member {
@@ -426,7 +437,7 @@ erDiagram
     notification {
         bigint id PK
         bigint member_id FK
-        varchar(30) type "APPLICATION_RECEIVED / APPLICATION_RESULT / APPLICATION_CANCELED / POST_UPDATED / INTEREST_POST / POST_DELETED / SANCTION / POLL_CONFIRMED / POLL_REMINDER"
+        varchar(30) type "APPLICATION_RECEIVED / APPLICATION_RESULT / APPLICATION_CANCELED / POST_UPDATED / INTEREST_POST / POST_DELETED / SANCTION / POLL_CONFIRMED / POLL_REMINDER / PARTY_INVITE / INVITE_RESULT"
         varchar(200) message
         bigint post_id FK "NULL 허용"
         boolean is_read
@@ -559,6 +570,9 @@ erDiagram
 | post_scrap.post_id | post | 1:N | CASCADE |
 | post_application.post_id | post | 1:N | RESTRICT |
 | post_application.applicant_id | member | 1:N | RESTRICT |
+| party_invitation.post_id | post | 1:N | RESTRICT |
+| party_invitation.inviter_id | member | 1:N | RESTRICT |
+| party_invitation.invitee_id | member | 1:N | RESTRICT |
 | comment.post_id | post | 1:N | RESTRICT |
 | comment.author_id | member | 1:N | RESTRICT |
 | comment.parent_id | comment | 0..1:N | RESTRICT |

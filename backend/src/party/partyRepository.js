@@ -1,6 +1,6 @@
 'use strict';
 
-const { APPLICATION_STATUS: S, POST_STATUS, NOTIFICATION_TYPE } = require('./partyConstants');
+const { APPLICATION_STATUS: S, INVITATION_STATUS: I, POST_STATUS, NOTIFICATION_TYPE } = require('./partyConstants');
 const { awardActivityPoints } = require('../common/activityPoint');
 
 const ALIVE_POST = "p.deleted_at IS NULL AND p.status <> 'DELETED'";
@@ -252,6 +252,100 @@ function createPartyRepository(pool) {
     });
   }
 
+  /** 이 공고로 이 회원에게 보낸 초대 → { id, status }. 없으면 null (UNIQUE(post_id, invitee_id) 라 최대 1건) */
+  async function findInvitation(postId, inviteeId) {
+    const [rows] = await pool.query('SELECT id, status FROM party_invitation WHERE post_id = ? AND invitee_id = ? LIMIT 1', [postId, inviteeId]);
+    return rows[0] ?? null;
+  }
+
+  /**
+   * 초대를 만들거나, 수락·거절로 끝난 예전 초대를 다시 PENDING 으로 되돌리고 초대 알림을 보냅니다.
+   * 예전 초대 알림은 지워서 받은 사람의 알림함에 응답할 초대가 하나만 남게 합니다.
+   * @returns {Promise<boolean>} 이미 응답을 기다리는 초대가 있으면 false
+   */
+  async function createInvitation({ postId, inviterId, inviteeId, notice }) {
+    return inTransaction(async (connection) => {
+      const [result] = await connection.query(
+        `INSERT INTO party_invitation (post_id, inviter_id, invitee_id) VALUES (?, ?, ?)
+         ON DUPLICATE KEY UPDATE
+           inviter_id   = IF(status = '${I.pending}', inviter_id, ?),
+           responded_at = IF(status = '${I.pending}', responded_at, NULL),
+           created_at   = IF(status = '${I.pending}', created_at, CURRENT_TIMESTAMP),
+           status       = '${I.pending}'`,
+        [postId, inviterId, inviteeId, inviterId],
+      );
+      // 1: 새로 추가, 2: 끝난 초대를 되살림, 0: 이미 PENDING (바뀐 값 없음)
+      if (result.affectedRows === 0) return false;
+      await connection.query('DELETE FROM notification WHERE member_id = ? AND post_id = ? AND type = ?', [inviteeId, postId, NOTIFICATION_TYPE.partyInvite]);
+      await insertNotification(connection, { memberId: inviteeId, type: NOTIFICATION_TYPE.partyInvite, message: notice, postId });
+      return true;
+    });
+  }
+
+  /**
+   * 받은 초대에 응답합니다. 수락하면 공고 행을 잠근 채 정원·상태를 확인하고 신청을 ACCEPTED 로 만들어 바로 파티원이 됩니다
+   * (신청 기록이 없으면 새로, 대기 중·취소한 신청이 있으면 그 행을 ACCEPTED 로). 정원이 차면 승인과 같이 공고를 마감합니다.
+   * 수락·거절 모두 파티장에게 INVITE_RESULT 알림을 보내고, 받은 초대 알림은 읽음 처리합니다.
+   * @returns {Promise<{ result: 'OK' | 'NOT_FOUND' | 'ALREADY_RESPONDED' | 'POST_CLOSED' | 'FULL' | 'ALREADY_JOINED' | 'NOT_ALLOWED', current?: number, max?: number, postStatus?: string }>}
+   */
+  async function respondInvitation({ postId, inviteeId, status, respondedAt, notices }) {
+    return inTransaction(async (connection) => {
+      const [[post]] = await connection.query(
+        `SELECT author_id AS authorId, status, headcount, current_count AS current FROM post p WHERE p.id = ? AND ${ALIVE_POST} FOR UPDATE`,
+        [postId],
+      );
+      const [[invitation]] = await connection.query('SELECT id, status FROM party_invitation WHERE post_id = ? AND invitee_id = ? FOR UPDATE', [
+        postId,
+        inviteeId,
+      ]);
+      if (!post || !invitation) return { result: 'NOT_FOUND' };
+      if (invitation.status !== I.pending) return { result: 'ALREADY_RESPONDED' };
+
+      let current = post.current;
+      let postStatus = post.status;
+      if (status === I.accepted) {
+        // 승인과 같이 일시 중단 중에도 받을 수 있습니다(새 신청만 막힘).
+        if (post.status !== POST_STATUS.open && post.status !== POST_STATUS.paused) return { result: 'POST_CLOSED' };
+        if (current >= post.headcount) return { result: 'FULL' };
+        const [[application]] = await connection.query('SELECT id, status FROM post_application WHERE post_id = ? AND applicant_id = ? FOR UPDATE', [
+          postId,
+          inviteeId,
+        ]);
+        if (application && application.status === S.accepted) return { result: 'ALREADY_JOINED' };
+        if (application && application.status !== S.pending && application.status !== S.canceled) return { result: 'NOT_ALLOWED' };
+        if (application) {
+          await connection.query('UPDATE post_application SET status = ?, decided_at = ? WHERE id = ?', [S.accepted, respondedAt, application.id]);
+        } else {
+          await connection.query('INSERT INTO post_application (post_id, applicant_id, status, decided_at) VALUES (?, ?, ?, ?)', [
+            postId,
+            inviteeId,
+            S.accepted,
+            respondedAt,
+          ]);
+        }
+        current += 1;
+        postStatus = current >= post.headcount ? POST_STATUS.closed : post.status;
+        await connection.query('UPDATE post SET current_count = ?, status = ? WHERE id = ?', [current, postStatus, postId]);
+      }
+      await connection.query('UPDATE party_invitation SET status = ?, responded_at = ? WHERE id = ?', [status, respondedAt, invitation.id]);
+      await connection.query('UPDATE notification SET is_read = TRUE WHERE member_id = ? AND post_id = ? AND type = ?', [
+        inviteeId,
+        postId,
+        NOTIFICATION_TYPE.partyInvite,
+      ]);
+      await insertNotification(connection, {
+        memberId: post.authorId,
+        type: NOTIFICATION_TYPE.inviteResult,
+        message: status === I.accepted ? notices.accepted : notices.declined,
+        postId,
+      });
+      if (postStatus === POST_STATUS.closed && post.status !== POST_STATUS.closed) {
+        await notifyApplicants(connection, { postId, type: NOTIFICATION_TYPE.postUpdated, message: notices.closed, statuses: [S.pending] });
+      }
+      return { result: 'OK', current, max: post.headcount, postStatus };
+    });
+  }
+
   /** 확정 파티원: 파티장 먼저, 이어서 수락된 신청자(수락 순) */
   async function findParticipants(postId) {
     const [rows] = await pool.query(
@@ -279,6 +373,9 @@ function createPartyRepository(pool) {
     decideApplication,
     changePostStatus,
     findParticipants,
+    findInvitation,
+    createInvitation,
+    respondInvitation,
   };
 }
 

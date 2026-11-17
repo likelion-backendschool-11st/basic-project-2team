@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { commentText, type PostComment } from '../../data/commentData';
+import type { InviteTarget } from '../../data/myPageData';
 import type { CommentAuthorProfile } from '../../hooks/useComments';
 import { useDismiss } from '../../hooks/useDismiss';
 import { Avatar } from '../ui/Avatar';
@@ -31,7 +32,7 @@ interface CommentItemProps {
   readonly onAccept?: () => void;
   readonly onCancelAccept?: () => void;
   readonly onTogglePopover: () => void;
-  readonly onPopoverAction: (message: string) => void;
+  readonly onInviteAuthor: (target: InviteTarget) => void;
   readonly renderReply: (reply: PostComment) => React.ReactNode;
 }
 
@@ -67,7 +68,7 @@ export const CommentItem: React.FC<CommentItemProps> = (p) => {
         <span className="text-fog-muted">{ago(c.ageMin)}</span>
         {c.secret && <i className="fa-solid fa-lock text-[10px] text-amberAccent" />}
       </div>
-      {p.popoverOpen && <UserPopover profile={p.profile} onAction={p.onPopoverAction} onClose={p.onTogglePopover} />}
+      {p.popoverOpen && <UserPopover profile={p.profile} onInvite={p.onInviteAuthor} onClose={p.onTogglePopover} />}
       </div>
       {p.isEditing ? (
         <div className="mt-2">

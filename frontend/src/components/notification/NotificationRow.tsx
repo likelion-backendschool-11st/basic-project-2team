@@ -7,16 +7,20 @@ interface NotificationRowProps {
   readonly onOpen: (notification: NotificationView) => void;
   readonly onMarkRead: (notification: NotificationView) => void;
   readonly onDelete: (notification: NotificationView) => void;
+  /** 파티 초대 알림의 참여·거절 */
+  readonly onRespond: (notification: NotificationView, status: 'ACCEPTED' | 'DECLINED') => void;
+  /** 이 알림의 초대 응답을 보내는 중 */
+  readonly responding: boolean;
 }
 
 const actionBtn =
   'px-2.5 py-1 rounded-md text-xs font-medium border border-night-border text-fog-sub hover:text-white hover:border-night-borderLight transition-colors';
 
 /**
- * 알림 한 줄: 유형 아이콘 · 메시지 · 시각 + 「읽음으로 표시」·「삭제」 버튼.
+ * 알림 한 줄: 유형 아이콘 · 메시지 · 시각 + 「읽음으로 표시」·「삭제」 버튼 (응답 전 파티 초대면 「참여」·「거절」).
  * 안 읽은 알림은 강조하고, 본문을 누르면 읽음 처리·공고 이동을 합니다(읽었고 연결 공고도 없으면 본문은 누를 수 없음).
  */
-export const NotificationRow: React.FC<NotificationRowProps> = ({ notification: n, onOpen, onMarkRead, onDelete }) => {
+export const NotificationRow: React.FC<NotificationRowProps> = ({ notification: n, onOpen, onMarkRead, onDelete, onRespond, responding }) => {
   const actionable = !n.read || n.postId !== null;
   const body = (
     <>
@@ -39,6 +43,7 @@ export const NotificationRow: React.FC<NotificationRowProps> = ({ notification: 
       </div>
     </>
   );
+  const pendingInvite = n.invitation === 'PENDING' && n.postId !== null;
   const bodyCls = 'flex-1 min-w-0 flex items-start gap-4 text-left';
 
   return (
@@ -51,7 +56,29 @@ export const NotificationRow: React.FC<NotificationRowProps> = ({ notification: 
         <div className={bodyCls}>{body}</div>
       )}
       <div className="shrink-0 flex flex-col sm:flex-row gap-1.5 self-center">
-        {!n.read && (
+        {pendingInvite && (
+          <>
+            <button
+              type="button"
+              disabled={responding}
+              onClick={() => onRespond(n, 'ACCEPTED')}
+              className="px-3 py-1 rounded-md text-xs font-bold bg-mercury text-white hover:bg-mercury-light disabled:opacity-60 transition-colors"
+            >
+              {responding ? notificationText.inviteResponding : notificationText.inviteAccept}
+            </button>
+            <button type="button" disabled={responding} onClick={() => onRespond(n, 'DECLINED')} className={`${actionBtn} hover:text-rose-300 disabled:opacity-60`}>
+              {notificationText.inviteDecline}
+            </button>
+          </>
+        )}
+        {(n.invitation === 'ACCEPTED' || n.invitation === 'DECLINED') && (
+          <span
+            className={`px-2.5 py-1 rounded-md text-xs font-semibold text-center ${n.invitation === 'ACCEPTED' ? 'bg-emerald-500/15 text-emerald-300' : 'bg-night-card text-fog-muted'}`}
+          >
+            {n.invitation === 'ACCEPTED' ? notificationText.inviteAccepted : notificationText.inviteDeclined}
+          </span>
+        )}
+        {!n.read && !pendingInvite && (
           <button type="button" onClick={() => onMarkRead(n)} className={actionBtn}>
             {notificationText.markRead}
           </button>

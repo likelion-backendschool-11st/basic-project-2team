@@ -26,6 +26,7 @@ function createNotificationService({ notificationRepository }) {
         postId: row.postId ?? null,
         read: Boolean(row.isRead),
         createdAt: toIso(row.createdAt),
+        invitationStatus: row.invitationStatus ?? null,
       })),
       page,
       size,

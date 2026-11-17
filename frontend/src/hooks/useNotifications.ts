@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { errorMessageOf, hasAccessToken } from '../api/http';
 import { deleteNotification, getNotifications, markAllNotificationsRead, markNotificationRead, notifyNotificationsChanged, toNotificationView, UNREAD_COUNT_CHANGED_EVENT } from '../api/notificationApi';
+import { respondInvitation } from '../api/postApi';
 import { NOTIFICATION_PAGE_SIZE, notificationText, type NotificationView } from '../data/notificationData';
 import { paths } from '../data/routes';
 
@@ -20,6 +21,7 @@ export function useNotifications() {
   const [reloadKey, setReloadKey] = useState(0);
   const [actionError, setActionError] = useState<string | null>(null);
   const [markingAll, setMarkingAll] = useState(false);
+  const [respondingId, setRespondingId] = useState<string | null>(null);
   const loggedIn = hasAccessToken();
   const navigate = useNavigate();
   const reload = useCallback(() => setReloadKey((k) => k + 1), []);
@@ -103,6 +105,31 @@ export function useNotifications() {
       });
   };
 
+  /**
+   * 파티 초대 알림의 「참여」·「거절」 (PATCH /api/posts/{postId}/invitations/me).
+   * 참여하면 바로 파티원이 되므로 그 공고 상세로 이동하고, 거절하면 그 줄을 「거절함」으로 바꿉니다.
+   */
+  const respond = async (item: NotificationView, status: 'ACCEPTED' | 'DECLINED') => {
+    if (item.postId === null || item.invitation !== 'PENDING' || respondingId !== null) return;
+    setActionError(null);
+    setRespondingId(item.id);
+    try {
+      await respondInvitation(item.postId, status);
+      notifyNotificationsChanged();
+      if (status === 'ACCEPTED') {
+        navigate(paths.postDetail(String(item.postId)));
+        return;
+      }
+      if (!item.read) setUnreadCount((c) => Math.max(0, c - 1));
+      setItems((prev) => prev.map((n) => (n.id === item.id ? { ...n, read: true, invitation: status } : n)));
+    } catch (err) {
+      setActionError(errorMessageOf(err, notificationText.inviteRespondFailed));
+      reload();
+    } finally {
+      setRespondingId(null);
+    }
+  };
+
   /** 「모두 읽음」: 서버에서 처리한 뒤 목록을 다시 불러옵니다(안 읽은 알림 필터에서는 목록이 비게 됩니다). */
   const markAllRead = async () => {
     if (markingAll || unreadCount === 0) return;
@@ -138,6 +165,8 @@ export function useNotifications() {
     markRead,
     remove,
     markAllRead,
+    respondingId,
+    respond: (item: NotificationView, status: 'ACCEPTED' | 'DECLINED') => void respond(item, status),
     pager: {
       page,
       pages: Array.from({ length: size }, (_, i) => start + i),

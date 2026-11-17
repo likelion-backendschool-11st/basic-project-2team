@@ -2,6 +2,7 @@ import {
   notificationText,
   notificationTypes,
   unknownNotificationType,
+  type InvitationStatus,
   type NotificationType,
   type NotificationView,
   type SubscriptionView,
@@ -16,6 +17,8 @@ export interface NotificationItem {
   readonly postId: number | null;
   readonly read: boolean;
   readonly createdAt: string;
+  /** PARTY_INVITE 알림이면 초대 상태, 아니면 null */
+  readonly invitationStatus?: InvitationStatus | null;
 }
 
 export interface NotificationPage {
@@ -94,5 +97,6 @@ export function toNotificationView(item: NotificationItem, now: Date = new Date(
     timeAgo: timeAgo(item.createdAt, now),
     read: item.read,
     postId: item.postId,
+    invitation: item.type === 'PARTY_INVITE' ? (item.invitationStatus ?? null) : null,
   };
 }
