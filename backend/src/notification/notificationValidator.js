@@ -1,7 +1,7 @@
 'use strict';
 
 const { ApiError } = require('../common/ApiError');
-const { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, CODE_PATTERN, notificationMessages: m } = require('./notificationConstants');
+const { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, CODE_PATTERN, TYPE_PATTERN, notificationMessages: m } = require('./notificationConstants');
 
 /** 양의 정수 문자열이면 숫자로, 아니면 null (값이 없으면 fallback) */
 function parseInteger(raw, fallback) {
@@ -14,7 +14,7 @@ function parseId(raw) {
   return typeof raw === 'string' && /^[1-9]\d*$/.test(raw) && Number.isSafeInteger(Number(raw)) ? Number(raw) : null;
 }
 
-/** 알림 목록 쿼리 ?page=&size=&unread= */
+/** 알림 목록 쿼리 ?page=&size=&unread=&type= (type 을 주면 그 유형만) */
 function parseListQuery(query) {
   const fields = [];
   const page = parseInteger(query.page, 1);
@@ -23,8 +23,10 @@ function parseListQuery(query) {
   if (size === null || size < 1 || size > MAX_PAGE_SIZE) fields.push({ field: 'size', message: m.sizeInvalid });
   const unread = query.unread === undefined ? 'false' : query.unread;
   if (unread !== 'true' && unread !== 'false') fields.push({ field: 'unread', message: m.unreadInvalid });
+  const type = query.type === undefined ? null : query.type;
+  if (type !== null && (typeof type !== 'string' || !TYPE_PATTERN.test(type))) fields.push({ field: 'type', message: m.typeInvalid });
   if (fields.length > 0) throw new ApiError(400, 'INVALID_INPUT', m.invalidInput, fields);
-  return { page, size, unreadOnly: unread === 'true' };
+  return { page, size, unreadOnly: unread === 'true', type };
 }
 
 const isObject = (body) => typeof body === 'object' && body !== null && !Array.isArray(body);

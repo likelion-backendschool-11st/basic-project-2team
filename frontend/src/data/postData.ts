@@ -2,7 +2,8 @@
 /** Stitch screens: "공고글 상세 - 파티원 모드 / 작성자 모드" (project 15649597777945524469), comments (project 270338861769685965) */
 
 export type PostStatus = 'OPEN' | 'PAUSED' | 'CLOSED' | 'COMPLETED';
-export type ApplicationStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'CANCELED' | 'NO_SHOW';
+/** KICKED: 파티장이 추방함 (탈퇴처럼 다시 신청할 수 있음) */
+export type ApplicationStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'CANCELED' | 'KICKED' | 'NO_SHOW';
 
 export interface Participant {
   /** 회원 id (프로필 페이지 링크용) */
@@ -11,6 +12,8 @@ export interface Participant {
   readonly avatarUrl?: string | null;
   readonly role: string;
   readonly leader?: boolean;
+  readonly level?: number;
+  readonly mannerTemp?: number;
 }
 
 export interface PostDetail {
@@ -160,6 +163,16 @@ export const postText = {
   viewProfile: '프로필 보기',
   applicantNoTags: '아직 받은 평가 태그가 없어요',
   participantsTitle: '파티 참가자 명단',
+  /** 참가자를 누르면 뜨는 창 */
+  participantMenu: {
+    label: (name: string) => `${name}님 메뉴`,
+    meta: (level: number, temp: number) => `Lv.${level} · 매너 ${temp.toFixed(1)}℃`,
+    leaderBadge: '파티장',
+    memberBadge: '확정',
+    viewProfile: '프로필 보기',
+    kick: '파티원 추방하기',
+    kickHint: '(공대장 권한)',
+  },
   emptySlot: '모집 중',
   conditionsTitle: '파티 모집 상세 조건',
   closeRecruit: '공고 모집 마감 완료',
@@ -174,8 +187,43 @@ export const postText = {
   disband: { title: '파티를 해산할까요?', description: '해산하면 참가자 전원에게 해산 알림이 전송되고, 공고는 종료 처리됩니다.', confirm: '해산', cancel: '아니오' },
   cancelApplication: { title: '참가 신청을 취소할까요?', description: '취소하면 방장의 수락 대기 목록에서 사라집니다. 이후 다시 신청할 수 있습니다.', confirm: '신청 취소', cancel: '아니오' },
   leave: { title: '파티에서 탈퇴할까요?', description: '탈퇴 후 재신청하려면 방장의 수락을 다시 받아야 하며, 잦은 탈퇴는 매너 점수에 반영될 수 있습니다.', confirm: '탈퇴', cancel: '아니오' },
+  kick: {
+    title: (name: string) => `${name}님을 추방할까요?`,
+    description: '추방하면 파티원 명단에서 빠지고 해당 유저에게 알림이 전송됩니다. 다시 참가하려면 새로 신청해 승인을 받아야 합니다.',
+    confirm: '추방',
+    cancel: '취소',
+    done: (name: string) => `${name}님을 파티에서 추방했습니다.`,
+    reasonLabel: '추방 사유 (선택)',
+    reasonPlaceholder: '예: 사전 고지 없는 미접속 및 지각 (출발 10분 전)',
+  },
+  /** 추방당한 본인에게 어느 화면에서든 뜨는 안내 (Stitch 「파티 추방 안내」 모달). 확인을 누르면 이전 페이지로 이동 */
+  kickedNotice: {
+    badge: '파티 추방 안내',
+    title: '파티에서 제외(추방)되었습니다',
+    subtitle: '공대장 권한으로 인해 해당 파티 명단에서 제외 처리되었습니다.',
+    postLabel: '대상 파티 공고',
+    hostLabel: '공대장',
+    reasonLabel: '추방 사유',
+    reasonHeadline: '공대장에 의해 파티에서 제외 조치되었습니다.',
+    noReason: '공대장이 따로 사유를 남기지 않았습니다.',
+    appealPrefix: '※ 추방과 관련된 이의 신청이나 비매너 강퇴 신고는 ',
+    appealLink: '고객지원 > 비매너 이용자 신고센터',
+    appealSuffix: '를 이용해 주세요.',
+    /** 추방된 그 공고 화면에 있을 때: 확인하면 이전 페이지로 이동 */
+    confirm: '[확인] 이전 페이지로 이동',
+    /** 다른 화면에 있을 때: 확인하면 창만 닫음 */
+    confirmStay: '확인',
+    close: '닫기',
+  },
   closeConfirm: { title: '모집을 마감할까요?', description: '마감하면 더 이상 신청을 받을 수 없고, 현재 참가자로 파티가 확정됩니다.', confirm: '마감', cancel: '취소' },
 };
+
+/** 추방 사유 최대 길이 (backend/src/party/partyConstants.js KICK_REASON_MAX_LENGTH) */
+export const KICK_REASON_MAX_LENGTH = 100;
+/** PARTY_KICKED 알림 문구에서 사유가 시작되는 표시 (backend partyMessages.notice.kicked) */
+export const KICK_REASON_MARKER = '\n사유: ';
+/** PARTY_KICKED 알림 문구 「'제목' 파티에서 …」에서 공고 제목을 꺼내는 패턴 (공고가 삭제돼 상세를 못 불러올 때) */
+export const KICK_TITLE_PATTERN = /^'(.+)' 파티에서 /;
 
 /** 노쇼 신고 사유 (backend/src/board/commentConstants.js NO_SHOW_REPORT_REASONS) */
 export const noShowReasons: readonly string[] = ['연락 없이 불참', '약속 시간 지각', '시작 후 무단 이탈', '기타'];

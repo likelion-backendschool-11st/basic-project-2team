@@ -13,6 +13,7 @@ function createPartyRouter(partyController, { requireAuth }) {
   router.get('/:postId/participants', partyController.listParticipants);
   router.post('/:postId/invitations', requireAuth, partyController.invite);
   router.post('/:postId/invitations/accept', requireAuth, partyController.acceptInvitation);
+  router.delete('/:postId/participants/:memberId', requireAuth, partyController.kick);
   return router;
 }
 

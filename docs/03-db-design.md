@@ -174,11 +174,11 @@ API의 `level`은 **서비스 활동 레벨**(`member.level`)입니다. 공고 �
 | applicant_id | BIGINT UNSIGNED | FK → member | |
 | role | VARCHAR(30) | | 포지션 |
 | message | VARCHAR(200) | | |
-| status | VARCHAR(20) | 기본 `PENDING` | PENDING / ACCEPTED / REJECTED / CANCELED / NO_SHOW |
+| status | VARCHAR(20) | 기본 `PENDING` | PENDING / ACCEPTED / REJECTED / CANCELED / KICKED(파티장이 추방) / NO_SHOW |
 | late_cancel | BOOLEAN | 기본 FALSE | APPLY-002. 출발 임박 시점의 취소를 노쇼와 구분 |
 | decided_at, canceled_at | DATETIME | | |
 
-`CANCELED` 상태인 사람이 다시 신청하면 같은 행의 상태를 `PENDING`으로 되돌립니다. `REJECTED`·`NO_SHOW` 상태에서는 같은 공고에 다시 신청할 수 없습니다.
+`CANCELED`·`KICKED` 상태인 사람이 다시 신청하면 같은 행의 상태를 `PENDING`으로 되돌립니다. `REJECTED`·`NO_SHOW` 상태에서는 같은 공고에 다시 신청할 수 없습니다.
 
 ### 2.10 `comment`
 
@@ -260,7 +260,7 @@ API의 `level`은 **서비스 활동 레벨**(`member.level`)입니다. 공고 �
 
 | 테이블 | 컬럼 | 비고 |
 | --- | --- | --- |
-| `notification` | id, member_id FK, type VARCHAR(30), message VARCHAR(200), post_id FK NULL, is_read BOOLEAN, created_at | type 예: APPLICATION_RECEIVED, APPLICATION_RESULT, APPLICATION_CANCELED, POST_UPDATED, INTEREST_POST, POST_DELETED, SANCTION, NO_SHOW, POLL_CONFIRMED, POLL_REMINDER, PARTY_INVITE(파티 초대 — 이 행이 초대장 역할, 지우면 초대도 사라지고 수락하거나 공고가 삭제·완료되면 삭제됨), INVITE_ACCEPTED |
+| `notification` | id, member_id FK, type VARCHAR(30), message VARCHAR(200), post_id FK NULL, is_read BOOLEAN, created_at | type 예: APPLICATION_RECEIVED, APPLICATION_RESULT, APPLICATION_CANCELED, PARTY_KICKED, POST_UPDATED, INTEREST_POST, POST_DELETED, SANCTION, NO_SHOW, POLL_CONFIRMED, POLL_REMINDER, PARTY_INVITE(파티 초대 — 이 행이 초대장 역할, 지우면 초대도 사라지고 수락하거나 공고가 삭제·완료되면 삭제됨), INVITE_ACCEPTED |
 | `notification_subscription` | id, member_id FK, game_id FK, game_content_id FK NULL, enabled BOOLEAN | NOTI-001 관심 게임·레이드 |
 
 ### 2.13 신고 · 관리
@@ -369,7 +369,7 @@ PK와 UNIQUE는 그 자체가 인덱스라서, 중복되는 인덱스는 따로 
 | 10 | 재가입 제한 | 제재 이력이 없으면 제한 없음. 경고·기간 정지 이력은 탈퇴 후 6개월, 영구 정지 이력은 영구 제한 | WITHDRAW-004. 탈퇴 후 바로 재가입해 제재를 피하는 것을 막는 최소 기간 |
 | 11 | 탈퇴자 보관 기간 | 제재 이력이 있으면 재가입 제한이 끝날 때까지, 없으면 30일 | WITHDRAW-003. 해시만 보관해 원문 개인정보는 남기지 않습니다. |
 | 12 | 댓글 자동 가림 | 서로 다른 신고자 5명 이상이면 `HIDDEN` | REPORT-004. 관리자가 확인 후 복구할 수 있습니다. |
-| 13 | 재신청 | `CANCELED`만 같은 공고에 재신청 가능, `REJECTED`·`NO_SHOW`는 불가 | 거절된 사람이 반복 신청하는 것을 막습니다. |
+| 13 | 재신청 | `CANCELED`·`KICKED`만 같은 공고에 재신청 가능, `REJECTED`·`NO_SHOW`는 불가 | 거절된 사람이 반복 신청하는 것을 막습니다. |
 | 14 | 카테고리 | `mmorpg`, `fps`, `aos`, `steam`, `etc` 5개 | 프론트·API와 동일 |
 | 15 | 마스터 데이터 FK | category·game·game_content·tag·review_tag를 참조하는 FK는 모두 RESTRICT | 쓰이는 마스터 행은 지우지 않고 `is_active`로 숨깁니다. |
 | 16 | 파티 의견 조율 투표 | 공고당 진행 중 투표 1개, 항목 2~5개, 공대원(파티장+수락된 파티원)만 투표, 투표 전까지만 편집, 마감 시각이 지나도 공대장이 확정해야 `CONFIRMED` | Stitch 투표 화면(생성·편집·결과 확정·참여자 현황) 기준. 출발 10분 전 미투표자 자동 배정은 배치가 필요해 뒤로 미룹니다. |

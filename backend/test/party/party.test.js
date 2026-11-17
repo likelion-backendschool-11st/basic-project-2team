@@ -47,7 +47,7 @@ function createFakeRepository() {
     },
     async reapply({ id, role, message, notice }) {
       const a = state.applications.find((x) => x.id === id);
-      if (a.status !== 'CANCELED') return false;
+      if (!['CANCELED', 'KICKED'].includes(a.status)) return false;
       notify(notice.memberId, notice.type, notice.message);
       Object.assign(a, { status: 'PENDING', role, message });
       return true;
@@ -63,6 +63,17 @@ function createFakeRepository() {
         a.lateCancel = a.lateCancel || lateCancel;
       }
       a.status = 'CANCELED';
+      dropInvites(postId, applicantId);
+      return true;
+    },
+    async kickParticipant({ postId, applicantId, notice }) {
+      const a = find(postId, applicantId);
+      if (!a || a.status !== 'ACCEPTED') return false;
+      const post = state.posts.get(postId);
+      if (post.status === 'CLOSED' && post.currentCount >= post.headcount) post.status = 'OPEN';
+      post.currentCount -= 1;
+      a.status = 'KICKED';
+      notify(notice.memberId, notice.type, notice.message);
       dropInvites(postId, applicantId);
       return true;
     },
@@ -717,6 +728,95 @@ describe('party application API', () => {
       repo.state.posts.get(1).status = 'PAUSED';
       repo.state.notifications.push({ memberId: C, type: 'PARTY_INVITE', postId: 1 });
       assert.equal((await json(await accept(C))).error.code, 'PARTY_FULL');
+    });
+  });
+
+  describe('DELETE /:postId/participants/:memberId', () => {
+    const kick = (memberId, by = HOST, body = undefined) => call('DELETE', `/1/participants/${memberId}`, body, by);
+
+    it('파티장이 수락된 파티원을 내보내면 204, 신청은 KICKED · 인원 감소 · 본인에게 알림', async () => {
+      await apply(A);
+      await decide(1, 'ACCEPTED');
+      repo.state.notifications.length = 0;
+      events.log.length = 0;
+      const res = await kick(A);
+      assert.equal(res.status, 204);
+      assert.equal(repo.state.applications[0].status, 'KICKED');
+      assert.equal(repo.state.applications[0].lateCancel, false);
+      assert.equal(repo.state.posts.get(1).currentCount, 1);
+      assert.deepEqual(repo.state.notifications, [{ memberId: A, type: 'PARTY_KICKED', message: "'카멘 하드 숙련팟' 파티에서 파티장에 의해 추방되었습니다." }]);
+      assert.equal(events.log.length, 1);
+      const { data } = await json(await call('GET', '/1/participants'));
+      assert.deepEqual(data.map((p) => p.id), [HOST]);
+    });
+
+    it('추방된 회원에게 실시간 신호가 가고, 남아 있던 초대는 지워져 승인 없이 다시 들어올 수 없다', async () => {
+      await apply(A);
+      await decide(1, 'ACCEPTED');
+      repo.state.notifications.push({ memberId: A, type: 'PARTY_INVITE', message: '옛 초대', postId: 1 });
+      memberEvents.log.length = 0;
+      assert.equal((await kick(A)).status, 204);
+      assert.deepEqual(memberEvents.log, [[A, 'notifications']]);
+      assert.equal(repo.state.notifications.some((n) => n.type === 'PARTY_INVITE'), false);
+      const res = await call('POST', '/1/invitations/accept', undefined, A);
+      assert.equal(res.status, 404);
+      assert.equal((await json(res)).error.code, 'INVITATION_NOT_FOUND');
+      assert.equal(repo.state.applications[0].status, 'KICKED');
+    });
+
+    it('정원이 차서 자동 마감된 공고는 추방하면 다시 모집 중이 되고, 추방된 회원은 다시 신청할 수 있다', async () => {
+      repo.state.posts.get(1).headcount = 2;
+      await apply(A);
+      await decide(1, 'ACCEPTED');
+      assert.equal(repo.state.posts.get(1).status, 'CLOSED');
+      await kick(A);
+      assert.equal(repo.state.posts.get(1).status, 'OPEN');
+      assert.equal((await apply(A)).status, 201);
+    });
+
+    it('추방 사유를 주면 알림 둘째 줄에 붙이고(줄바꿈은 띄어쓰기로), 100자를 넘으면 400', async () => {
+      await apply(A);
+      await decide(1, 'ACCEPTED');
+      const tooLong = await kick(A, HOST, { reason: '가'.repeat(101) });
+      assert.equal(tooLong.status, 400);
+      assert.equal((await json(tooLong)).error.fields[0].field, 'reason');
+      repo.state.notifications.length = 0;
+      assert.equal((await kick(A, HOST, { reason: ' 사전 고지 없는\n지각 ' })).status, 204);
+      assert.equal(repo.state.notifications[0].message, "'카멘 하드 숙련팟' 파티에서 파티장에 의해 추방되었습니다.\n사유: 사전 고지 없는 지각");
+    });
+
+    it('작성자가 아니면 403 NOT_POST_AUTHOR', async () => {
+      await apply(A);
+      await decide(1, 'ACCEPTED');
+      const res = await kick(A, B);
+      assert.equal(res.status, 403);
+      assert.equal((await json(res)).error.code, 'NOT_POST_AUTHOR');
+    });
+
+    it('파티장 본인은 400 CANNOT_KICK_HOST', async () => {
+      const res = await kick(HOST);
+      assert.equal(res.status, 400);
+      assert.equal((await json(res)).error.code, 'CANNOT_KICK_HOST');
+    });
+
+    it('수락되지 않은(대기 중·없는) 회원은 404 PARTICIPANT_NOT_FOUND', async () => {
+      await apply(A);
+      for (const target of [A, C, 'abc']) {
+        const res = await kick(target);
+        assert.equal(res.status, 404, String(target));
+        assert.equal((await json(res)).error.code, 'PARTICIPANT_NOT_FOUND');
+      }
+      assert.equal(repo.state.applications[0].status, 'PENDING');
+    });
+
+    it('완료된 파티는 409 POST_COMPLETED, 비로그인은 401', async () => {
+      await apply(A);
+      await decide(1, 'ACCEPTED');
+      assert.equal((await call('DELETE', `/1/participants/${A}`)).status, 401);
+      repo.state.posts.get(1).status = 'COMPLETED';
+      const res = await kick(A);
+      assert.equal(res.status, 409);
+      assert.equal((await json(res)).error.code, 'POST_COMPLETED');
     });
   });
 

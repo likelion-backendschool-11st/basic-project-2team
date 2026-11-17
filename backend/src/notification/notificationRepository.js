@@ -5,17 +5,18 @@
  * @param {import('mysql2/promise').Pool} pool
  */
 function createNotificationRepository(pool) {
-  /** 내 알림 한 페이지(최신순)와 조건에 맞는 전체 건수 */
-  async function findPage({ memberId, unreadOnly, limit, offset }) {
-    const where = `member_id = ?${unreadOnly ? ' AND is_read = FALSE' : ''}`;
-    const [[{ totalCount }]] = await pool.query(`SELECT COUNT(*) AS totalCount FROM notification WHERE ${where}`, [memberId]);
+  /** 내 알림 한 페이지(최신순)와 조건에 맞는 전체 건수. type 을 주면 그 유형만 */
+  async function findPage({ memberId, unreadOnly, type = null, limit, offset }) {
+    const where = `member_id = ?${unreadOnly ? ' AND is_read = FALSE' : ''}${type ? ' AND type = ?' : ''}`;
+    const params = type ? [memberId, type] : [memberId];
+    const [[{ totalCount }]] = await pool.query(`SELECT COUNT(*) AS totalCount FROM notification WHERE ${where}`, params);
     // 파티 초대 알림에는 받은 사람의 그 공고 신청 상태를 붙입니다(ACCEPTED 면 이미 수락한 초대).
     const [rows] = await pool.query(
       `SELECT n.id, n.type, n.message, n.post_id AS postId, n.is_read AS isRead, n.created_at AS createdAt, pa.status AS applicationStatus
          FROM notification n
          LEFT JOIN post_application pa ON n.type = 'PARTY_INVITE' AND pa.post_id = n.post_id AND pa.applicant_id = n.member_id
-        WHERE n.member_id = ?${unreadOnly ? ' AND n.is_read = FALSE' : ''} ORDER BY n.created_at DESC, n.id DESC LIMIT ? OFFSET ?`,
-      [memberId, limit, offset],
+        WHERE n.member_id = ?${unreadOnly ? ' AND n.is_read = FALSE' : ''}${type ? ' AND n.type = ?' : ''} ORDER BY n.created_at DESC, n.id DESC LIMIT ? OFFSET ?`,
+      [...params, limit, offset],
     );
     return { rows, totalCount };
   }

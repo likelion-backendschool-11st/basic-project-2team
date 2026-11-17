@@ -6,10 +6,12 @@ interface ModalProps {
   readonly children: React.ReactNode;
   readonly ariaLabel: string;
   readonly widthClass?: string;
+  /** 창 테두리·배경 (경고 모달처럼 톤을 바꿀 때) */
+  readonly panelClass?: string;
 }
 
 /** Centered dialog over a blurred backdrop. Closes on backdrop click and Escape. */
-export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, children, ariaLabel, widthClass = 'max-w-md' }) => {
+export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, children, ariaLabel, widthClass = 'max-w-md', panelClass = 'rounded-3xl border border-night-borderLight bg-night-surface p-7 shadow-2xl' }) => {
   useEffect(() => {
     if (!isOpen) return undefined;
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
@@ -25,7 +27,7 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, children, ariaLab
         aria-modal="true"
         aria-label={ariaLabel}
         onMouseDown={(e) => e.stopPropagation()}
-        className={`w-full ${widthClass} rounded-3xl border border-night-borderLight bg-night-surface p-7 shadow-2xl`}
+        className={`w-full ${widthClass} ${panelClass}`}
       >
         {children}
       </div>

@@ -1,7 +1,15 @@
 'use strict';
 
 const { ApiError } = require('../common/ApiError');
-const { DECISION_STATUSES, LIST_STATUSES, POST_STATUSES, ROLE_MAX_LENGTH, MESSAGE_MAX_LENGTH, partyMessages: m } = require('./partyConstants');
+const {
+  DECISION_STATUSES,
+  LIST_STATUSES,
+  POST_STATUSES,
+  ROLE_MAX_LENGTH,
+  MESSAGE_MAX_LENGTH,
+  KICK_REASON_MAX_LENGTH,
+  partyMessages: m,
+} = require('./partyConstants');
 
 const charLength = (value) => Array.from(value).length;
 const POSITIVE_INT = /^[1-9]\d*$/;
@@ -30,6 +38,15 @@ function validateApply(body) {
   if (message === undefined) fields.push({ field: 'message', message: m.messageInvalid });
   if (fields.length > 0) throw new ApiError(400, 'INVALID_INPUT', m.invalidInput, fields);
   return { role, message };
+}
+
+/** 추방 본문 { reason? } — 본문이 없어도 됩니다. 줄바꿈은 한 칸 띄어쓰기로 바꿉니다(알림 문구 형식 유지). */
+function validateKick(body) {
+  const source = body && typeof body === 'object' ? body : {};
+  const raw = typeof source.reason === 'string' ? source.reason.replace(/\s+/g, ' ') : source.reason;
+  const reason = optionalText(raw, KICK_REASON_MAX_LENGTH);
+  if (reason === undefined) throw new ApiError(400, 'INVALID_INPUT', m.invalidInput, [{ field: 'reason', message: m.kickReasonInvalid }]);
+  return { reason };
 }
 
 /** 승인/거절 본문 { status } */
@@ -69,4 +86,4 @@ function validateInvite(body) {
   return { memberId };
 }
 
-module.exports = { parseId, validateApply, validateDecision, validatePostStatus, parseListStatus, validateInvite };
+module.exports = { parseId, validateApply, validateKick, validateDecision, validatePostStatus, parseListStatus, validateInvite };

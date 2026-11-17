@@ -106,9 +106,14 @@ export interface ParticipantResponse {
   readonly id: number;
   readonly nickname: string;
   readonly avatarUrl: string | null;
+  readonly level: number;
+  readonly mannerTemp: number;
   readonly role: string | null;
   readonly isHost: boolean;
 }
 export const getParticipants = (postId: string) => request<readonly ParticipantResponse[]>('GET', postUrl(postId, '/participants'));
+/** DELETE /api/posts/{postId}/participants/{memberId} { reason? } — 작성자만. 수락된 파티원을 추방합니다(사유는 추방 알림에 함께 실림). */
+export const kickParticipant = (postId: string, memberId: number, reason: string) =>
+  request<void>('DELETE', postUrl(postId, `/participants/${memberId}`), reason ? { reason } : {});
 
 export const getRelatedPosts = (postId: string) => request<readonly RelatedPostResponse[]>('GET', postUrl(postId, '/related?limit=3'));

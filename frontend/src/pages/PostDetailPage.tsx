@@ -23,7 +23,7 @@ import Toast from '../components/ui/Toast';
 import LoggedInLayout from '../components/user/LoggedInLayout';
 import NoticeDialog from '../components/ui/NoticeDialog';
 import { COMMENTS_ANCHOR_ID, commentText, profanityDialog, type CommentChannel } from '../data/commentData';
-import { postDetailText, postText } from '../data/postData';
+import { KICK_REASON_MAX_LENGTH, postDetailText, postText } from '../data/postData';
 import { paths, ROUTES } from '../data/routes';
 import { useAuth } from '../hooks/useAuth';
 import { useComments } from '../hooks/useComments';
@@ -143,7 +143,7 @@ const PostDetailView: React.FC<{ readonly postId: string }> = ({ postId }) => {
         </div>
         <aside className="flex flex-col gap-5 xl:sticky xl:top-24">
           {detail.isOwner ? (
-            <OwnerPanel detail={detail} participants={post.participants} noShow={noShow} state={post.state} onClose={post.closeRecruit.open} onTogglePause={post.togglePause} onDisband={post.disband.open} />
+            <OwnerPanel detail={detail} participants={post.participants} noShow={noShow} state={post.state} onClose={post.closeRecruit.open} onTogglePause={post.togglePause} onDisband={post.disband.open} onKick={post.askKick} />
           ) : (
             <>
               <PartyStatusCard detail={detail} filled={post.filled} percent={post.percent} applied={post.applied} accepted={post.accepted} state={post.state} scrapped={post.scrapped} onApply={post.apply} onLeave={post.leave.open} onScrap={post.toggleScrap} onCopy={post.copyLink} />
@@ -158,6 +158,13 @@ const PostDetailView: React.FC<{ readonly postId: string }> = ({ postId }) => {
       <ConfirmDialog isOpen={post.remove.isOpen} title={postText.deletePost.title} description={postText.deletePost.description} confirmLabel={postText.deletePost.confirm} cancelLabel={postText.deletePost.cancel} icon="fa-trash-can" onConfirm={post.confirmRemove} onCancel={post.remove.close} />
       <ConfirmDialog isOpen={post.disband.isOpen} title={postText.disband.title} description={postText.disband.description} confirmLabel={postText.disband.confirm} cancelLabel={postText.disband.cancel} icon="fa-people-group" onConfirm={post.confirmDisband} onCancel={post.disband.close} />
       <ConfirmDialog isOpen={post.leave.isOpen} title={leaveText.title} description={leaveText.description} confirmLabel={leaveText.confirm} cancelLabel={leaveText.cancel} icon="fa-right-from-bracket" tone="warning" onConfirm={post.confirmLeave} onCancel={post.leave.close} />
+      <ConfirmDialog isOpen={post.kickTarget !== null} title={postText.kick.title(post.kickTarget?.name ?? '')} description={postText.kick.description} confirmLabel={postText.kick.confirm} cancelLabel={postText.kick.cancel} icon="fa-user-xmark" onConfirm={() => void post.confirmKick()} onCancel={post.cancelKick}>
+        <label className="w-full text-left mt-1">
+          <span className="text-xs font-semibold text-fog-sub">{postText.kick.reasonLabel}</span>
+          <textarea value={post.kickReason} onChange={(e) => post.setKickReason(e.target.value)} maxLength={KICK_REASON_MAX_LENGTH} rows={2} placeholder={postText.kick.reasonPlaceholder} className="mt-1.5 w-full resize-none rounded-xl border border-night-borderLight bg-night-base px-3 py-2 text-sm text-white placeholder:text-fog-muted focus:border-mercury focus:ring-0" />
+          <span className="block text-right text-[11px] text-fog-muted">{post.kickReason.length}/{KICK_REASON_MAX_LENGTH}</span>
+        </label>
+      </ConfirmDialog>
       <ConfirmDialog isOpen={post.closeRecruit.isOpen} title={postText.closeConfirm.title} description={postText.closeConfirm.description} confirmLabel={postText.closeConfirm.confirm} cancelLabel={postText.closeConfirm.cancel} icon="fa-circle-check" tone="brand" onConfirm={post.confirmClose} onCancel={post.closeRecruit.close} />
       <ConfirmDialog isOpen={activeThread.deleteDialog.isOpen} title={commentText.deleteDialog.title} description={commentText.deleteDialog.description} confirmLabel={commentText.deleteDialog.confirm} cancelLabel={commentText.deleteDialog.cancel} icon="fa-trash-can" onConfirm={activeThread.confirmDelete} onCancel={activeThread.deleteDialog.close} />
       <ReportDialog isOpen={activeThread.reportDialog.isOpen} onConfirm={activeThread.confirmReport} onClose={activeThread.reportDialog.close} />
